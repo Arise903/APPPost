@@ -8,9 +8,13 @@ def annotate(sections):
     rules=json.loads(Path(__file__).with_name('permission_rules.json').read_text(encoding='utf-8'))
     for section in sections:
         group=None
+        account_section=False
         for block in section['blocks']:
             if block['type'] in ('h3','h4'):
                 group=next((g for g in rules['groups'] if re.search(g['heading'],block['title'])),None)
+                account_section=bool(re.search(r'^(?:5\.4\s|账号注销与数据主体权利)',block['title']))
+            if block['type']=='item' and account_section:
+                block['cond']='hasAccountSystem'
             if block['type']=='item' and group:
                 block['permissionRule']=next((r['requires'] for r in group['rules'] if r['contains'] in block['text']),group['default'])
 

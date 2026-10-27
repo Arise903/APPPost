@@ -30,3 +30,9 @@ test('Permission-specific checklist rows follow selected permissions',async()=>{
  for(const [permission,marker] of [['photos','READ_MEDIA_IMAGES'],['bluetooth','BLUETOOTH_CONNECT'],['notifications','POST_NOTIFICATIONS'],['location_background','ACCESS_BACKGROUND_LOCATION'],['tracking','ATT 声明'],['health','敏感权限']])assert.equal(texts([permission]).some(t=>t.includes(marker)),true,permission);
  for(const selected of [[],['camera'],['tracking'],['notifications']]){project.permissions.selected=selected;const data=S.payload(project);const expected=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,checklist_tool as c;from pathlib import Path;print(c.document_payload(Path('online/default_checklist.md').read_text(),'test.md',1,(json.loads(__import__('sys').argv[1]),{},{}),{},'1')['total'])",JSON.stringify(selected)],{encoding:'utf8'}));assert.equal(data.total,expected);}
 });
+
+test('Legacy account deletion subsection follows account-system feature without changing item identity',async()=>{
+ const {S}=setup();const document='# Test\n<!-- FEATURES hasAccountSystem=0 targetMinors=0 -->\n## Privacy\n### 5.4 账号注销与数据主体权利\n- [x] 账号注销入口可达\n- [ ] 注销流程在 App 内完整走完\n### 5.5 iOS 权限声明\n- [ ] 其他核对项\n';
+ const original=S.parse(document).items[0].id;const id=await S.create({name:'Legacy account',document});const p=S.get(id),data=S.payload(p);assert.equal(data.items[0].cond,'hasAccountSystem');assert.equal(data.items[1].cond,'hasAccountSystem');assert.equal(data.items[0].id,original);assert.equal(data.items[0].state,'done');assert.equal(data.total,0);
+ p.document=p.document.replace('hasAccountSystem=0','hasAccountSystem=1');assert.equal(S.payload(p).total,2);
+});
