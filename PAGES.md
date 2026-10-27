@@ -4,7 +4,7 @@
 
 ## 发布
 
-当前只提交页面文件，没有替你启用线上发布。
+站点已配置为从 `main → /docs` 发布。访问：https://arise903.github.io/APPPost/ 。以下步骤用于以后重新配置。
 
 1. 打开 https://github.com/Arise903/APPPost/settings/pages 。
 2. Source 选 **Deploy from a branch**。
