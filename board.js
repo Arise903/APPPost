@@ -699,7 +699,7 @@ async function loadFromServer(){
     baseRevision = d.revision;
     gen = d.generation;
     state = Object.assign(seedFromData(d), changes);
-    serverBaseline = Object.fromEntries(d.items.map(it => [it.id, it.state]));
+    serverBaseline = baselineFromData(d);
     baseRevision = d.revision;
     reviewData = d.review || reviewData;
     DATA = mergeItems(d);
@@ -720,6 +720,7 @@ async function loadFromServer(){
       }catch(e){}
     }
     gateDone = !!d.gateDone;
+    if(d.gateId && changes[d.gateId]) gateDone = changes[d.gateId] === "done";
     if(gateDone){
       try{ localStorage.setItem(GUIDE_KEY, "1"); }catch(e){}
     }else if(d.gateState !== "skip"){
@@ -792,6 +793,7 @@ document.getElementById("list").addEventListener("change", e => {
     return;
   }
   state[id] = cb.checked ? "done" : "todo";
+  if(li.dataset.gate === "1") gateDone = cb.checked;
   saveState();
   refreshAll();
   markDirty();
@@ -862,7 +864,7 @@ document.getElementById("btnSave").addEventListener("click", async () => {
     gen = d.generation;
     DATA = mergeItems(d);
     state = seedFromData(d);
-    serverBaseline = Object.fromEntries(d.items.map(it => [it.id, it.state]));
+    serverBaseline = baselineFromData(d);
     saveState();
     dirty = false;
     document.getElementById("btnSave").textContent = "保存进度";
@@ -959,7 +961,7 @@ document.getElementById("mClear").addEventListener("click", async () => {
     baseRevision = d.revision;
     gen = d.generation;
     state = seedFromData(d);
-    serverBaseline = Object.fromEntries(d.items.map(it => [it.id,it.state]));
+    serverBaseline = baselineFromData(d);
     saveState();
     DATA = mergeItems(d);
     dirty = false;
@@ -1577,7 +1579,18 @@ function seedFromData(d){
   // 以 md 文件里的实际标记为准，作为初始状态
   const out = {};
   (d.items || []).forEach(it => { if(it.state && it.state !== "todo") out[it.id] = it.state; });
+  // Pages excludes the gate from counted items, but it still lives in the sections.
+  (d.sections || []).forEach(sec => (sec.blocks || []).forEach(block => {
+    if(block.type === "item" && block.gate && block.state && block.state !== "todo") out[block.id] = block.state;
+  }));
   return out;
+}
+function baselineFromData(d){
+  const baseline = Object.fromEntries((d.items || []).map(it => [it.id, it.state || "todo"]));
+  (d.sections || []).forEach(sec => (sec.blocks || []).forEach(block => {
+    if(block.type === "item" && block.gate) baseline[block.id] = block.state || "todo";
+  }));
+  return baseline;
 }
 
 
@@ -1659,12 +1672,12 @@ document.getElementById('newReleaseForm').onsubmit=async event=>{
  try{
   const release={...reviewData.release,version:form.elements.version.value.trim(),build:form.elements.build.value.trim(),date:new Date().toLocaleDateString('sv-SE')};
   const d=await api('/api/new-release',{release,keepNotes:form.elements.keepNotes.checked,keepEvidence:form.elements.keepEvidence.checked});
-  gen=d.generation;reviewData=d.review;state=seedFromData(d);serverBaseline=Object.fromEntries(d.items.map(it=>[it.id,it.state]));DATA=mergeItems(d);dirty=false;saveState();render();refreshFeatUI();document.getElementById('newReleaseDialog').close();toast('上一轮已归档，新一轮发布已开始');
+  gen=d.generation;reviewData=d.review;state=seedFromData(d);serverBaseline=baselineFromData(d);DATA=mergeItems(d);dirty=false;saveState();render();refreshFeatUI();document.getElementById('newReleaseDialog').close();toast('上一轮已归档，新一轮发布已开始');
  }catch(error){document.getElementById('newReleaseError').textContent=error.message;}finally{button.disabled=false;updateSaveStatus();}
 };
 
 DATA = EMBEDDED;
-serverBaseline = Object.fromEntries(EMBEDDED.items.map(it => [it.id,it.state]));
+serverBaseline = baselineFromData(EMBEDDED);
 gen = EMBEDDED.generation || 1;
 state = normalizeState(loadState(gen));
 // md 里已有的标记同步进来（离线模式尤其重要）
@@ -1672,6 +1685,8 @@ state = Object.assign(seedFromData(EMBEDDED), state);
 dirty = Object.keys(state).some(k => state[k] !== (serverBaseline[k] || "todo"));
 if(dirty) markDirty();
 gateDone = !!(EMBEDDED.gateDone);
+const embeddedGate = (EMBEDDED.sections || []).flatMap(sec => sec.blocks || []).find(block => block.type === "item" && block.gate);
+if(embeddedGate && st(embeddedGate.id) === "done") gateDone = true;
 // 离线兜底：本地记过一次确认
 if(!gateDone){
   try{ gateDone = localStorage.getItem(GUIDE_KEY) === "1"; }catch(e){}
