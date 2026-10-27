@@ -1,0 +1,46 @@
+name: Online checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: release_test
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: release_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements-online.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements-online.txt
+      - name: Local and cloud regression tests
+        run: python -m unittest -v test_checklist test_online
+      - name: PostgreSQL integration tests
+        env:
+          TEST_DATABASE_URL: postgresql://release_test:test-only-password@localhost:5432/release_test
+        run: python -m unittest -v test_online
+      - run: python test_http_integration.py
+      - run: node --check board.js
+      - run: node --check online/static/app.js
+      - name: Build production image
+        run: docker build -t release-desk:test .

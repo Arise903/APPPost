@@ -1,0 +1,13 @@
+**
+!Dockerfile
+!requirements-online.txt
+!checklist_tool.py
+!storage_utils.py
+!board_template.html
+!board.js
+!board.css
+!permission_profiles.json
+!online/
+!online/**
+online/**/*.sqlite3*
+online/**/__pycache__/

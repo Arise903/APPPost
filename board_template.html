@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+__BOARD_CSS__
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="gatebar hidden" id="gateBar">
+    <span class="gi">!</span>
+    <span class="gt">请先阅读《使用说明》并勾选确认，清单才会解锁</span>
+    <button class="btn gbtn" id="btnGuide">立即阅读</button>
+  </div>
+
+  <header class="card">
+    <div class="hrow">
+      <h1 id="ttl"></h1>
+      <span class="grow"></span>
+      <span class="pill warn hidden" id="featPill" title="点击打开项目设置">已隐藏 <b>0</b> 项</span>
+      <span class="mode" id="mode"><span class="dot"></span><span id="modeTxt">离线模式</span></span>
+    </div>
+
+    <div class="hprog">
+      <div class="track"><div class="fill" id="fill"></div></div>
+      <span class="pct" id="pct">0%</span>
+      <span class="cnt" id="cnt"></span>
+    </div>
+
+    <button class="seqline" id="seqline" title="点击跳到当前应处理的条目"></button>
+
+    <div class="toolbar">
+      <div class="seg" id="seg">
+        <button data-f="all" class="on">全部</button>
+        <button data-f="todo">待办</button>
+        <button data-f="done">已完成</button>
+        <button data-f="skip">已跳过</button>
+      </div>
+      <input type="search" id="q" placeholder="搜索…">
+      <span class="grow"></span>
+      <button class="btn" id="btnFeat">项目设置</button>
+      <button class="btn" id="btnGuide2">使用说明</button>
+      <button class="btn" id="btnPerm">权限配置</button>
+      <button class="btn primary" id="btnSave" disabled>保存</button>
+      <span class="morewrap">
+        <button class="btn" id="btnMore" aria-haspopup="true" aria-expanded="false">更多</button>
+        <div class="moremenu" id="moreMenu">
+          <button id="mExport">导出 Markdown 副本</button>
+          <button id="mGuide">查看使用说明</button>
+          <div class="msep"></div>
+          <button class="danger" id="mClear">清空完成状态</button>
+        </div>
+      </span>
+    </div>
+    <div class="secnote hidden" id="filtNote"></div>
+  </header>
+
+  <div id="list"></div>
+  <div class="empty hidden" id="empty">没有匹配的条目</div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">
+<button class="btn" id="releaseEdit">发布信息</button>
+<button class="btn" id="releaseArchive">归档本次发布</button>
+<button class="btn" id="releaseSummary">导出发布摘要</button>
+<button class="btn" id="backupRestore">恢复备份</button>
+</div>
+<footer>
+    <div id="built"></div>
+    <div>勾选状态保存在本机浏览器 · 需要写回文件请使用本地服务模式</div>
+  </footer>
+</div>
+
+<!-- 通用确认对话框 -->
+<div class="overlay" id="ov" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <div class="dialog">
+    <div class="dlg-head">
+      <div class="dlg-title">
+        <span class="dlg-icon" id="dlgIcon">!</span>
+        <span id="dlgTitle"></span>
+      </div>
+    </div>
+    <div class="dlg-body">
+      <div id="dlgBody"></div>
+      <div class="dlg-detail hidden" id="dlgDetail"></div>
+      <label class="dlg-check hidden" id="dlgCheckWrap">
+        <input type="checkbox" id="dlgCheck">
+        <span id="dlgCheckText"></span>
+      </label>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" id="dlgCancel">取消</button>
+      <button class="btn primary" id="dlgOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="toastAct"></button></div>
+
+<!-- 项目设置面板 -->
+<div class="panel" id="featPanel" role="dialog" aria-modal="true" aria-labelledby="featTitle">
+  <div class="panel-box">
+    <div class="panel-head">
+      <div style="flex:1">
+        <h2 id="featTitle">项目设置</h2>
+        <p>先确认下面两项。<b>不适用的检查项会自动隐藏</b> —— 不再出现在清单里，也不占用序号。<br>
+           设置保存在清单文件里，可与团队共享。</p>
+      </div>
+      <button class="panel-x" id="featClose" title="关闭">×</button>
+    </div>
+
+    <div class="panel-body">
+      <div class="panel-sec">
+        <div class="featlist">
+          <label class="featrow">
+            <input type="checkbox" id="featAcc">
+            <span class="featmain">
+              <b>App 有用户账号系统</b>
+              <em>有注册 / 登录 / 绑定设备。关闭后隐藏「演示账号」「账号注销入口」等 6 项</em>
+            </span>
+          </label>
+          <label class="featrow">
+            <input type="checkbox" id="featMinor">
+            <span class="featmain">
+              <b>App 面向未成年用户</b>
+              <em>含儿童 / 青少年模式。关闭后隐藏「儿童隐私条款」「家长控制」等 2 项</em>
+            </span>
+          </label>
+        </div>
+        <div class="featpreview" id="featPreview"></div>
+      </div>
+    </div>
+
+    <div class="panel-foot">
+      <span class="hint" id="featHint"></span>
+      <span class="grow"></span>
+      <button class="btn" id="featCancel">取消</button>
+      <button class="btn primary" id="featSave">保存到 md</button>
+    </div>
+  </div>
+</div>
+
+<!-- 权限与隐私配置面板 -->
+<div class="panel" id="permPanel" role="dialog" aria-modal="true" aria-labelledby="permTitle">
+  <div class="panel-box">
+    <div class="panel-head">
+      <div style="flex:1">
+        <h2 id="permTitle">权限与隐私配置</h2>
+        <p>勾选 App 实际使用的权限，工具会同步生成 <b>Info.plist</b>、<b>AndroidManifest</b>、
+           <b>App Store 隐私问卷</b>、<b>隐私政策段落</b>与<b>审核要点</b>，一次改全，漏一处不会。<br>
+           <b>ATT（跨应用追踪）也在这里配</b> —— 勾选后自动生成 <code>NSUserTrackingUsageDescription</code>
+           与 <code>AD_ID</code>，清单里不再单独配置。</p>
+      </div>
+      <button class="panel-x" id="permClose" title="关闭">×</button>
+    </div>
+
+    <div class="panel-body">
+      <div class="panel-sec">
+        <h3>快速套用场景</h3>
+        <div class="scenarios" id="scenarios"></div>
+      </div>
+
+      <div class="panel-sec">
+        <h3>权限选择</h3>
+        <div id="permGroups"></div>
+      </div>
+
+      <div class="panel-sec" id="descSec" style="display:none">
+        <h3>用途描述（会写进 Info.plist 与隐私政策）</h3>
+        <div class="langtabs" id="langTabs">
+          <button class="langtab on" data-lang="zh">中文</button>
+          <button class="langtab" data-lang="en">English</button>
+        </div>
+        <div id="descList"></div>
+        <p class="langhint" id="langHint"></p>
+      </div>
+
+      <div class="panel-sec">
+        <h3>生成结果</h3>
+        <div class="warnbar hidden" id="permWarn"></div>
+
+        <div class="genbox">
+          <div class="gh"><span class="t">iOS Info.plist</span>
+            <span class="grow" style="flex:1"></span>
+            <button class="copy" data-copy="gen-ios">复制</button></div>
+          <pre id="gen-ios"></pre>
+        </div>
+
+        <div class="genbox">
+          <div class="gh"><span class="t">AndroidManifest.xml</span>
+            <span class="grow" style="flex:1"></span>
+            <button class="copy" data-copy="gen-android">复制</button></div>
+          <pre id="gen-android"></pre>
+        </div>
+
+        <div class="genbox">
+          <div class="gh"><span class="t">App Store Connect 隐私问卷</span></div>
+          <ul class="genlist" id="gen-appstore"></ul>
+        </div>
+
+        <div class="genbox">
+          <div class="gh"><span class="t">隐私政策必备段落</span>
+            <span class="grow" style="flex:1"></span>
+            <button class="copy" data-copy="gen-policy">复制</button></div>
+          <pre id="gen-policy"></pre>
+        </div>
+
+        <div class="genbox">
+          <div class="gh"><span class="t">审核要点</span></div>
+          <ul class="genlist" id="gen-checks"></ul>
+        </div>
+      </div>
+
+      <div class="panel-sec">
+        <h3>英文隐私政策与权限文档</h3>
+        <p class="langhint" style="margin:0 0 10px">
+          一份可直接提交的英文文档：隐私政策全文、每个权限的 <code>UsageDescription</code>、
+          同意弹窗文案、App Store 与 Google Play 问卷填法、审核备注。
+          占位符用 <code>[方括号]</code> 标出，文末有完整清单。
+        </p>
+        <div class="enpreview" id="enPreview"></div>
+      </div>
+    </div>
+
+    <div class="panel-foot">
+      <span class="hint" id="permHint"></span>
+      <span class="savestate" id="permSaveState"></span>
+      <span class="grow"></span>
+      <button class="btn" id="permEn">导出英文文档</button>
+      <button class="btn" id="permCancel">关闭</button>
+      <button class="btn primary" id="permSave">立即写入 md</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const EMBEDDED = __DATA__;
+const EMBEDDED_PROFILES = __PROFILES__;
+
+
+__BOARD_JS__
+</script>
+</body>
+</html>

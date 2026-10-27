@@ -1,0 +1,24 @@
+# Creates billable resources only when you explicitly apply this Blueprint.
+services:
+  - type: web
+    name: release-desk
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: release-desk-db
+          property: connectionString
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+databases:
+  - name: release-desk-db
+    plan: basic-256mb
+    ipAllowList: []

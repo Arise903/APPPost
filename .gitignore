@@ -1,0 +1,27 @@
+# 看板运行时产物
+.checklist_generation.json
+*.md.bak-*
+__*_test.html
+__shot*.html
+
+# Online application: runtime data and credentials
+.venv-online/
+.env
+.env.*
+!.env.example
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+__pycache__/
+*.pyc
+.DS_Store
+*.permstate.json
+*.review.json*
+.workbuddy/
+上架前App配置清单.html
+上架前App配置清单.md
+Privacy-and-Permissions-EN.md
+使用说明.html
+
+release-desk-source.zip
+artifacts/

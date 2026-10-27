@@ -1,0 +1,1 @@
+"""Hosted release checklist application."""
