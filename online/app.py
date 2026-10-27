@@ -72,6 +72,10 @@ def create_app(overrides=None):
                 conn.execute('INSERT INTO users VALUES (?,?,?,?,?) ON CONFLICT(email) DO NOTHING',
                              (uuid.uuid4().hex, email, '项目管理员', generate_password_hash(password), int(time.time())))
 
+    with db.connect() as conn:
+        if not conn.one('SELECT id FROM users LIMIT 1') and not app.config['TESTING']:
+            raise RuntimeError('First launch requires ADMIN_EMAIL and ADMIN_PASSWORD')
+
     @app.before_request
     def authenticate_and_protect():
         g.nonce = secrets.token_urlsafe(18)
@@ -359,7 +363,7 @@ def create_app(overrides=None):
             elif operation == 'clear':
                 parsed = checklist.parse_md(project['document'])
                 gate = checklist.find_gate_item(parsed)
-                states = {x['id']: 'todo' for x in parsed['items'] if not gate or x['id'] != gate['id']}
+                states = {x['id']: 'todo' for x in parsed['items'] if x['state'] != 'todo' and (not gate or x['id'] != gate['id'])}
                 project['document'] = checklist.apply_states(project['document'], parsed, states)
                 project['generation'] += 1
                 extra['cleared'] = len(states)

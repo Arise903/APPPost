@@ -1,8 +1,12 @@
 # Release Desk · App 上架工作台
 
+源码仓库：[Arise903/release-desk](https://github.com/Arise903/release-desk)（私有）。
+
 新增在线版：支持账号登录、多个私有项目、云端记录、成员权限与完整快照恢复。GitHub CI 和 Render + PostgreSQL 部署已配置，详见 [在线部署说明](DEPLOY.md)。
 
 本地预览：安装 `requirements-online.txt` 后运行 `python run_online.py`。原有本地文件版继续保留，以下为其说明。
+
+从 GitHub 首次获取后，先复制初始模板：`cp online/default_checklist.md 上架前App配置清单.md`。
 
 双击 `启动看板.command`，或运行 `python3 checklist_tool.py serve`。要求 Python 3.8+，无第三方 Python 依赖。已有服务需要停止后重新启动，才能加载后端更新。
 
