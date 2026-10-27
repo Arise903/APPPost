@@ -1,6 +1,6 @@
 # Release Desk · App 上架工作台
 
-源码仓库：[Arise903/release-desk](https://github.com/Arise903/release-desk)（私有）。
+源码仓库：[Arise903/APPPost](https://github.com/Arise903/APPPost)（公开源码，不包含个人检查记录或凭证）。
 
 新增在线版：支持账号登录、多个私有项目、云端记录、成员权限与完整快照恢复。GitHub CI 和 Render + PostgreSQL 部署已配置，详见 [在线部署说明](DEPLOY.md)。
 
