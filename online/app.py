@@ -286,7 +286,7 @@ def create_app(overrides=None):
         js = js.replace('已连接 · 可写回文件', '云端已连接 · 修改可同步').replace('本地服务', '在线服务').replace('仅本机保存', '草稿仅保存在当前浏览器')
         if project['role'] == 'viewer':
             js += '\nconst lockViewer=()=>document.querySelectorAll("li.item input,li.item button,#btnSave,#releaseEdit,#releaseArchive,#backupRestore,#featSave,#permSave").forEach(el=>el.disabled=true); const viewerObserver=new MutationObserver(lockViewer); viewerObserver.observe(document.getElementById("list"),{childList:true,subtree:true}); lockViewer(); setTimeout(lockViewer,500);' 
-        page = (page.replace('__BOARD_CSS__', (checklist.HERE / 'board.css').read_text(encoding='utf-8'))
+        page = (page.replace('__PERMISSION_RULES__', (checklist.HERE / 'permission_rules.json').read_text(encoding='utf-8')).replace('__PERMISSION_VISIBILITY__', (checklist.HERE / 'permission_visibility.js').read_text(encoding='utf-8')).replace('__BOARD_CSS__', (checklist.HERE / 'board.css').read_text(encoding='utf-8'))
                 .replace('__BOARD_JS__', script + '\n' + js)
                 .replace('__TITLE__', html.escape(project['name']))
                 .replace('__DATA__', encode(payload).replace('</', '<\\/'))

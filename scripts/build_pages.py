@@ -13,7 +13,8 @@ def build():
     for name in ('index.html','dashboard.js','store.js','guide.html','guide.js'):
         shutil.copyfile(ROOT/'pages'/name,OUT/name)
     shutil.copyfile(ROOT/'online/static/app.css',OUT/'app.css')
-    data={'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles()}
+    shutil.copyfile(ROOT/'permission_visibility.js',OUT/'permission_visibility.js')
+    data={'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles(),'rules':json.loads((ROOT/'permission_rules.json').read_text(encoding='utf-8'))}
     (OUT/'data.js').write_text('const PAGES_DATA = '+json.dumps(data,ensure_ascii=False).replace('</','<\\/')+';\n',encoding='utf-8')
     page=(ROOT/'board_template.html').read_text(encoding='utf-8')
     js='document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;\n'+(ROOT/'board.js').read_text(encoding='utf-8')
@@ -33,7 +34,7 @@ def build():
         '文件会被直接改写':'浏览器中的项目记录会更新', '原始文件会先自动备份为 带时间戳的 .bak 文件，误操作可从备份恢复。':'操作前保留完整本机快照。清理网站数据会删除项目和快照，请先导出备份。',
     }
     for old,new in replacements.items():js=js.replace(old,new)
-    page=page.replace('__BOARD_CSS__',(ROOT/'board.css').read_text(encoding='utf-8')).replace('__BOARD_JS__',js)
+    page=page.replace('__PERMISSION_RULES__',(ROOT/'permission_rules.json').read_text(encoding='utf-8')).replace('__PERMISSION_VISIBILITY__',(ROOT/'permission_visibility.js').read_text(encoding='utf-8')).replace('__BOARD_CSS__',(ROOT/'board.css').read_text(encoding='utf-8')).replace('__BOARD_JS__',js)
     page=page.replace('const EMBEDDED = __DATA__;','const EMBEDDED = PagesStore.openProject();').replace('const EMBEDDED_PROFILES = __PROFILES__;','const EMBEDDED_PROFILES = PAGES_DATA.profiles;').replace('__TITLE__','检查项目 · Pages 个人版')
     page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="store.js"></script><script>PagesStore.install();</script>')
     page=page.replace('<body>','<body><div style="padding:14px 24px;background:#17243a;color:white"><a href="index.html" style="color:white">← 返回个人工作台</a>　·　<span id="pagesProjectName"></span>　·　数据仅保存在当前浏览器，请定期导出备份</div>')

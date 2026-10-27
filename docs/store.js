@@ -35,8 +35,8 @@ function parse(text){
  if(fence&&fence.lines.length)blocks().push(fence);return result;
 }
 function apply(text,states){const parsed=parse(text),lines=text.split('\n');for(const item of parsed.items){const value=states[item.id];if(value===undefined)continue;if(!['todo','done','skip'].includes(value))throw Error('检查状态无效');const [a,b]=item.span;lines[item.line]=lines[item.line].slice(0,a)+({todo:'[ ]',done:'[x]',skip:'[-]'}[value])+lines[item.line].slice(b);}return lines.join('\n');}
-function payload(project){const parsed=parse(project.document);const gate=parsed.sections.find(s=>s.is_gate||s.title.includes('确认已了解使用说明'))?.blocks.find(b=>b.type==='item');let n=0;for(const item of parsed.items){item.gate=item.id===gate?.id;item.seq=item.gate?'':++n;}
- const items=parsed.items.filter(x=>!x.gate&&parsed.features[x.cond]!==false);
+function payload(project){const parsed=parse(project.document);global.PermissionVisibility.annotate(parsed.sections,PAGES_DATA.rules);const gate=parsed.sections.find(s=>s.is_gate||s.title.includes('确认已了解使用说明'))?.blocks.find(b=>b.type==='item');let n=0;for(const item of parsed.items){item.gate=item.id===gate?.id;item.seq=item.gate?'':++n;}
+ const items=parsed.items.filter(x=>!x.gate&&parsed.features[x.cond]!==false&&global.PermissionVisibility.visible(x.permissionRule,project.permissions.selected,PAGES_DATA.profiles));
  return {...parsed,mdName:project.name+'.md',mdText:project.document,generation:project.generation,revision:String(project.version),review:copy(project.review),permSelected:copy(project.permissions.selected),permDescs:copy(project.permissions.descs),permDescsEn:copy(project.permissions.descsEn),gateId:gate?.id||null,gateDone:!gate||gate.state==='done',gateState:gate?.state||'done',total:items.length,done:items.filter(x=>x.state==='done').length,skipped:items.filter(x=>x.state==='skip').length,built:'Pages 个人版'};
 }
 function get(id){const project=read().projects[id];if(!project)throw Error('项目不存在或已删除，请返回工作台。');return project;}

@@ -754,6 +754,120 @@
 </div>
 
 <script>
+const PERMISSION_RULES = {
+  "groups": [
+    {
+      "heading": "^5\\.5\\s",
+      "default": "ios",
+      "rules": [
+        {
+          "contains": "*UsageDescription",
+          "requires": "iosUsage"
+        }
+      ]
+    },
+    {
+      "heading": "^5\\.6\\s",
+      "default": "android",
+      "rules": [
+        {
+          "contains": "危险权限",
+          "requires": "androidRuntime"
+        },
+        {
+          "contains": "READ_MEDIA_IMAGES",
+          "requires": [
+            "photos"
+          ]
+        },
+        {
+          "contains": "BLUETOOTH_CONNECT",
+          "requires": [
+            "bluetooth"
+          ]
+        },
+        {
+          "contains": "POST_NOTIFICATIONS",
+          "requires": [
+            "notifications"
+          ]
+        },
+        {
+          "contains": "ACCESS_BACKGROUND_LOCATION",
+          "requires": [
+            "location_background"
+          ]
+        },
+        {
+          "contains": "权限被拒绝",
+          "requires": "androidRuntime"
+        }
+      ]
+    },
+    {
+      "heading": "^5\\.7\\s",
+      "default": "any",
+      "rules": [
+        {
+          "contains": "隐私政策里写的权限用途",
+          "requires": "prompt"
+        },
+        {
+          "contains": "权限用途说明齐全",
+          "requires": "prompt"
+        },
+        {
+          "contains": "Google Play",
+          "requires": "androidRuntime"
+        },
+        {
+          "contains": "未申请的后台权限",
+          "requires": [
+            "location_background"
+          ]
+        },
+        {
+          "contains": "敏感权限",
+          "requires": [
+            "health",
+            "contacts"
+          ]
+        },
+        {
+          "contains": "ATT 声明",
+          "requires": [
+            "tracking"
+          ]
+        },
+        {
+          "contains": "设备 ID",
+          "requires": [
+            "tracking"
+          ]
+        }
+      ]
+    }
+  ]
+}
+;
+/* Shared permission-driven checklist visibility; keeps task IDs and saved states intact. */
+(function(root){
+ const api={
+  annotate(sections,rules){for(const section of sections||[]){let group=null;for(const block of section.blocks||[]){if(block.type==='h3'||block.type==='h4')group=(rules.groups||[]).find(g=>new RegExp(g.heading).test(block.title))||null;if(block.type==='item'&&group)block.permissionRule=group.rules.find(r=>block.text.includes(r.contains))?.requires||group.default;}}},
+  visible(rule,selected,profiles){
+   if(!rule)return true;const ids=new Set(selected||[]);if(Array.isArray(rule))return rule.some(id=>ids.has(id));
+   const picked=(profiles.permissions||[]).filter(p=>ids.has(p.id));
+   if(rule==='any')return picked.length>0;
+   if(rule==='ios')return picked.some(p=>p.id==='notifications'||p.ios?.infoplist_key||p.ios?.infoplist_keys?.length);
+   if(rule==='prompt')return picked.some(p=>p.id==='notifications'||p.ios?.infoplist_key||p.ios?.infoplist_keys?.length||p.android?.runtime);
+   if(rule==='iosUsage')return picked.some(p=>p.ios?.infoplist_key||p.ios?.infoplist_keys?.length);
+   if(rule==='android')return picked.some(p=>p.android?.manifest);
+   if(rule==='androidRuntime')return picked.some(p=>p.android?.manifest&&p.android?.runtime);
+   return false;
+  }
+ };root.PermissionVisibility=api;
+})(typeof window==='undefined'?globalThis:window);
+
 const EMBEDDED = PagesStore.openProject();
 const EMBEDDED_PROFILES = PAGES_DATA.profiles;
 
@@ -1021,6 +1135,7 @@ function makeTable(b){
 function fillBlocks(el, blocks){
   let ul = null, bul = null, ord = null;
   for(const b of blocks){
+    if(b.hiddenByPermission) continue;
     if(b.type === "h3"){
       if(b.hiddenHead){ ul = null; bul = null; ord = null; continue; }
       const h3 = document.createElement("h3");
@@ -1164,12 +1279,13 @@ function condOk(cond){
 }
 function applyFeatures(){
   if(!DATA) return;
+  PermissionVisibility.annotate(DATA.sections, PERMISSION_RULES);
   let n = 0;
   const walk = blocks => {
     (blocks || []).forEach(b => {
       if(b.type !== "item") return;
       if(b.gate){ b.visible = true; b.seq = ""; return; }
-      b.visible = condOk(b.cond);
+      b.visible = condOk(b.cond) && PermissionVisibility.visible(b.permissionRule, DATA.permSelected || [], EMBEDDED_PROFILES);
       if(b.visible){ n++; b.seq = n; } else { b.seq = ""; }
     });
   };
@@ -1189,6 +1305,7 @@ function applyFeatures(){
         j++;
       }
       b.hiddenHead = has && !vis;
+      for(let k=i+1;k<j;k++){ if(bl[k].type !== "item") bl[k].hiddenByPermission = b.hiddenHead; }
     }
   });
   DATA.visibleTotal = n;
@@ -1579,6 +1696,7 @@ document.getElementById("mExport").addEventListener("click", () => {
   const MARK = {done:"[x]", skip:"[-]", todo:"[ ]"};
   const walk = blocks => {
     for(const b of blocks){
+      if(b.hiddenByPermission) continue;
       if(b.type === "h3"){ if(!b.hiddenHead){ lines.push("### " + b.title); lines.push(""); } }
       else if(b.type === "h4"){ if(!b.hiddenHead){ lines.push("#### " + b.title); lines.push(""); } }
       else if(b.type === "item"){
@@ -2277,7 +2395,7 @@ document.getElementById("releaseEdit").onclick = async () => {
   await persistReview(next);
 };
 function releaseSnapshot(){
-  return {release:reviewData.release || {}, date:new Date().toISOString(), items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:!b.cond || DATA.features[b.cond] !== false, ...(reviewData.items || {})[b.id]}))};
+  return {release:reviewData.release || {}, date:new Date().toISOString(), items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false, ...(reviewData.items || {})[b.id]}))};
 }
 document.getElementById("releaseArchive").onclick = async () => {
   if(!online || dirty){ toast("请先连接服务并保存勾选进度"); return; }

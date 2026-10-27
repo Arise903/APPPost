@@ -23,6 +23,7 @@
 
 from storage_utils import atomic_write, revision, load_review, save_review
 import logging
+import permission_visibility
 import argparse
 import datetime
 import html as html_mod
@@ -1669,6 +1670,8 @@ def build_html(md_path: Path, out_path: Path) -> Path:
     profiles = json.dumps(load_profiles(), ensure_ascii=False).replace("</", "<\\/")
     html = (
         TEMPLATE.read_text(encoding="utf-8")
+        .replace("__PERMISSION_RULES__", (HERE / "permission_rules.json").read_text(encoding="utf-8"))
+        .replace("__PERMISSION_VISIBILITY__", (HERE / "permission_visibility.js").read_text(encoding="utf-8"))
         .replace("__BOARD_CSS__", (HERE / "board.css").read_text(encoding="utf-8"))
         .replace("__BOARD_JS__", (HERE / "board.js").read_text(encoding="utf-8"))
         .replace("__TITLE__", html_mod.escape(data["title"]))
@@ -1703,6 +1706,8 @@ def document_payload(text, md_name, generation, permissions, review, version):
     """Pure payload construction shared by local files and cloud database records."""
     parsed = parse_md(text)
     perm_sel, perm_descs, perm_descs_en = permissions
+    permission_visibility.annotate(parsed["sections"])
+    permission_profiles = load_profiles()
     # 序号 = 在全文条目中的出现顺序，前端据此强制按序完成
     seq_map = {}
     for n, it in enumerate(parsed["items"], 1):
@@ -1736,6 +1741,7 @@ def document_payload(text, md_name, generation, permissions, review, version):
     check_items = [
         it for it in parsed["items"]
         if not it.get("gate") and feats.get(it.get("cond"), True)
+        and permission_visibility.visible(it.get("permissionRule"), perm_sel, permission_profiles)
     ]
     items = [
         {

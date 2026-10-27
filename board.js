@@ -260,6 +260,7 @@ function makeTable(b){
 function fillBlocks(el, blocks){
   let ul = null, bul = null, ord = null;
   for(const b of blocks){
+    if(b.hiddenByPermission) continue;
     if(b.type === "h3"){
       if(b.hiddenHead){ ul = null; bul = null; ord = null; continue; }
       const h3 = document.createElement("h3");
@@ -403,12 +404,13 @@ function condOk(cond){
 }
 function applyFeatures(){
   if(!DATA) return;
+  PermissionVisibility.annotate(DATA.sections, PERMISSION_RULES);
   let n = 0;
   const walk = blocks => {
     (blocks || []).forEach(b => {
       if(b.type !== "item") return;
       if(b.gate){ b.visible = true; b.seq = ""; return; }
-      b.visible = condOk(b.cond);
+      b.visible = condOk(b.cond) && PermissionVisibility.visible(b.permissionRule, DATA.permSelected || [], EMBEDDED_PROFILES);
       if(b.visible){ n++; b.seq = n; } else { b.seq = ""; }
     });
   };
@@ -428,6 +430,7 @@ function applyFeatures(){
         j++;
       }
       b.hiddenHead = has && !vis;
+      for(let k=i+1;k<j;k++){ if(bl[k].type !== "item") bl[k].hiddenByPermission = b.hiddenHead; }
     }
   });
   DATA.visibleTotal = n;
@@ -818,6 +821,7 @@ document.getElementById("mExport").addEventListener("click", () => {
   const MARK = {done:"[x]", skip:"[-]", todo:"[ ]"};
   const walk = blocks => {
     for(const b of blocks){
+      if(b.hiddenByPermission) continue;
       if(b.type === "h3"){ if(!b.hiddenHead){ lines.push("### " + b.title); lines.push(""); } }
       else if(b.type === "h4"){ if(!b.hiddenHead){ lines.push("#### " + b.title); lines.push(""); } }
       else if(b.type === "item"){
@@ -1515,7 +1519,7 @@ document.getElementById("releaseEdit").onclick = async () => {
   await persistReview(next);
 };
 function releaseSnapshot(){
-  return {release:reviewData.release || {}, date:new Date().toISOString(), items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:!b.cond || DATA.features[b.cond] !== false, ...(reviewData.items || {})[b.id]}))};
+  return {release:reviewData.release || {}, date:new Date().toISOString(), items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false, ...(reviewData.items || {})[b.id]}))};
 }
 document.getElementById("releaseArchive").onclick = async () => {
   if(!online || dirty){ toast("请先连接服务并保存勾选进度"); return; }

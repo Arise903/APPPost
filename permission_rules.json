@@ -1,0 +1,95 @@
+{
+  "groups": [
+    {
+      "heading": "^5\\.5\\s",
+      "default": "ios",
+      "rules": [
+        {
+          "contains": "*UsageDescription",
+          "requires": "iosUsage"
+        }
+      ]
+    },
+    {
+      "heading": "^5\\.6\\s",
+      "default": "android",
+      "rules": [
+        {
+          "contains": "危险权限",
+          "requires": "androidRuntime"
+        },
+        {
+          "contains": "READ_MEDIA_IMAGES",
+          "requires": [
+            "photos"
+          ]
+        },
+        {
+          "contains": "BLUETOOTH_CONNECT",
+          "requires": [
+            "bluetooth"
+          ]
+        },
+        {
+          "contains": "POST_NOTIFICATIONS",
+          "requires": [
+            "notifications"
+          ]
+        },
+        {
+          "contains": "ACCESS_BACKGROUND_LOCATION",
+          "requires": [
+            "location_background"
+          ]
+        },
+        {
+          "contains": "权限被拒绝",
+          "requires": "androidRuntime"
+        }
+      ]
+    },
+    {
+      "heading": "^5\\.7\\s",
+      "default": "any",
+      "rules": [
+        {
+          "contains": "隐私政策里写的权限用途",
+          "requires": "prompt"
+        },
+        {
+          "contains": "权限用途说明齐全",
+          "requires": "prompt"
+        },
+        {
+          "contains": "Google Play",
+          "requires": "androidRuntime"
+        },
+        {
+          "contains": "未申请的后台权限",
+          "requires": [
+            "location_background"
+          ]
+        },
+        {
+          "contains": "敏感权限",
+          "requires": [
+            "health",
+            "contacts"
+          ]
+        },
+        {
+          "contains": "ATT 声明",
+          "requires": [
+            "tracking"
+          ]
+        },
+        {
+          "contains": "设备 ID",
+          "requires": [
+            "tracking"
+          ]
+        }
+      ]
+    }
+  ]
+}
