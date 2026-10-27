@@ -1,0 +1,45 @@
+"""Build a self-contained personal Pages edition from public templates only."""
+import json
+import shutil
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import checklist_tool as c
+ROOT=Path(__file__).resolve().parents[1]
+OUT=ROOT/'docs'
+
+def build():
+    OUT.mkdir(exist_ok=True)
+    for name in ('index.html','dashboard.js','store.js','guide.html','guide.js'):
+        shutil.copyfile(ROOT/'pages'/name,OUT/name)
+    shutil.copyfile(ROOT/'online/static/app.css',OUT/'app.css')
+    data={'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles()}
+    (OUT/'data.js').write_text('const PAGES_DATA = '+json.dumps(data,ensure_ascii=False).replace('</','<\\/')+';\n',encoding='utf-8')
+    page=(ROOT/'board_template.html').read_text(encoding='utf-8')
+    js='document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;\n'+(ROOT/'board.js').read_text(encoding='utf-8')
+    js=js.replace('"app-guide-ack" + (window.RELEASE_CLOUD', '"app-guide-ack:pages:" + PagesStore.projectId() + (window.RELEASE_CLOUD')
+    js=js.replace('EMBEDDED.mdName);','"pages:" + PagesStore.projectId());')
+    js=js.replace('window.open(online ? (window.RELEASE_CLOUD', 'if(window.RELEASE_PAGES){ window.open("guide.html?id=" + encodeURIComponent(PagesStore.projectId()), "_blank"); return; }\n  window.open(online ? (window.RELEASE_CLOUD')
+    js=js.replace('if(window.RELEASE_CLOUD){ const link', 'if(window.RELEASE_CLOUD || window.RELEASE_PAGES){ const link')
+    js=js.replace('toast("已清空 " + d.cleared', 'toast("已清空 " + (d.cleared || 0)')
+    replacements={
+        '已连接 · 可写回文件':'Pages 个人版 · 保存到当前浏览器',
+        '本地服务':'本机存储', '在线模式':'本机模式', '云端':'本机',
+        '保存勾选状态到 md 文件？':'保存检查进度到当前浏览器？',
+        '文件中原有的其他内容与格式保持不变。':'项目保存在当前浏览器，不会上传 GitHub。',
+        '写回前会自动生成一份带时间戳的 .bak 备份文件。':'保存前保留本机项目快照；请定期从工作台导出完整记录。',
+        '将恢复 Markdown 清单，当前文件会先备份。权限面板和发布记录保留当前值。未保存勾选将丢弃，是否继续？':'将恢复完整本机快照，包括检查、权限和发布记录。当前状态会先备份；未保存勾选将丢弃，是否继续？',
+        '已写回文件':'已保存到当前浏览器', '已连接本机存储，可直接保存到 md':'本机存储已就绪；请定期导出完整记录',
+        '文件会被直接改写':'浏览器中的项目记录会更新', '原始文件会先自动备份为 带时间戳的 .bak 文件，误操作可从备份恢复。':'操作前保留完整本机快照。清理网站数据会删除项目和快照，请先导出备份。',
+    }
+    for old,new in replacements.items():js=js.replace(old,new)
+    page=page.replace('__BOARD_CSS__',(ROOT/'board.css').read_text(encoding='utf-8')).replace('__BOARD_JS__',js)
+    page=page.replace('const EMBEDDED = __DATA__;','const EMBEDDED = PagesStore.openProject();').replace('const EMBEDDED_PROFILES = __PROFILES__;','const EMBEDDED_PROFILES = PAGES_DATA.profiles;').replace('__TITLE__','检查项目 · Pages 个人版')
+    page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="store.js"></script><script>PagesStore.install();</script>')
+    page=page.replace('<body>','<body><div style="padding:14px 24px;background:#17243a;color:white"><a href="index.html" style="color:white">← 返回个人工作台</a>　·　<span id="pagesProjectName"></span>　·　数据仅保存在当前浏览器，请定期导出备份</div>')
+    page=page.replace('勾选状态保存在本机浏览器 · 需要写回文件请使用本地服务模式','所有记录保存在当前浏览器 · 换设备或清理网站数据前请导出完整 JSON')
+    (OUT/'board.html').write_text(page,encoding='utf-8')
+    (OUT/'.nojekyll').write_text('')
+    print('Pages 个人版已生成：'+str(OUT))
+
+if __name__=='__main__':build()

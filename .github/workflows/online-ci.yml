@@ -42,5 +42,10 @@ jobs:
       - run: python test_http_integration.py
       - run: node --check board.js
       - run: node --check online/static/app.js
+      - name: Build and verify Pages personal edition
+        run: |
+          python scripts/build_pages.py
+          git diff --exit-code -- docs
+          node --test test_pages.cjs
       - name: Build production image
         run: docker build -t release-desk:test .
