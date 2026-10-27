@@ -1089,6 +1089,7 @@ function build(){
   for(const sec of orderedSections){
     // 「怎么用」这一节只作独立说明页的内容源，不在看板首页重复展示
     if(sec.guide_only) continue;
+    if(/^附录[：:]\s*权限与隐私配置/.test(sec.title.trim()) && !(DATA.permSelected || []).length) continue;
     // 条件不满足的条目不渲染；整节都没有可见条目时连标题一起隐藏
     const secItems = (sec.blocks || []).filter(b => b.type === "item");
     const visItems = secItems.filter(b => b.visible !== false);
@@ -1226,7 +1227,7 @@ function structureKey(){
   };
   for(const sec of DATA.sections || []) walk(sec.blocks);
   walk(DATA.preamble);
-  return feats + "#" + heads + "#" + ids.join(",") + "#" + hashStr(JSON.stringify(others));
+  return JSON.stringify(DATA.permSelected || []) + "#" + feats + "#" + heads + "#" + ids.join(",") + "#" + hashStr(JSON.stringify(others));
 }
 
 /* 若结构未变则不重建 DOM，只刷新状态。
@@ -1446,6 +1447,7 @@ function mergeItems(d){
     done: d.done != null ? d.done : 0,
     skipped: d.skipped != null ? d.skipped : 0,
     mdName: d.mdName || (em && em.mdName) || "清单文件",
+    permSelected: Array.isArray(d.permSelected) ? d.permSelected : ((em && em.permSelected) || []),
     features: d.features || (em && em.features) || {hasAccountSystem:true, targetMinors:true}
   };
   const secSrc = d.sections && d.sections.length ? d.sections : ((em && em.sections) || []);
