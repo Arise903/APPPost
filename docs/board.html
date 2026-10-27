@@ -1323,6 +1323,11 @@ function hiddenItems(){
   return out;
 }
 
+function featureHiddenItems(){
+  const keys = ["hasAccountSystem", "hasFeedbackSystem", "targetMinors"];
+  return hiddenItems().filter(it => keys.includes(it.cond) && !condOk(it.cond));
+}
+
 /* 渲染前的结构指纹：基于 DATA 计算（章节标题 + 可见条目 id 序列 + 项目特征
    + 非条目内容指纹）。附录等说明章节没有条目，若只比条目 id，
    权限面板写入后附录内容变了也不会触发重渲染 —— 所以把表格/代码等
@@ -1418,7 +1423,7 @@ function refreshProgress(){
   // 项目设置：已隐藏条目提示
   const fp = document.getElementById("featPill");
   if(fp){
-    const hidden = hiddenItems().length;
+    const hidden = featureHiddenItems().length;
     fp.classList.toggle("hidden", hidden === 0);
     const fb = fp.querySelector("b");
     if(fb) fb.textContent = hidden;
@@ -2274,7 +2279,7 @@ function refreshFeatUI(){
   featAcc.checked = f.hasAccountSystem;
   featMinor.checked = f.targetMinors;
   // 顶部「已隐藏 N 项」提示
-  const hidden = hiddenItems();
+  const hidden = featureHiddenItems();
   const pill = document.getElementById("featPill");
   if(pill){
     pill.classList.toggle("hidden", hidden.length === 0);
@@ -2285,17 +2290,16 @@ function refreshFeatUI(){
   const pv = document.getElementById("featPreview");
   if(pv){
     if(hidden.length === 0){
-      pv.innerHTML = "<b>当前全部检查项都会显示。</b><br>关闭上面的开关，与之相关的条目会自动隐藏（序号会重新连续编号）。";
+      pv.innerHTML = "<b>项目功能开关没有隐藏检查项。</b><br>权限相关条目仍按「权限配置」面板的选择显示。";
     }else{
       const byCond = {};
       hidden.forEach(it => { (byCond[it.cond] = byCond[it.cond] || []).push(it.text); });
       const LABEL = {
         hasAccountSystem: "无用户账号系统",
         hasFeedbackSystem: "无用户反馈系统",
-        targetMinors: "不面向未成年用户",
-        undefined: "未选择对应权限"
+        targetMinors: "不面向未成年用户"
       };
-      let html = "<b>以下 " + hidden.length + " 项将被隐藏：</b>";
+      let html = "<b>以下 " + hidden.length + " 项因项目功能设置隐藏：</b>";
       Object.keys(byCond).forEach(c => {
         html += "<span class=\"fx\"><b>" + (LABEL[c] || c) + "</b> — " + byCond[c].length + " 项<br>"
               + byCond[c].map(x => "· " + x.replace(/<[^>]+>/g, "").replace(/\*\*/g, "")).join("<br>") + "</span>";
