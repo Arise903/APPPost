@@ -271,7 +271,7 @@ function makeTable(b){
 function fillBlocks(el, blocks){
   let ul = null, bul = null, ord = null;
   for(const b of blocks){
-    if(b.hiddenByPermission) continue;
+    if(b.hiddenByPermission || (b.type === "item" && b.visible === false)) continue;
     if(b.type === "h3"){
       if(b.hiddenHead){ ul = null; bul = null; ord = null; continue; }
       const h3 = document.createElement("h3");
@@ -319,6 +319,8 @@ function fillBlocks(el, blocks){
   }
 }
 function build(){
+  // Every entry point must apply visibility before touching the DOM.
+  applyFeatures();
   const list = document.getElementById("list");
   list.innerHTML = "";
   document.getElementById("ttl").textContent = DATA.title;

@@ -25,3 +25,5 @@ Privacy-and-Permissions-EN.md
 
 release-desk-source.zip
 artifacts/
+
+node_modules/

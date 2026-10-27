@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=5557628f8e2d"></script><script src="store.js?v=5557628f8e2d"></script><script>PagesStore.install();</script><script defer src="experience.js?v=5557628f8e2d"></script>
+<script src="data.js?v=33c9e9324fb1"></script><script src="store.js?v=33c9e9324fb1"></script><script>PagesStore.install();</script><script defer src="experience.js?v=33c9e9324fb1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -1248,7 +1248,7 @@ function makeTable(b){
 function fillBlocks(el, blocks){
   let ul = null, bul = null, ord = null;
   for(const b of blocks){
-    if(b.hiddenByPermission) continue;
+    if(b.hiddenByPermission || (b.type === "item" && b.visible === false)) continue;
     if(b.type === "h3"){
       if(b.hiddenHead){ ul = null; bul = null; ord = null; continue; }
       const h3 = document.createElement("h3");
@@ -1296,6 +1296,8 @@ function fillBlocks(el, blocks){
   }
 }
 function build(){
+  // Every entry point must apply visibility before touching the DOM.
+  applyFeatures();
   const list = document.getElementById("list");
   list.innerHTML = "";
   document.getElementById("ttl").textContent = DATA.title;
