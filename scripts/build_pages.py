@@ -1,4 +1,6 @@
 """Build a self-contained personal Pages edition from public templates only."""
+import hashlib
+import re
 import json
 import shutil
 import sys
@@ -10,11 +12,17 @@ OUT=ROOT/'docs'
 
 def build():
     OUT.mkdir(exist_ok=True)
-    for name in ('index.html','dashboard.js','store.js','guide.html','guide.js'):
+    inputs=[ROOT/'board.js',ROOT/'board.css',ROOT/'board_template.html',ROOT/'permission_rules.json',ROOT/'permission_visibility.js',ROOT/'permission_profiles.json',ROOT/'online/default_checklist.md',ROOT/'online/static/app.css',Path(__file__),*sorted(path for path in (ROOT/'pages').glob('*') if path.suffix in ('.js','.html','.css'))]
+    digest=hashlib.sha256()
+    for path in inputs:
+        if path.is_file(): digest.update(path.read_bytes())
+    version=digest.hexdigest()[:12]
+    template_version=hashlib.sha256((ROOT/'online/default_checklist.md').read_bytes()).hexdigest()[:10]
+    for name in ('index.html','dashboard.js','store.js','guide.html','guide.js','experience.js'):
         shutil.copyfile(ROOT/'pages'/name,OUT/name)
     shutil.copyfile(ROOT/'online/static/app.css',OUT/'app.css')
     shutil.copyfile(ROOT/'permission_visibility.js',OUT/'permission_visibility.js')
-    data={'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles(),'rules':json.loads((ROOT/'permission_rules.json').read_text(encoding='utf-8'))}
+    data={'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles(),'rules':json.loads((ROOT/'permission_rules.json').read_text(encoding='utf-8')),'version':version,'templateVersion':template_version,'dataVersion':2}
     (OUT/'data.js').write_text('const PAGES_DATA = '+json.dumps(data,ensure_ascii=False).replace('</','<\\/')+';\n',encoding='utf-8')
     page=(ROOT/'board_template.html').read_text(encoding='utf-8')
     js='document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;\n'+(ROOT/'board.js').read_text(encoding='utf-8')
@@ -36,10 +44,15 @@ def build():
     for old,new in replacements.items():js=js.replace(old,new)
     page=page.replace('__PERMISSION_RULES__',(ROOT/'permission_rules.json').read_text(encoding='utf-8')).replace('__PERMISSION_VISIBILITY__',(ROOT/'permission_visibility.js').read_text(encoding='utf-8')).replace('__BOARD_CSS__',(ROOT/'board.css').read_text(encoding='utf-8')).replace('__BOARD_JS__',js)
     page=page.replace('const EMBEDDED = __DATA__;','const EMBEDDED = PagesStore.openProject();').replace('const EMBEDDED_PROFILES = __PROFILES__;','const EMBEDDED_PROFILES = PAGES_DATA.profiles;').replace('__TITLE__','检查项目 · Pages 个人版')
-    page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="store.js"></script><script>PagesStore.install();</script>')
+    page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="store.js"></script><script>PagesStore.install();</script><script defer src="experience.js"></script>')
     page=page.replace('<body>','<body><div style="padding:14px 24px;background:#17243a;color:white"><a href="index.html" style="color:white">← 返回个人工作台</a>　·　<span id="pagesProjectName"></span>　·　数据仅保存在当前浏览器，请定期导出备份</div>')
     page=page.replace('勾选状态保存在本机浏览器 · 需要写回文件请使用本地服务模式','所有记录保存在当前浏览器 · 换设备或清理网站数据前请导出完整 JSON')
     (OUT/'board.html').write_text(page,encoding='utf-8')
+    for target in OUT.glob('*.html'):
+        html=target.read_text(encoding='utf-8')
+        html=re.sub(r'(src|href)="([A-Za-z_-]+\.(?:js|css))"',lambda m:m[1]+'="'+m[2]+'?v='+version+'"',html)
+        target.write_text(html,encoding='utf-8')
+    (OUT/'version.json').write_text(json.dumps({'version':version,'templateVersion':template_version}))
     (OUT/'.nojekyll').write_text('')
     print('Pages 个人版已生成：'+str(OUT))
 

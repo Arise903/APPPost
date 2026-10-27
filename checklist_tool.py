@@ -211,7 +211,10 @@ def parse_md(text: str) -> dict:
         m = RE_H2.match(raw)
         if m:
             name = m.group(1).strip()
-            sid = "s_%08x" % _fnv1a(name)
+            fixed_section = re.search(r"\s*<!-- section:([A-Za-z0-9_-]+) -->\s*$", name)
+            if fixed_section:
+                name = name[:fixed_section.start()].rstrip()
+            sid = fixed_section.group(1) if fixed_section else "s_%08x" % _fnv1a(name)
             cur_section = {
                 "title": name,
                 "id": sid,
@@ -253,15 +256,19 @@ def parse_md(text: str) -> dict:
                 st = "skip"
             else:
                 st = "todo"
+            fixed_item = re.search(r"\s*<!-- task:([A-Za-z0-9_-]+) -->\s*$", body)
+            if fixed_item:
+                body = body[:fixed_item.start()].rstrip()
             # 行尾条件标记：<!-- if:hasAccountSystem -->
             cond = None
             cm = RE_ITEM_COND.search(body)
             if cm:
                 cond = cm.group(1)
                 body = body[: cm.start()].rstrip()
+            legacy_id = _make_id(path, body.strip(), counter)
             item = {
                 "type": "item",
-                "id": _make_id(path, body.strip(), counter),
+                "id": fixed_item.group(1) if fixed_item else legacy_id,
                 "level": level,
                 "state": st,
                 "checked": st == "done",
@@ -319,6 +326,23 @@ def parse_md(text: str) -> dict:
 # --------------------------------------------------------------------------- #
 # 权限 / 隐私配置
 # --------------------------------------------------------------------------- #
+
+def stabilize_document(text):
+    """Freeze existing task/section IDs without changing identity or checked states."""
+    parsed = parse_md(text)
+    lines = text.split("\n")
+    for item in parsed["items"]:
+        if not re.search(r"<!-- task:[A-Za-z0-9_-]+ -->\s*$", lines[item["line"]]):
+            lines[item["line"]] += " <!-- task:" + item["id"] + " -->"
+    in_fence = False
+    for i, line in enumerate(lines):
+        if RE_FENCE.match(line):
+            in_fence = not in_fence
+        if not in_fence and RE_H2.match(line) and "<!-- section:" not in line:
+            name = RE_H2.match(line).group(1).strip()
+            lines[i] += " <!-- section:s_%08x -->" % _fnv1a(name)
+    return "\n".join(lines)
+
 
 def load_profiles() -> dict:
     if not PERM_FILE.exists():
@@ -1754,6 +1778,7 @@ def document_payload(text, md_name, generation, permissions, review, version):
             "seq": seq_map.get(it["id"], ""),
             "gate": bool(it.get("gate")),
             "cond": it.get("cond"),
+            "permissionRule": it.get("permissionRule"),
         }
         for it in parsed["items"]
     ]

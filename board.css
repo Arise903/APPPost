@@ -515,3 +515,10 @@
   .savestate.saving{color:var(--accent)}
   .savestate.error{color:var(--danger)}
   .savestate.offline{color:var(--warn)}
+
+#saveStatus{padding:8px 0;font-weight:600;color:#22785e}#saveStatus[data-state="error"]{color:#b03939}#saveStatus[data-state="pending"]{color:#9b6b12}.save-explanation{font-size:11px;line-height:1.8;color:var(--text-3)}.mobile-actions{display:none}.upgrade-banner{padding:12px 18px;background:#fff6db;border:1px solid #ead49a;border-radius:10px;margin:14px 0;line-height:1.7;font-size:12px}.upgrade-banner button{margin-left:8px}
+@media(max-width:700px){body{padding-bottom:110px}.mobile-actions{position:fixed;bottom:0;left:0;right:0;z-index:90;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:8px 12px calc(10px + env(safe-area-inset-bottom));background:var(--surface,#fff);border-top:1px solid var(--border,#ddd);box-shadow:0 -4px 18px #17243a12}.mobile-actions>span{width:100%;font-size:10px;text-align:center}.mobile-actions>.btn{flex:1;min-height:40px}}
+
+[hidden]{display:none!important}
+li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size:11px;line-height:1.7}
+@media(max-width:700px){li.item{flex-wrap:wrap;gap:8px}li.item>label{flex:1 1 calc(100% - 46px);min-width:0}li.item.gateitem>label{flex-basis:100%}li.item>.btn,li.item>.skipbtn{flex:0 0 auto;min-height:34px}li.item .txt{min-width:0;overflow-wrap:anywhere}li.item>small{width:100%;flex-basis:100%}.toast{bottom:110px}}

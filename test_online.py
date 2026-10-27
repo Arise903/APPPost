@@ -135,6 +135,19 @@ class OnlineTests(unittest.TestCase):
         self.assertTrue(enabled.json['features']['hasFeedbackSystem'])
         self.assertEqual(enabled.json['total'], initial['total'] + len(feedback))
 
+    def test_new_release_archives_and_resets_atomically(self):
+        original=self.payload()
+        task=next(x for x in original['items'] if not x['gate'])
+        checked=self.post('write',{'revision':original['revision'],'states':{task['id']:'done'}}).json
+        reviewed=self.post('review',{'revision':checked['revision'],'review':{'release':{'version':'1'},'items':{task['id']:{'notes':'keep','evidence':'drop'}},'history':[]}}).json
+        next_release=self.post('new-release',{'revision':reviewed['revision'],'release':{'version':'2'},'keepNotes':True,'keepEvidence':False})
+        self.assertEqual(next_release.status_code,200)
+        data=next_release.json
+        self.assertEqual(data['review']['history'][0]['release']['version'],'1')
+        self.assertEqual(data['review']['items'][task['id']],{'notes':'keep'})
+        self.assertEqual(next(x for x in data['items'] if x['id']==task['id'])['state'],'todo')
+        self.assertEqual(data['review']['release']['version'],'2')
+
     def test_login_throttle(self):
         anonymous=self.app.test_client()
         email=uuid.uuid4().hex+'@example.test'

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js"></script><script src="store.js"></script><script>PagesStore.install();</script>
+<script src="data.js?v=5557628f8e2d"></script><script src="store.js?v=5557628f8e2d"></script><script>PagesStore.install();</script><script defer src="experience.js?v=5557628f8e2d"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -524,6 +524,13 @@
   .savestate.error{color:var(--danger)}
   .savestate.offline{color:var(--warn)}
 
+#saveStatus{padding:8px 0;font-weight:600;color:#22785e}#saveStatus[data-state="error"]{color:#b03939}#saveStatus[data-state="pending"]{color:#9b6b12}.save-explanation{font-size:11px;line-height:1.8;color:var(--text-3)}.mobile-actions{display:none}.upgrade-banner{padding:12px 18px;background:#fff6db;border:1px solid #ead49a;border-radius:10px;margin:14px 0;line-height:1.7;font-size:12px}.upgrade-banner button{margin-left:8px}
+@media(max-width:700px){body{padding-bottom:110px}.mobile-actions{position:fixed;bottom:0;left:0;right:0;z-index:90;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:8px 12px calc(10px + env(safe-area-inset-bottom));background:var(--surface,#fff);border-top:1px solid var(--border,#ddd);box-shadow:0 -4px 18px #17243a12}.mobile-actions>span{width:100%;font-size:10px;text-align:center}.mobile-actions>.btn{flex:1;min-height:40px}}
+
+[hidden]{display:none!important}
+li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size:11px;line-height:1.7}
+@media(max-width:700px){li.item{flex-wrap:wrap;gap:8px}li.item>label{flex:1 1 calc(100% - 46px);min-width:0}li.item.gateitem>label{flex-basis:100%}li.item>.btn,li.item>.skipbtn{flex:0 0 auto;min-height:34px}li.item .txt{min-width:0;overflow-wrap:anywhere}li.item>small{width:100%;flex-basis:100%}.toast{bottom:110px}}
+
 </style>
 </head>
 <body><div style="padding:14px 24px;background:#17243a;color:white"><a href="index.html" style="color:white">← 返回个人工作台</a>　·　<span id="pagesProjectName"></span>　·　数据仅保存在当前浏览器，请定期导出备份</div>
@@ -562,7 +569,7 @@
       <button class="btn" id="btnFeat">项目设置</button>
       <button class="btn" id="btnGuide2">使用说明</button>
       <button class="btn" id="btnPerm">权限配置</button>
-      <button class="btn primary" id="btnSave" disabled>保存</button>
+      <button class="btn primary" id="btnSave" disabled>保存进度</button>
       <span class="morewrap">
         <button class="btn" id="btnMore" aria-haspopup="true" aria-expanded="false">更多</button>
         <div class="moremenu" id="moreMenu">
@@ -573,6 +580,7 @@
         </div>
       </span>
     </div>
+    <div id="saveStatus" role="status" aria-live="polite"></div><div class="save-explanation">检查进度：点击保存；备注、发布信息和权限配置：分别即时保存。项目设置点击保存后生效。</div>
     <div class="secnote hidden" id="filtNote"></div>
   </header>
 
@@ -581,7 +589,7 @@
 
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">
 <button class="btn" id="releaseEdit">发布信息</button>
-<button class="btn" id="releaseArchive">归档本次发布</button>
+<button class="btn" id="releaseArchive">归档本次发布</button><button class="btn" id="newRelease">开始新一轮发布</button>
 <button class="btn" id="releaseSummary">导出发布摘要</button>
 <button class="btn" id="backupRestore">恢复备份</button>
 </div>
@@ -659,7 +667,7 @@
       <span class="hint" id="featHint"></span>
       <span class="grow"></span>
       <button class="btn" id="featCancel">取消</button>
-      <button class="btn primary" id="featSave">保存到 md</button>
+      <button class="btn primary" id="featSave">保存项目设置</button>
     </div>
   </div>
 </div>
@@ -747,16 +755,19 @@
     </div>
 
     <div class="panel-foot">
-      <span class="hint" id="permHint"></span>
+      <span class="hint" id="permHint"></span><span id="permissionFilterNote" role="status"></span>
       <span class="savestate" id="permSaveState"></span>
       <span class="grow"></span>
       <button class="btn" id="permEn">导出英文文档</button>
       <button class="btn" id="permCancel">关闭</button>
-      <button class="btn primary" id="permSave">立即写入 md</button>
+      <button class="btn primary" id="permSave">保存权限配置</button>
     </div>
   </div>
 </div>
 
+<dialog id="newReleaseDialog" style="max-width:460px;width:calc(100% - 32px);border:1px solid #dce2df;border-radius:14px;padding:24px">
+<form id="newReleaseForm"><h2>开始新一轮发布</h2><p>先归档当前发布，再清空检查进度。权限选择、项目功能设置和阅读确认保留。</p><label>新版本号<input name="version" required maxlength="80" style="display:block;width:100%;margin:8px 0 16px;padding:10px"></label><label>构建号<input name="build" maxlength="80" style="display:block;width:100%;margin:8px 0 16px;padding:10px"></label><p><label><input name="keepNotes" type="checkbox" checked> 保留检查备注和跳过原因</label></p><p><label><input name="keepEvidence" type="checkbox"> 保留证据路径和链接</label></p><p id="newReleaseError" role="alert"></p><button class="btn" type="button" id="cancelNewRelease">取消</button><button class="btn primary" type="submit">归档并开始</button></form></dialog>
+<div class="mobile-actions"><span id="mobileStatus" role="status"></span><button id="mobileCurrent" class="btn">当前检查项</button><button id="mobileSave" class="btn primary">保存进度</button><button id="mobileExport" class="btn">导出摘要</button></div>
 <script>
 const PERMISSION_RULES = {
   "groups": [
@@ -851,13 +862,100 @@ const PERMISSION_RULES = {
         }
       ]
     }
-  ]
+  ],
+  "schemaVersion": 2,
+  "featureGroups": [
+    {
+      "heading": "^(?:5\\.4\\s|账号注销与数据主体权利)",
+      "feature": "hasAccountSystem"
+    },
+    {
+      "heading": "用户反馈|feedbackApiKey",
+      "feature": "hasFeedbackSystem"
+    }
+  ],
+  "featureText": [
+    {
+      "contains": "（反馈功能）",
+      "feature": "hasFeedbackSystem"
+    }
+  ],
+  "itemRules": {
+    "t_0911f6f9": "iosUsage",
+    "t_165bf3dd": "ios",
+    "t_0333b600": "ios",
+    "t_baaadf56": "ios",
+    "t_8793689d": "ios",
+    "t_6bc90f79": "android",
+    "t_cb588da7": "android",
+    "t_1b7eb939": "androidRuntime",
+    "t_4df29bbe": [
+      "photos"
+    ],
+    "t_fe196a61": [
+      "bluetooth"
+    ],
+    "t_4cc648e9": [
+      "notifications"
+    ],
+    "t_75f86cfd": [
+      "location_background"
+    ],
+    "t_126de941": "androidRuntime",
+    "t_5d678244": "any",
+    "t_afc28149": "prompt",
+    "t_70a9ee0a": "androidRuntime",
+    "t_3675ba68": "prompt",
+    "t_145bce3f": [
+      "location_background"
+    ],
+    "t_8210733f": [
+      "health",
+      "contacts"
+    ],
+    "t_9ec219b3": [
+      "tracking"
+    ],
+    "t_a9cdcf47": [
+      "tracking"
+    ]
+  },
+  "featureConditions": {
+    "t_3b8c1729": "hasFeedbackSystem",
+    "t_2ca0dee8": "hasFeedbackSystem",
+    "t_7f2f1dd7": "hasFeedbackSystem",
+    "t_1b7e06e5": "hasFeedbackSystem",
+    "t_736d15b5": "hasAccountSystem",
+    "t_2dfc3ff4": "targetMinors",
+    "t_1adcdcdc": "hasAccountSystem",
+    "t_b50a5797": "targetMinors",
+    "t_0ca092e6": "hasFeedbackSystem",
+    "t_bc434831": "hasAccountSystem",
+    "t_ce994e06": "hasAccountSystem",
+    "t_6a5d3450": "hasAccountSystem",
+    "t_f642b1a5": "hasAccountSystem"
+  }
 }
 ;
 /* Shared permission-driven checklist visibility; keeps task IDs and saved states intact. */
 (function(root){
  const api={
-  annotate(sections,rules){for(const section of sections||[]){let group=null,accountSection=false,feedbackSection=false;for(const block of section.blocks||[]){if(block.type==='h3'||block.type==='h4'){group=(rules.groups||[]).find(g=>new RegExp(g.heading).test(block.title))||null;accountSection=/^(?:5\.4\s|账号注销与数据主体权利)/.test(block.title);feedbackSection=/用户反馈|feedbackApiKey/.test(block.title);}if(block.type==='item'&&(feedbackSection||block.text.includes('（反馈功能）')))block.cond='hasFeedbackSystem';if(block.type==='item'&&accountSection)block.cond='hasAccountSystem';if(block.type==='item'&&group)block.permissionRule=group.rules.find(r=>block.text.includes(r.contains))?.requires||group.default;}}},
+  annotate(sections,rules){
+   for(const section of sections||[]){
+    let group=null,feature=null;
+    for(const block of section.blocks||[]){
+     if(block.type==='h3'||block.type==='h4'){
+      group=(rules.groups||[]).find(g=>new RegExp(g.heading).test(block.title))||null;
+      feature=(rules.featureGroups||[]).find(g=>new RegExp(g.heading).test(block.title))?.feature||null;
+     }
+     if(block.type!=='item')continue;
+     const knownFeature=rules.featureConditions?.[block.id]||feature||(rules.featureText||[]).find(r=>block.text.includes(r.contains))?.feature;
+     if(knownFeature)block.cond=knownFeature;
+     const requirement=rules.itemRules?.[block.id]||(group?(group.rules.find(r=>block.text.includes(r.contains))?.requires||group.default):null);
+     if(requirement)block.permissionRule=requirement;
+    }
+   }
+  },
   visible(rule,selected,profiles){
    if(!rule)return true;const ids=new Set(selected||[]);if(Array.isArray(rule))return rule.some(id=>ids.has(id));
    const picked=(profiles.permissions||[]).filter(p=>ids.has(p.id));
@@ -890,6 +988,17 @@ function boardFetch(path, options){
 /* ------------------------------------------------------------------ *
  * 状态
  * ------------------------------------------------------------------ */
+let savingOperations=0, saveFailure="", lastSavedAt=null;
+function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
+function updateSaveStatus(){
+ const el=document.getElementById("saveStatus");if(!el)return;
+ const permissionPending=typeof permDirty!=="undefined"&&permDirty;
+ const pending=(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
+ let label=saveFailure?"保存失败 · "+saveFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleTimeString():"尚无待保存修改";
+ el.textContent=label;el.dataset.state=saveFailure?'error':savingOperations?'saving':pending?'pending':'saved';
+ const mobile=document.getElementById("mobileStatus");if(mobile)mobile.textContent=label;
+ const save=document.getElementById("mobileSave");if(save)save.disabled=savingOperations>0||!online;
+}
 let baseRevision = EMBEDDED.revision;
 let serverBaseline = {};
 let reviewData = EMBEDDED.review || {release:{},items:{},history:[]};
@@ -1496,6 +1605,7 @@ function jumpToCurrent(){
   );
 }
 function refreshAll(){
+  updateSaveStatus();
   // 先按顺序计算锁定，再统一应用
   const firstOpen = computeLocks();
   document.querySelectorAll("li.item").forEach(li => {
@@ -1528,7 +1638,19 @@ function setMode(live){
 /* ------------------------------------------------------------------ *
  * 与本机存储通信
  * ------------------------------------------------------------------ */
-async function api(path, body){
+let saveQueue=Promise.resolve(), queuedWrites=0;
+function api(path,body){
+ const writing=body!==undefined&&!['/api/backups','/api/perm-config','/api/perm-en-preview','/api/perm-write-en'].includes(path);
+ if(!writing)return apiRequest(path,body);
+ queuedWrites++;updateSaveStatus();
+ const observedRevision=baseRevision;
+ const result=saveQueue.catch(()=>{}).then(()=>apiRequest(path,{...body,revision:body.revision===undefined||body.revision===observedRevision?baseRevision:body.revision}));
+ saveQueue=result.finally(()=>{queuedWrites--;setTimeout(updateSaveStatus,0);});saveQueue.catch(()=>{});return result;
+}
+async function apiRequest(path, body){
+  const writing = body !== undefined && !["/api/profiles", "/api/backups", "/api/perm-config", "/api/perm-en-preview", "/api/perm-write-en"].includes(path);
+  if(writing){ savingOperations++; saveFailure=""; updateSaveStatus(); }
+  try{
   const opt = body === undefined ? {} : {
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -1538,7 +1660,10 @@ async function api(path, body){
   if(!r.ok){ const err = await r.json().catch(() => ({})); throw new Error(err.error || (path + " -> HTTP " + r.status)); }
   const data = await r.json();
   if(body !== undefined && data.revision){ baseRevision = data.revision; saveState(); }
+  if(writing) lastSavedAt = Date.now();
   return data;
+  }catch(error){ if(writing) saveFailure=error.message; throw error; }
+  finally{ if(writing) savingOperations--; setTimeout(updateSaveStatus,0); }
 }
 async function loadFromServer(){
   try{
@@ -1667,8 +1792,10 @@ document.getElementById("list").addEventListener("click", e => {
   markDirty();
 });
 function markDirty(){
-  dirty = true;
-  document.getElementById("btnSave").textContent = "保存 *";
+  dirty = Object.keys({...serverBaseline,...state}).some(id=>st(id)!==(serverBaseline[id]||"todo"));
+  saveFailure = "";
+  updateSaveStatus();
+  document.getElementById("btnSave").textContent = dirty ? "保存进度 *" : "保存进度";
 }
 
 document.getElementById("seg").addEventListener("click", e => {
@@ -1690,7 +1817,7 @@ document.getElementById("btnSave").addEventListener("click", async () => {
   if(!online){ toast("当前是离线模式，无法写回文件"); return; }
   const doneCount = Object.values(state).filter(v => v === "done").length;
   const skipCount = Object.values(state).filter(v => v === "skip").length;
-  const ok = await askConfirm({
+  const ok = window.RELEASE_PAGES || window.RELEASE_CLOUD ? true : await askConfirm({
     title:"保存检查进度到当前浏览器？",
     icon:"info",
     body:`将把当前看板上的 <strong>${doneCount}</strong> 项完成、
@@ -1713,7 +1840,7 @@ document.getElementById("btnSave").addEventListener("click", async () => {
     serverBaseline = Object.fromEntries(d.items.map(it => [it.id, it.state]));
     saveState();
     dirty = false;
-    document.getElementById("btnSave").textContent = "保存";
+    document.getElementById("btnSave").textContent = "保存进度";
     render();
     toast("已保存到当前浏览器");
   }catch(e){
@@ -1811,7 +1938,7 @@ document.getElementById("mClear").addEventListener("click", async () => {
     saveState();
     DATA = mergeItems(d);
     dirty = false;
-    document.getElementById("btnSave").textContent = "保存";
+    document.getElementById("btnSave").textContent = "保存进度";
     render();
     toast("已清空 " + (d.cleared || 0) + " 处状态，并已备份原文件");
   }catch(e){
@@ -1821,7 +1948,7 @@ document.getElementById("mClear").addEventListener("click", async () => {
 
 /* ---- 离开前提醒未保存 ---- */
 window.addEventListener("beforeunload", e => {
-  if(dirty && online){ e.preventDefault(); e.returnValue = ""; }
+  if((dirty || featureHasChanges() || permDirty || savingOperations>0) && online){ e.preventDefault(); e.returnValue = ""; }
 });
 
 /* ------------------------------------------------------------------ *
@@ -1982,6 +2109,13 @@ function renderDescs(){
     : "中文文案用于生成的中文隐私政策与 Info.plist；英文版请切到 English 标签填写。";
 }
 
+function refreshPermissionVisibilityNote(){
+ const el=document.getElementById('permissionFilterNote');if(!el||!DATA)return;
+ PermissionVisibility.annotate(DATA.sections,PERMISSION_RULES);
+ const rows=DATA.sections.flatMap(s=>s.blocks).filter(b=>b.type==='item'&&b.permissionRule&&condOk(b.cond));
+ const visible=rows.filter(b=>PermissionVisibility.visible(b.permissionRule,permSelected,EMBEDDED_PROFILES)).length;
+ el.textContent='权限筛选：'+visible+' 项核对适用，'+(rows.length-visible)+' 项因未选对应权限隐藏。权限改动自动保存。';
+}
 async function refreshPermGen(){
   const body = {selected: permSelected, descs: permDescs, descsEn: permDescsEn, lang: permLang};
   let cfg = null;
@@ -1994,6 +2128,7 @@ async function refreshPermGen(){
     cfg = genLocally();
   }
   if(!cfg) return;
+  refreshPermissionVisibilityNote();
   document.getElementById("gen-ios").textContent =
     "<dict>\n" + (cfg.iosPlist || "    <!-- 无需添加权限声明 -->") + "\n</dict>";
   document.getElementById("gen-android").textContent =
@@ -2205,6 +2340,7 @@ function setPermSaveState(kind, text){
   el.textContent = text || "";
 }
 function schedulePermSave(){
+  updateSaveStatus();
   if(!permDirty) return;               // 打开面板时的初始预览不算改动
   if(!online){
     setPermSaveState("offline", "离线模式：改动只在本机，不会写入文件");
@@ -2328,17 +2464,20 @@ function refreshFeatUI(){
       let html = "<b>以下 " + hidden.length + " 项因项目功能设置隐藏：</b>";
       Object.keys(byCond).forEach(c => {
         html += "<span class=\"fx\"><b>" + (LABEL[c] || c) + "</b> — " + byCond[c].length + " 项<br>"
-              + byCond[c].map(x => "· " + x.replace(/<[^>]+>/g, "").replace(/\*\*/g, "")).join("<br>") + "</span>";
+              + byCond[c].map(x => "· " + escapeHtml(x.replace(/<[^>]+>/g, "").replace(/\*\*/g, ""))).join("<br>") + "</span>";
       });
       pv.innerHTML = html;
     }
   }
 }
+let featureSnapshot = null;
 function openFeatPanel(){
+  featureSnapshot = JSON.parse(JSON.stringify(DATA.features));
   refreshFeatUI();
   document.getElementById("featPanel").classList.add("on");
 }
 function closeFeatPanel(){
+  if(featureSnapshot){ DATA.features=featureSnapshot; featureSnapshot=null; render(); refreshFeatUI(); updateSaveStatus(); }
   document.getElementById("featPanel").classList.remove("on");
 }
 document.getElementById("btnFeat").addEventListener("click", openFeatPanel);
@@ -2348,6 +2487,7 @@ document.getElementById("featPill").addEventListener("click", openFeatPanel);
 
 // 切换开关 -> 立即预览
 function onFeatToggle(){
+  saveFailure="";
   if(!DATA) return;
   DATA.features = {
     hasFeedbackSystem: featFeedback.checked,
@@ -2357,6 +2497,7 @@ function onFeatToggle(){
   applyFeatures();
   render();
   refreshFeatUI();
+  updateSaveStatus();
 }
 featFeedback.addEventListener("change", onFeatToggle);
 featAcc.addEventListener("change", onFeatToggle);
@@ -2375,7 +2516,9 @@ document.getElementById("featSave").addEventListener("click", async () => {
     DATA = mergeItems(d);
     render();
     refreshFeatUI();
+    featureSnapshot=null;
     closeFeatPanel();
+    updateSaveStatus();
     toast("项目设置已保存到 md");
   }catch(e){
     toast("保存失败：" + e.message);
@@ -2436,7 +2579,7 @@ document.getElementById("releaseEdit").onclick = async () => {
   await persistReview(next);
 };
 function releaseSnapshot(){
-  return {release:reviewData.release || {}, date:new Date().toISOString(), items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false, ...(reviewData.items || {})[b.id]}))};
+  return {release:reviewData.release || {}, date:new Date().toISOString(), features:{...DATA.features}, selectedPermissions:[...(DATA.permSelected||[])], items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false, ...(reviewData.items || {})[b.id]}))};
 }
 document.getElementById("releaseArchive").onclick = async () => {
   if(!online || dirty){ toast("请先连接服务并保存勾选进度"); return; }
@@ -2472,6 +2615,28 @@ document.getElementById("backupRestore").onclick = async () => {
     dirty = false;
     location.reload();
   }catch(e){ toast("恢复失败：" + e.message); }
+};
+
+document.getElementById("mobileSave").onclick=()=>document.getElementById("btnSave").click();
+document.getElementById("mobileCurrent").onclick=jumpToCurrent;
+document.getElementById("mobileExport").onclick=()=>document.getElementById("releaseSummary").click();
+document.getElementById("featPanel").addEventListener('click',e=>{if(e.target.id==='featPanel')closeFeatPanel();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('featPanel').classList.contains('on'))closeFeatPanel();});
+
+const newReleaseButton=document.getElementById('newRelease');
+newReleaseButton.hidden=!(window.RELEASE_PAGES||window.RELEASE_CLOUD);
+newReleaseButton.onclick=()=>{
+ if(dirty||permDirty||featureHasChanges()||savingOperations){toast('请先保存所有改动，再开始新一轮发布');return;}
+ document.getElementById('newReleaseForm').reset();document.getElementById('newReleaseError').textContent='';document.getElementById('newReleaseDialog').showModal();
+};
+document.getElementById('cancelNewRelease').onclick=()=>document.getElementById('newReleaseDialog').close();
+document.getElementById('newReleaseForm').onsubmit=async event=>{
+ event.preventDefault();const form=event.target,button=form.querySelector('[type=submit]');button.disabled=true;
+ try{
+  const release={...reviewData.release,version:form.elements.version.value.trim(),build:form.elements.build.value.trim(),date:new Date().toLocaleDateString('sv-SE')};
+  const d=await api('/api/new-release',{release,keepNotes:form.elements.keepNotes.checked,keepEvidence:form.elements.keepEvidence.checked});
+  gen=d.generation;reviewData=d.review;state=seedFromData(d);serverBaseline=Object.fromEntries(d.items.map(it=>[it.id,it.state]));DATA=mergeItems(d);dirty=false;saveState();render();refreshFeatUI();document.getElementById('newReleaseDialog').close();toast('上一轮已归档，新一轮发布已开始');
+ }catch(error){document.getElementById('newReleaseError').textContent=error.message;}finally{button.disabled=false;updateSaveStatus();}
 };
 
 DATA = EMBEDDED;

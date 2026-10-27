@@ -258,8 +258,11 @@ def create_app(overrides=None):
             document = (ROOT / 'default_checklist.md').read_text(encoding='utf-8')
         if not isinstance(document, str) or not 1 <= len(document.encode()) <= 800_000:
             abort(400, 'Markdown 文件无效或超过 800 KB')
+        if len({item['id'] for item in checklist.parse_md(document)['items']}) != len(checklist.parse_md(document)['items']):
+            abort(400, '检查项 ID 重复')
         if not checklist.parse_md(document)['items']:
             abort(400, '清单中至少需要一个 Markdown 检查项')
+        document = checklist.stabilize_document(document)
         permissions = data.get('permissions', {'selected': [], 'descs': {}, 'descsEn': {}})
         review = data.get('review', {'release': {}, 'items': {}, 'history': []})
         validate_permissions(permissions)
@@ -350,6 +353,7 @@ def create_app(overrides=None):
             compare_version(project, data)
             snapshot(conn, project, g.user['id'], operation)
             extra = {}
+            project['document'] = checklist.stabilize_document(project['document'])
             if operation == 'write':
                 states = data.get('states')
                 if not isinstance(states, dict) or any(v not in ('todo', 'done', 'skip') for v in states.values()):
@@ -392,6 +396,24 @@ def create_app(overrides=None):
                     extra['appendix'] = checklist.write_appendix(path, permissions['selected'], permissions['descs'], permissions['descsEn'])
                     project['document'] = path.read_text(encoding='utf-8')
                 project['permissions'] = encode(permissions)
+            elif operation == 'new-release':
+                release = data.get('release')
+                if not isinstance(release, dict) or not isinstance(release.get('version'), str) or not release['version'].strip() or any(type(data.get(key)) is not bool for key in ('keepNotes', 'keepEvidence')):
+                    abort(400, '请填写新版本号和保留选项')
+                review = json.loads(project['review'])
+                before = project_payload(project)
+                review.setdefault('history', []).append({'release': review.get('release', {}), 'date': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'features': before['features'], 'permissions': json.loads(project['permissions']), 'items': [{**item, 'applicable': before['features'].get(item.get('cond'), True) and checklist.permission_visibility.visible(item.get('permissionRule'), json.loads(project['permissions'])['selected'], checklist.load_profiles()), **review.get('items', {}).get(item['id'], {})} for item in before['items'] if not item['gate']]})
+                parsed = checklist.parse_md(project['document'])
+                gate = checklist.find_gate_item(parsed)
+                project['document'] = checklist.apply_states(project['document'], parsed, {item['id']: 'todo' for item in parsed['items'] if not gate or item['id'] != gate['id']})
+                retained = {}
+                for key, item in review.get('items', {}).items():
+                    saved = {k: v for k, v in item.items() if (k in ('notes', 'reason') and data['keepNotes']) or (k == 'evidence' and data['keepEvidence'])}
+                    if saved: retained[key] = saved
+                review['items'] = retained
+                review['release'] = release
+                project['review'] = encode(review)
+                project['generation'] += 1
             elif operation == 'restore':
                 backup = conn.one('SELECT state FROM snapshots WHERE id=? AND project_id=?', (data.get('name', ''), project_id))
                 if not backup:

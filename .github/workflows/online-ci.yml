@@ -42,6 +42,7 @@ jobs:
       - run: python test_http_integration.py
       - run: node --check board.js
       - run: node --check online/static/app.js
+      - run: node --check pages/experience.js
       - name: Build and verify Pages personal edition
         run: |
           python scripts/build_pages.py

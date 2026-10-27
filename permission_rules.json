@@ -91,5 +91,77 @@
         }
       ]
     }
-  ]
+  ],
+  "schemaVersion": 2,
+  "featureGroups": [
+    {
+      "heading": "^(?:5\\.4\\s|账号注销与数据主体权利)",
+      "feature": "hasAccountSystem"
+    },
+    {
+      "heading": "用户反馈|feedbackApiKey",
+      "feature": "hasFeedbackSystem"
+    }
+  ],
+  "featureText": [
+    {
+      "contains": "（反馈功能）",
+      "feature": "hasFeedbackSystem"
+    }
+  ],
+  "itemRules": {
+    "t_0911f6f9": "iosUsage",
+    "t_165bf3dd": "ios",
+    "t_0333b600": "ios",
+    "t_baaadf56": "ios",
+    "t_8793689d": "ios",
+    "t_6bc90f79": "android",
+    "t_cb588da7": "android",
+    "t_1b7eb939": "androidRuntime",
+    "t_4df29bbe": [
+      "photos"
+    ],
+    "t_fe196a61": [
+      "bluetooth"
+    ],
+    "t_4cc648e9": [
+      "notifications"
+    ],
+    "t_75f86cfd": [
+      "location_background"
+    ],
+    "t_126de941": "androidRuntime",
+    "t_5d678244": "any",
+    "t_afc28149": "prompt",
+    "t_70a9ee0a": "androidRuntime",
+    "t_3675ba68": "prompt",
+    "t_145bce3f": [
+      "location_background"
+    ],
+    "t_8210733f": [
+      "health",
+      "contacts"
+    ],
+    "t_9ec219b3": [
+      "tracking"
+    ],
+    "t_a9cdcf47": [
+      "tracking"
+    ]
+  },
+  "featureConditions": {
+    "t_3b8c1729": "hasFeedbackSystem",
+    "t_2ca0dee8": "hasFeedbackSystem",
+    "t_7f2f1dd7": "hasFeedbackSystem",
+    "t_1b7e06e5": "hasFeedbackSystem",
+    "t_736d15b5": "hasAccountSystem",
+    "t_2dfc3ff4": "targetMinors",
+    "t_1adcdcdc": "hasAccountSystem",
+    "t_b50a5797": "targetMinors",
+    "t_0ca092e6": "hasFeedbackSystem",
+    "t_bc434831": "hasAccountSystem",
+    "t_ce994e06": "hasAccountSystem",
+    "t_6a5d3450": "hasAccountSystem",
+    "t_f642b1a5": "hasAccountSystem"
+  }
 }

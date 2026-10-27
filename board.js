@@ -11,6 +11,17 @@ function boardFetch(path, options){
 /* ------------------------------------------------------------------ *
  * 状态
  * ------------------------------------------------------------------ */
+let savingOperations=0, saveFailure="", lastSavedAt=null;
+function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
+function updateSaveStatus(){
+ const el=document.getElementById("saveStatus");if(!el)return;
+ const permissionPending=typeof permDirty!=="undefined"&&permDirty;
+ const pending=(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
+ let label=saveFailure?"保存失败 · "+saveFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleTimeString():"尚无待保存修改";
+ el.textContent=label;el.dataset.state=saveFailure?'error':savingOperations?'saving':pending?'pending':'saved';
+ const mobile=document.getElementById("mobileStatus");if(mobile)mobile.textContent=label;
+ const save=document.getElementById("mobileSave");if(save)save.disabled=savingOperations>0||!online;
+}
 let baseRevision = EMBEDDED.revision;
 let serverBaseline = {};
 let reviewData = EMBEDDED.review || {release:{},items:{},history:[]};
@@ -617,6 +628,7 @@ function jumpToCurrent(){
   );
 }
 function refreshAll(){
+  updateSaveStatus();
   // 先按顺序计算锁定，再统一应用
   const firstOpen = computeLocks();
   document.querySelectorAll("li.item").forEach(li => {
@@ -649,7 +661,19 @@ function setMode(live){
 /* ------------------------------------------------------------------ *
  * 与本地服务通信
  * ------------------------------------------------------------------ */
-async function api(path, body){
+let saveQueue=Promise.resolve(), queuedWrites=0;
+function api(path,body){
+ const writing=body!==undefined&&!['/api/backups','/api/perm-config','/api/perm-en-preview','/api/perm-write-en'].includes(path);
+ if(!writing)return apiRequest(path,body);
+ queuedWrites++;updateSaveStatus();
+ const observedRevision=baseRevision;
+ const result=saveQueue.catch(()=>{}).then(()=>apiRequest(path,{...body,revision:body.revision===undefined||body.revision===observedRevision?baseRevision:body.revision}));
+ saveQueue=result.finally(()=>{queuedWrites--;setTimeout(updateSaveStatus,0);});saveQueue.catch(()=>{});return result;
+}
+async function apiRequest(path, body){
+  const writing = body !== undefined && !["/api/profiles", "/api/backups", "/api/perm-config", "/api/perm-en-preview", "/api/perm-write-en"].includes(path);
+  if(writing){ savingOperations++; saveFailure=""; updateSaveStatus(); }
+  try{
   const opt = body === undefined ? {} : {
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -659,7 +683,10 @@ async function api(path, body){
   if(!r.ok){ const err = await r.json().catch(() => ({})); throw new Error(err.error || (path + " -> HTTP " + r.status)); }
   const data = await r.json();
   if(body !== undefined && data.revision){ baseRevision = data.revision; saveState(); }
+  if(writing) lastSavedAt = Date.now();
   return data;
+  }catch(error){ if(writing) saveFailure=error.message; throw error; }
+  finally{ if(writing) savingOperations--; setTimeout(updateSaveStatus,0); }
 }
 async function loadFromServer(){
   try{
@@ -788,8 +815,10 @@ document.getElementById("list").addEventListener("click", e => {
   markDirty();
 });
 function markDirty(){
-  dirty = true;
-  document.getElementById("btnSave").textContent = "保存 *";
+  dirty = Object.keys({...serverBaseline,...state}).some(id=>st(id)!==(serverBaseline[id]||"todo"));
+  saveFailure = "";
+  updateSaveStatus();
+  document.getElementById("btnSave").textContent = dirty ? "保存进度 *" : "保存进度";
 }
 
 document.getElementById("seg").addEventListener("click", e => {
@@ -811,7 +840,7 @@ document.getElementById("btnSave").addEventListener("click", async () => {
   if(!online){ toast("当前是离线模式，无法写回文件"); return; }
   const doneCount = Object.values(state).filter(v => v === "done").length;
   const skipCount = Object.values(state).filter(v => v === "skip").length;
-  const ok = await askConfirm({
+  const ok = window.RELEASE_PAGES || window.RELEASE_CLOUD ? true : await askConfirm({
     title:"保存勾选状态到 md 文件？",
     icon:"info",
     body:`将把当前看板上的 <strong>${doneCount}</strong> 项完成、
@@ -834,7 +863,7 @@ document.getElementById("btnSave").addEventListener("click", async () => {
     serverBaseline = Object.fromEntries(d.items.map(it => [it.id, it.state]));
     saveState();
     dirty = false;
-    document.getElementById("btnSave").textContent = "保存";
+    document.getElementById("btnSave").textContent = "保存进度";
     render();
     toast("已写回文件");
   }catch(e){
@@ -932,7 +961,7 @@ document.getElementById("mClear").addEventListener("click", async () => {
     saveState();
     DATA = mergeItems(d);
     dirty = false;
-    document.getElementById("btnSave").textContent = "保存";
+    document.getElementById("btnSave").textContent = "保存进度";
     render();
     toast("已清空 " + d.cleared + " 处状态，并已备份原文件");
   }catch(e){
@@ -942,7 +971,7 @@ document.getElementById("mClear").addEventListener("click", async () => {
 
 /* ---- 离开前提醒未保存 ---- */
 window.addEventListener("beforeunload", e => {
-  if(dirty && online){ e.preventDefault(); e.returnValue = ""; }
+  if((dirty || featureHasChanges() || permDirty || savingOperations>0) && online){ e.preventDefault(); e.returnValue = ""; }
 });
 
 /* ------------------------------------------------------------------ *
@@ -1103,6 +1132,13 @@ function renderDescs(){
     : "中文文案用于生成的中文隐私政策与 Info.plist；英文版请切到 English 标签填写。";
 }
 
+function refreshPermissionVisibilityNote(){
+ const el=document.getElementById('permissionFilterNote');if(!el||!DATA)return;
+ PermissionVisibility.annotate(DATA.sections,PERMISSION_RULES);
+ const rows=DATA.sections.flatMap(s=>s.blocks).filter(b=>b.type==='item'&&b.permissionRule&&condOk(b.cond));
+ const visible=rows.filter(b=>PermissionVisibility.visible(b.permissionRule,permSelected,EMBEDDED_PROFILES)).length;
+ el.textContent='权限筛选：'+visible+' 项核对适用，'+(rows.length-visible)+' 项因未选对应权限隐藏。权限改动自动保存。';
+}
 async function refreshPermGen(){
   const body = {selected: permSelected, descs: permDescs, descsEn: permDescsEn, lang: permLang};
   let cfg = null;
@@ -1115,6 +1151,7 @@ async function refreshPermGen(){
     cfg = genLocally();
   }
   if(!cfg) return;
+  refreshPermissionVisibilityNote();
   document.getElementById("gen-ios").textContent =
     "<dict>\n" + (cfg.iosPlist || "    <!-- 无需添加权限声明 -->") + "\n</dict>";
   document.getElementById("gen-android").textContent =
@@ -1326,6 +1363,7 @@ function setPermSaveState(kind, text){
   el.textContent = text || "";
 }
 function schedulePermSave(){
+  updateSaveStatus();
   if(!permDirty) return;               // 打开面板时的初始预览不算改动
   if(!online){
     setPermSaveState("offline", "离线模式：改动只在本机，不会写入文件");
@@ -1449,17 +1487,20 @@ function refreshFeatUI(){
       let html = "<b>以下 " + hidden.length + " 项因项目功能设置隐藏：</b>";
       Object.keys(byCond).forEach(c => {
         html += "<span class=\"fx\"><b>" + (LABEL[c] || c) + "</b> — " + byCond[c].length + " 项<br>"
-              + byCond[c].map(x => "· " + x.replace(/<[^>]+>/g, "").replace(/\*\*/g, "")).join("<br>") + "</span>";
+              + byCond[c].map(x => "· " + escapeHtml(x.replace(/<[^>]+>/g, "").replace(/\*\*/g, ""))).join("<br>") + "</span>";
       });
       pv.innerHTML = html;
     }
   }
 }
+let featureSnapshot = null;
 function openFeatPanel(){
+  featureSnapshot = JSON.parse(JSON.stringify(DATA.features));
   refreshFeatUI();
   document.getElementById("featPanel").classList.add("on");
 }
 function closeFeatPanel(){
+  if(featureSnapshot){ DATA.features=featureSnapshot; featureSnapshot=null; render(); refreshFeatUI(); updateSaveStatus(); }
   document.getElementById("featPanel").classList.remove("on");
 }
 document.getElementById("btnFeat").addEventListener("click", openFeatPanel);
@@ -1469,6 +1510,7 @@ document.getElementById("featPill").addEventListener("click", openFeatPanel);
 
 // 切换开关 -> 立即预览
 function onFeatToggle(){
+  saveFailure="";
   if(!DATA) return;
   DATA.features = {
     hasFeedbackSystem: featFeedback.checked,
@@ -1478,6 +1520,7 @@ function onFeatToggle(){
   applyFeatures();
   render();
   refreshFeatUI();
+  updateSaveStatus();
 }
 featFeedback.addEventListener("change", onFeatToggle);
 featAcc.addEventListener("change", onFeatToggle);
@@ -1496,7 +1539,9 @@ document.getElementById("featSave").addEventListener("click", async () => {
     DATA = mergeItems(d);
     render();
     refreshFeatUI();
+    featureSnapshot=null;
     closeFeatPanel();
+    updateSaveStatus();
     toast("项目设置已保存到 md");
   }catch(e){
     toast("保存失败：" + e.message);
@@ -1556,7 +1601,7 @@ document.getElementById("releaseEdit").onclick = async () => {
   await persistReview(next);
 };
 function releaseSnapshot(){
-  return {release:reviewData.release || {}, date:new Date().toISOString(), items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false, ...(reviewData.items || {})[b.id]}))};
+  return {release:reviewData.release || {}, date:new Date().toISOString(), features:{...DATA.features}, selectedPermissions:[...(DATA.permSelected||[])], items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false, ...(reviewData.items || {})[b.id]}))};
 }
 document.getElementById("releaseArchive").onclick = async () => {
   if(!online || dirty){ toast("请先连接服务并保存勾选进度"); return; }
@@ -1592,6 +1637,28 @@ document.getElementById("backupRestore").onclick = async () => {
     dirty = false;
     location.reload();
   }catch(e){ toast("恢复失败：" + e.message); }
+};
+
+document.getElementById("mobileSave").onclick=()=>document.getElementById("btnSave").click();
+document.getElementById("mobileCurrent").onclick=jumpToCurrent;
+document.getElementById("mobileExport").onclick=()=>document.getElementById("releaseSummary").click();
+document.getElementById("featPanel").addEventListener('click',e=>{if(e.target.id==='featPanel')closeFeatPanel();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('featPanel').classList.contains('on'))closeFeatPanel();});
+
+const newReleaseButton=document.getElementById('newRelease');
+newReleaseButton.hidden=!(window.RELEASE_PAGES||window.RELEASE_CLOUD);
+newReleaseButton.onclick=()=>{
+ if(dirty||permDirty||featureHasChanges()||savingOperations){toast('请先保存所有改动，再开始新一轮发布');return;}
+ document.getElementById('newReleaseForm').reset();document.getElementById('newReleaseError').textContent='';document.getElementById('newReleaseDialog').showModal();
+};
+document.getElementById('cancelNewRelease').onclick=()=>document.getElementById('newReleaseDialog').close();
+document.getElementById('newReleaseForm').onsubmit=async event=>{
+ event.preventDefault();const form=event.target,button=form.querySelector('[type=submit]');button.disabled=true;
+ try{
+  const release={...reviewData.release,version:form.elements.version.value.trim(),build:form.elements.build.value.trim(),date:new Date().toLocaleDateString('sv-SE')};
+  const d=await api('/api/new-release',{release,keepNotes:form.elements.keepNotes.checked,keepEvidence:form.elements.keepEvidence.checked});
+  gen=d.generation;reviewData=d.review;state=seedFromData(d);serverBaseline=Object.fromEntries(d.items.map(it=>[it.id,it.state]));DATA=mergeItems(d);dirty=false;saveState();render();refreshFeatUI();document.getElementById('newReleaseDialog').close();toast('上一轮已归档，新一轮发布已开始');
+ }catch(error){document.getElementById('newReleaseError').textContent=error.message;}finally{button.disabled=false;updateSaveStatus();}
 };
 
 DATA = EMBEDDED;

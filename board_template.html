@@ -44,7 +44,7 @@ __BOARD_CSS__
       <button class="btn" id="btnFeat">项目设置</button>
       <button class="btn" id="btnGuide2">使用说明</button>
       <button class="btn" id="btnPerm">权限配置</button>
-      <button class="btn primary" id="btnSave" disabled>保存</button>
+      <button class="btn primary" id="btnSave" disabled>保存进度</button>
       <span class="morewrap">
         <button class="btn" id="btnMore" aria-haspopup="true" aria-expanded="false">更多</button>
         <div class="moremenu" id="moreMenu">
@@ -55,6 +55,7 @@ __BOARD_CSS__
         </div>
       </span>
     </div>
+    <div id="saveStatus" role="status" aria-live="polite"></div><div class="save-explanation">检查进度：点击保存；备注、发布信息和权限配置：分别即时保存。项目设置点击保存后生效。</div>
     <div class="secnote hidden" id="filtNote"></div>
   </header>
 
@@ -63,7 +64,7 @@ __BOARD_CSS__
 
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">
 <button class="btn" id="releaseEdit">发布信息</button>
-<button class="btn" id="releaseArchive">归档本次发布</button>
+<button class="btn" id="releaseArchive">归档本次发布</button><button class="btn" id="newRelease">开始新一轮发布</button>
 <button class="btn" id="releaseSummary">导出发布摘要</button>
 <button class="btn" id="backupRestore">恢复备份</button>
 </div>
@@ -141,7 +142,7 @@ __BOARD_CSS__
       <span class="hint" id="featHint"></span>
       <span class="grow"></span>
       <button class="btn" id="featCancel">取消</button>
-      <button class="btn primary" id="featSave">保存到 md</button>
+      <button class="btn primary" id="featSave">保存项目设置</button>
     </div>
   </div>
 </div>
@@ -229,16 +230,19 @@ __BOARD_CSS__
     </div>
 
     <div class="panel-foot">
-      <span class="hint" id="permHint"></span>
+      <span class="hint" id="permHint"></span><span id="permissionFilterNote" role="status"></span>
       <span class="savestate" id="permSaveState"></span>
       <span class="grow"></span>
       <button class="btn" id="permEn">导出英文文档</button>
       <button class="btn" id="permCancel">关闭</button>
-      <button class="btn primary" id="permSave">立即写入 md</button>
+      <button class="btn primary" id="permSave">保存权限配置</button>
     </div>
   </div>
 </div>
 
+<dialog id="newReleaseDialog" style="max-width:460px;width:calc(100% - 32px);border:1px solid #dce2df;border-radius:14px;padding:24px">
+<form id="newReleaseForm"><h2>开始新一轮发布</h2><p>先归档当前发布，再清空检查进度。权限选择、项目功能设置和阅读确认保留。</p><label>新版本号<input name="version" required maxlength="80" style="display:block;width:100%;margin:8px 0 16px;padding:10px"></label><label>构建号<input name="build" maxlength="80" style="display:block;width:100%;margin:8px 0 16px;padding:10px"></label><p><label><input name="keepNotes" type="checkbox" checked> 保留检查备注和跳过原因</label></p><p><label><input name="keepEvidence" type="checkbox"> 保留证据路径和链接</label></p><p id="newReleaseError" role="alert"></p><button class="btn" type="button" id="cancelNewRelease">取消</button><button class="btn primary" type="submit">归档并开始</button></form></dialog>
+<div class="mobile-actions"><span id="mobileStatus" role="status"></span><button id="mobileCurrent" class="btn">当前检查项</button><button id="mobileSave" class="btn primary">保存进度</button><button id="mobileExport" class="btn">导出摘要</button></div>
 <script>
 const PERMISSION_RULES = __PERMISSION_RULES__;
 __PERMISSION_VISIBILITY__

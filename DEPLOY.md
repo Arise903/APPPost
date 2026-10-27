@@ -78,3 +78,6 @@ flask --app 'online.app:create_app()' reset-password you@example.com
 数据库结构目前为首版，通过幂等初始化创建；PostgreSQL 使用事务级锁避免多进程初始化竞争。后续升级表结构应引入显式版本迁移，勿直接删除生产数据表。
 
 会话有效期 7 天；服务器仅保存会话 token 的哈希；生产 Cookie 启用 Secure、HttpOnly 和 SameSite。浏览器草稿按用户和项目分隔。邀请仅用于建立项目成员身份，不提供公开注册或邮件验证功能。
+
+
+新版看板增加统一保存状态、项目设置取消回滚、手机操作栏，以及“开始新一轮发布”（云端同样使用数据库事务先归档后清空）。GitHub Pages 个人版的全部项目备份、版本提示、固定 ID 与模板升级见 [PAGES.md](PAGES.md)。已有云端项目首次保存时补齐固定 ID 标记，保存前数据库快照保留旧文档。

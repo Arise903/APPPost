@@ -8,19 +8,16 @@ def annotate(sections):
     rules=json.loads(Path(__file__).with_name('permission_rules.json').read_text(encoding='utf-8'))
     for section in sections:
         group=None
-        account_section=False
-        feedback_section=False
+        feature=None
         for block in section['blocks']:
             if block['type'] in ('h3','h4'):
                 group=next((g for g in rules['groups'] if re.search(g['heading'],block['title'])),None)
-                account_section=bool(re.search(r'^(?:5\.4\s|账号注销与数据主体权利)',block['title']))
-                feedback_section=bool(re.search(r'用户反馈|feedbackApiKey',block['title']))
-            if block['type']=='item' and (feedback_section or '（反馈功能）' in block['text']):
-                block['cond']='hasFeedbackSystem'
-            if block['type']=='item' and account_section:
-                block['cond']='hasAccountSystem'
-            if block['type']=='item' and group:
-                block['permissionRule']=next((r['requires'] for r in group['rules'] if r['contains'] in block['text']),group['default'])
+                feature=next((g['feature'] for g in rules.get('featureGroups',[]) if re.search(g['heading'],block['title'])),None)
+            if block['type']!='item':continue
+            condition=rules.get('featureConditions',{}).get(block['id']) or feature or next((r['feature'] for r in rules.get('featureText',[]) if r['contains'] in block['text']),None)
+            if condition:block['cond']=condition
+            requirement=rules.get('itemRules',{}).get(block['id']) or (next((r['requires'] for r in group['rules'] if r['contains'] in block['text']),group['default']) if group else None)
+            if requirement:block['permissionRule']=requirement
 
 
 def visible(rule,selected,profiles):

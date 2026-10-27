@@ -42,3 +42,25 @@ test('Feedback feature defaults off and preserves completed feedback items when 
  const id=await S.create({name:'Optional feedback',document});const p=S.get(id);let data=S.payload(p);assert.equal(data.features.hasFeedbackSystem,false);assert.equal(data.total,1);const task=data.items[0];assert.equal(task.cond,'hasFeedbackSystem');
  await S.mutate(id,1,'enable feedback',p=>p.document='<!-- FEATURES hasAccountSystem=1 targetMinors=1 hasFeedbackSystem=1 -->\n'+p.document);data=S.payload(S.get(id));assert.equal(data.total,3);assert.equal(data.items[0].id,task.id);assert.equal(data.items[0].state,'done');
 });
+
+test('Fixed task and section IDs survive wording changes and match Python',async()=>{
+ const {S}=setup();const raw='# App\n## Group\n### Details\n- [x] Original task\n';const before=S.parse(raw),fixed=S.stabilize(raw);const edited=fixed.replace('Group','Renamed group').replace('Original task','Revised task');const after=S.parse(edited);assert.equal(after.items[0].id,before.items[0].id);assert.equal(after.sections[0].id,before.sections[0].id);assert.equal(after.items[0].state,'done');
+ const python=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c','import json,sys,checklist_tool as c;print(json.dumps(c.parse_md(sys.argv[1])))',edited],{encoding:'utf8'}));assert.equal(python.items[0].id,after.items[0].id);assert.equal(python.sections[0].id,after.sections[0].id);
+});
+test('Legacy migration keeps states and review identities with a complete pre-upgrade snapshot',async()=>{
+ const {S,context}=setup();const raw='# Old\n## Tasks\n- [x] Original\n';const id='legacy',task=S.parse(raw).items[0];
+ context.localStorage.setItem(S.KEY,JSON.stringify({schema:1,projects:{[id]:{id,name:'Old',document:raw,permissions:{selected:[],descs:{},descsEn:{}},review:{release:{version:'1'},items:{[task.id]:{notes:'keep'}},history:[]},version:3,generation:1,snapshots:[],createdAt:1,updatedAt:1}}}));
+ const result=await S.initialize();assert.equal(result.migrated,1);const p=S.get(id);assert.equal(p.version,3);assert.equal(S.parse(p.document).items[0].id,task.id);assert.equal(p.review.items[task.id].notes,'keep');assert.equal(p.snapshots[0].state.document,raw);assert.equal(p.dataVersion,2);
+});
+test('Workspace backup restores multiple projects, snapshots and browser drafts without overwriting',async()=>{
+ const source=setup(),id=await source.S.create({name:'One'});await source.S.create({name:'Two'});await source.S.mutate(id,1,'note',p=>p.review.release.version='2');source.context.localStorage.setItem('app-release-checklist-state-v2:pages:'+id,JSON.stringify({state:{draft:'done'},revision:'2',__gen:1}));
+ const bundle=source.S.exportAll(),target=setup();await target.S.create({name:'Existing'});const imported=await target.S.importAll(bundle);assert.equal(target.S.list().length,3);assert.equal(imported.ids.length,2);const p=target.S.get(imported.ids[0]);assert.equal(p.review.release.version,'2');assert.equal(p.snapshots.length,1);assert.equal(p.snapshots[0].state.id,p.id);assert.equal(JSON.parse(target.context.localStorage.getItem('app-release-checklist-state-v2:pages:'+p.id)).revision,'1');
+ const bad=JSON.parse(JSON.stringify(bundle));bad.projects.push({document:'invalid'});await assert.rejects(target.S.importAll(bad));assert.equal(target.S.list().length,3);
+});
+test('New release archives completed state, retains chosen notes, clears evidence and checks atomically',async()=>{
+ const {S,context}=setup();const id=await S.create({name:'Release'});const item=S.payload(S.get(id)).items.find(i=>!i.gate);await S.mutate(id,1,'prepare',p=>{p.document=S.apply(p.document,{[item.id]:'done'});p.review={release:{version:'1'},items:{[item.id]:{notes:'keep',evidence:'remove.png'}},history:[]};});context.location.search='?id='+id;context.window.fetch=async()=>{};S.install();
+ const response=await context.window.fetch('/api/new-release',{method:'POST',body:JSON.stringify({revision:'2',release:{version:'2'},keepNotes:true,keepEvidence:false})});assert.equal(response.status,200);const p=S.get(id);assert.equal(p.review.history[0].release.version,'1');assert.equal(p.review.history[0].items.find(x=>x.id===item.id).state,'done');assert.equal(p.review.release.version,'2');assert.equal(p.review.items[item.id].notes,'keep');assert.equal(p.review.items[item.id].evidence,undefined);assert.equal(S.payload(p).items.find(x=>x.id===item.id).state,'todo');assert.equal(p.generation,2);
+});
+test('Template update preserves modified built-in text, custom tasks and notes',async()=>{
+ const {S}=setup();const id=await S.create({name:'Template'});const before=S.get(id),item=S.parse(before.document).items[0];await S.mutate(id,1,'custom edit',p=>{p.document=p.document.replace(item.text,'My custom wording')+'\n## Custom\n- [x] My custom task\n';p.review.items[item.id]={notes:'keep'};});await S.updateTemplate(id,2);const p=S.get(id);assert.match(p.document,/My custom wording/);assert.match(p.document,/My custom task/);assert.equal(p.review.items[item.id].notes,'keep');assert.ok(p.snapshots.length>=2);
+});
