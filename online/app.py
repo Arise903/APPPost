@@ -374,9 +374,11 @@ def create_app(overrides=None):
                     project['document'] = checklist.apply_states(project['document'], parsed, {gate['id']: 'done' if operation == 'ack' else 'skip'})
             elif operation == 'features':
                 features = data.get('features')
-                if not isinstance(features, dict) or any(type(features.get(k)) is not bool for k in ('hasAccountSystem', 'targetMinors')):
+                if isinstance(features, dict):
+                    features = {'hasFeedbackSystem': False, **features}
+                if not isinstance(features, dict) or any(type(features.get(k)) is not bool for k in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem')):
                     abort(400, '项目特征无效')
-                line = '<!-- FEATURES ' + ' '.join(k + '=' + str(int(features[k])) for k in ('hasAccountSystem', 'targetMinors')) + ' -->'
+                line = '<!-- FEATURES ' + ' '.join(k + '=' + str(int(features[k])) for k in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem')) + ' -->'
                 project['document'] = checklist.RE_FEATURES.sub(line, project['document']) if checklist.RE_FEATURES.search(project['document']) else line + '\n' + project['document']
             elif operation == 'review':
                 validate_review(data.get('review'))

@@ -9,7 +9,7 @@ function save(data){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(_)
 async function transaction(action){if(!navigator.locks)throw Error('此浏览器不支持安全保存，请使用新版 Chrome、Edge、Safari 或 Firefox，并通过 HTTP/HTTPS 打开。');return navigator.locks.request('release-desk-pages-write',()=>{const data=read();const result=action(data);save(data);return result;});}
 function hash(text){let h=0x811c9dc5;for(const byte of new TextEncoder().encode(text)){h^=byte;h=Math.imul(h,0x01000193)>>>0;}return h.toString(16).padStart(8,'0');}
 function parse(text){
- const lines=text.split('\n'), result={title:'Checklist',preamble:[],sections:[],items:[],features:{hasAccountSystem:true,targetMinors:true}};
+ const lines=text.split('\n'), result={title:'Checklist',preamble:[],sections:[],items:[],features:{hasAccountSystem:true,targetMinors:true,hasFeedbackSystem:false}};
  let section=null,path=[],fence=null,pending=[];const counts={};const blocks=()=>section?section.blocks:result.preamble;
  const features=text.match(/<!--\s*FEATURES\s+([\s\S]*?)-->/);if(features)for(const kv of features[1].matchAll(/([A-Za-z0-9_]+)\s*=\s*([01])/g))result.features[kv[1]]=kv[2]==='1';
  for(let i=0;i<lines.length;i++){
@@ -87,7 +87,7 @@ async function handle(path,options={}){
  const updated=await mutate(id,data.revision,op,project=>{
   if(op==='write'){const ids=new Set(parse(project.document).items.map(x=>x.id));if(!data.states||Object.keys(data.states).some(x=>!ids.has(x)))throw Error('检查项已变化');project.document=apply(project.document,data.states);}
   else if(op==='review'){validate({...project,review:data.review});project.review=copy(data.review);}
-  else if(op==='features'){const features=data.features;if(!features||['hasAccountSystem','targetMinors'].some(k=>typeof features[k]!=='boolean'))throw Error('项目特征无效');const line='<!-- FEATURES '+Object.entries(features).filter(([k])=>['hasAccountSystem','targetMinors'].includes(k)).map(([k,v])=>k+'='+(v?1:0)).join(' ')+' -->';project.document=/<!--\s*FEATURES\s+[\s\S]*?-->/.test(project.document)?project.document.replace(/<!--\s*FEATURES\s+[\s\S]*?-->/,line):line+'\n'+project.document;}
+  else if(op==='features'){const features={hasFeedbackSystem:false,...data.features};if(!features||['hasAccountSystem','targetMinors','hasFeedbackSystem'].some(k=>typeof features[k]!=='boolean'))throw Error('项目特征无效');const line='<!-- FEATURES '+Object.entries(features).filter(([k])=>['hasAccountSystem','targetMinors','hasFeedbackSystem'].includes(k)).map(([k,v])=>k+'='+(v?1:0)).join(' ')+' -->';project.document=/<!--\s*FEATURES\s+[\s\S]*?-->/.test(project.document)?project.document.replace(/<!--\s*FEATURES\s+[\s\S]*?-->/,line):line+'\n'+project.document;}
   else if(op==='ack'||op==='unack'){const gate=payload(project).gateId;if(gate)project.document=apply(project.document,{[gate]:op==='ack'?'done':'skip'});}
   else if(op==='clear'){const d=payload(project);project.document=apply(project.document,Object.fromEntries(d.items.filter(x=>!x.gate).map(x=>[x.id,'todo'])));project.generation++;}
   else if(op==='perm-write'){const permissions={selected:data.selected||[],descs:data.descs||{},descsEn:data.descsEn||{}};validate({...project,permissions});project.permissions=copy(permissions);project.document=replaceAppendix(project.document,appendix(permissions));}

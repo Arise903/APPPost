@@ -125,6 +125,16 @@ class OnlineTests(unittest.TestCase):
         self.assertEqual(guide.status_code,200)
         self.assertIn((self.prefix+'/ack').encode(),guide.data)
 
+    def test_feedback_feature_is_optional(self):
+        initial = self.payload()
+        self.assertFalse(initial['features']['hasFeedbackSystem'])
+        feedback = [x for x in initial['items'] if x['cond'] == 'hasFeedbackSystem']
+        self.assertTrue(feedback)
+        enabled = self.post('features', {'revision': initial['revision'], 'features': {'hasAccountSystem': True, 'targetMinors': True, 'hasFeedbackSystem': True}})
+        self.assertEqual(enabled.status_code, 200)
+        self.assertTrue(enabled.json['features']['hasFeedbackSystem'])
+        self.assertEqual(enabled.json['total'], initial['total'] + len(feedback))
+
     def test_login_throttle(self):
         anonymous=self.app.test_client()
         email=uuid.uuid4().hex+'@example.test'

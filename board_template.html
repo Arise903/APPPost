@@ -105,7 +105,7 @@ __BOARD_CSS__
     <div class="panel-head">
       <div style="flex:1">
         <h2 id="featTitle">项目设置</h2>
-        <p>先确认下面两项。<b>不适用的检查项会自动隐藏</b> —— 不再出现在清单里，也不占用序号。<br>
+        <p>按 App 实际功能选择。<b>不适用的检查项会自动隐藏</b> —— 不再出现在清单里，也不占用序号。<br>
            设置保存在清单文件里，可与团队共享。</p>
       </div>
       <button class="panel-x" id="featClose" title="关闭">×</button>
@@ -114,6 +114,10 @@ __BOARD_CSS__
     <div class="panel-body">
       <div class="panel-sec">
         <div class="featlist">
+          <label class="featrow">
+            <input type="checkbox" id="featFeedback">
+            <span class="featmain"><b>App 有用户反馈系统</b><em>开启后显示 feedbackApiKey、反馈入口、提交流程和隐私说明核对项；默认关闭。</em></span>
+          </label>
           <label class="featrow">
             <input type="checkbox" id="featAcc">
             <span class="featmain">

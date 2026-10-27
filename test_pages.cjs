@@ -36,3 +36,9 @@ test('Legacy account deletion subsection follows account-system feature without 
  const original=S.parse(document).items[0].id;const id=await S.create({name:'Legacy account',document});const p=S.get(id),data=S.payload(p);assert.equal(data.items[0].cond,'hasAccountSystem');assert.equal(data.items[1].cond,'hasAccountSystem');assert.equal(data.items[0].id,original);assert.equal(data.items[0].state,'done');assert.equal(data.total,0);
  p.document=p.document.replace('hasAccountSystem=0','hasAccountSystem=1');assert.equal(S.payload(p).total,2);
 });
+
+test('Feedback feature defaults off and preserves completed feedback items when toggled',async()=>{
+ const {S}=setup();const document='# App\n## Config\n### 3. 用户反馈 → `feedbackApiKey`\n- [x] feedbackApiKey 已替换\n- [ ] 反馈入口可达\n### 4. Other\n- [ ] Other check\n';
+ const id=await S.create({name:'Optional feedback',document});const p=S.get(id);let data=S.payload(p);assert.equal(data.features.hasFeedbackSystem,false);assert.equal(data.total,1);const task=data.items[0];assert.equal(task.cond,'hasFeedbackSystem');
+ await S.mutate(id,1,'enable feedback',p=>p.document='<!-- FEATURES hasAccountSystem=1 targetMinors=1 hasFeedbackSystem=1 -->\n'+p.document);data=S.payload(S.get(id));assert.equal(data.total,3);assert.equal(data.items[0].id,task.id);assert.equal(data.items[0].state,'done');
+});

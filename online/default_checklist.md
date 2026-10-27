@@ -1,6 +1,6 @@
 # 上架前 App 配置 Checklist
 
-<!-- FEATURES hasAccountSystem=1 targetMinors=1 -->
+<!-- FEATURES hasAccountSystem=1 targetMinors=1 hasFeedbackSystem=0 -->
 
 ## 零、怎么用
 
