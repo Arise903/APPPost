@@ -18,7 +18,7 @@ def build():
         if path.is_file(): digest.update(path.read_bytes())
     version=digest.hexdigest()[:12]
     template_version=hashlib.sha256((ROOT/'online/default_checklist.md').read_bytes()).hexdigest()[:10]
-    for name in ('index.html','dashboard.js','store.js','guide.html','guide.js','experience.js'):
+    for name in ('index.html','dashboard.js','store.js','github-sync.js','guide.html','guide.js','experience.js'):
         shutil.copyfile(ROOT/'pages'/name,OUT/name)
     shutil.copyfile(ROOT/'online/static/app.css',OUT/'app.css')
     shutil.copyfile(ROOT/'permission_visibility.js',OUT/'permission_visibility.js')

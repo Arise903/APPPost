@@ -4,3 +4,5 @@
 
 .backup-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 20px}.backup-tools>span{font-size:11px;color:#7c8981;line-height:1.6}.backup-tools .backup-due{color:#9a6517}.upgrade-banner{padding:14px 24px;background:#fff5d9;font-size:12px;line-height:1.8}.upgrade-banner button{margin-left:12px}@media(max-width:700px){.backup-tools>.button{flex:1}.backup-tools>span{width:100%}}
 .dashboard-upgrade,.dashboard-version{margin-left:225px}@media(max-width:1000px) and (min-width:701px){.dashboard-upgrade,.dashboard-version{margin-left:190px}}@media(max-width:700px){.dashboard-upgrade,.dashboard-version{margin-left:0}}
+
+.github-sync-status{flex-basis:100%;padding:4px 2px}.github-sync-status[data-state="error"]{color:#a33}.github-sync-status[data-state="connected"]{color:#28704f}.github-sync-status[data-state="busy"]{color:#9a6517}.github-token-steps{padding-left:22px;font-size:13px;line-height:1.9}.github-token-steps li{padding:2px 0}#githubSyncDialog form>p{font-size:13px;line-height:1.8;color:#657265}

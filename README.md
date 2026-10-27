@@ -4,7 +4,7 @@
 
 直接使用：[GitHub Pages 个人工作台](https://arise903.github.io/APPPost/)。
 
-新增 **GitHub Pages 个人版**：无需服务器，打开网页即可检查、备注、配置权限、归档和导入导出。数据仅保存在当前浏览器；发布设置及使用说明见 [PAGES.md](PAGES.md)。
+新增 **GitHub Pages 个人版**：无需服务器，打开网页即可检查、备注、配置权限、归档和导入导出。数据默认保存在当前浏览器，也可手动同步到专用私有 `Arise903/APPdata` 仓库；发布设置及使用说明见 [PAGES.md](PAGES.md)。
 
 新增在线版：支持账号登录、多个私有项目、云端记录、成员权限与完整快照恢复。GitHub CI 和 Render + PostgreSQL 部署已配置，详见 [在线部署说明](DEPLOY.md)。
 
