@@ -466,6 +466,28 @@ def generate_config(profiles: dict, selected: list, descs: dict, descs_en: dict 
     }
 
 
+def build_english_appendix(profiles: dict, selected: list, descs_en: dict = None) -> str:
+    """English explanations embedded beside the Chinese permission appendix."""
+    descs_en = descs_en or {}
+    pm = _perm_by_id(profiles)
+    cfg = generate_config(profiles, selected, {}, descs_en, lang="en")
+    out = ["### 英文权限用途说明（English Permission Descriptions）", ""]
+    for pid in selected:
+        permission = pm.get(pid)
+        if not permission:
+            continue
+        descriptions = [k.get("desc_en", "") for k in _ios_keys(permission)]
+        description = (descs_en.get(pid) or " ".join(dict.fromkeys(d for d in descriptions if d))
+                       or (permission.get("android") or {}).get("desc_en")
+                       or permission.get("policy_text_en") or "Please provide an English description of this permission's purpose.")
+        out.append(f"- **{permission.get('name_en') or pid}**: {description}")
+    out.extend(["", "### iOS Info.plist（English）", "", "```xml", "<dict>",
+                cfg["iosPlist"] or "    <!-- No permission usage descriptions required -->", "</dict>", "```", "",
+                "### 英文隐私政策文案（Privacy Policy Copy）", "",
+                cfg["privacyPolicy"] or "_No permission-specific privacy policy copy configured._", ""])
+    return "\n".join(out)
+
+
 def build_appendix(profiles: dict, selected: list, descs: dict, descs_en: dict = None) -> str:
     """生成 md 附录（权限与隐私配置）。"""
     pm = _perm_by_id(profiles)
@@ -542,6 +564,9 @@ def build_appendix(profiles: dict, selected: list, descs: dict, descs_en: dict =
         out.append(cfg["privacyPolicy"])
     else:
         out.append("_当前选中的权限无需在隐私政策中单独说明。_")
+    out.append("")
+
+    out.append(build_english_appendix(profiles, selected, descs_en))
     out.append("")
 
     # 审核要点

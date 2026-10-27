@@ -25,6 +25,15 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual(self.path.read_text().count('KEEP'), 1)
         self.assertEqual(self.path.read_text().count(c.APPENDIX_END), 1)
 
+    def test_bilingual_appendix(self):
+        text = c.build_appendix(c.load_profiles(), ['tracking'], {'tracking': '中文用途'}, {'tracking': 'Measure campaigns & improve ads.'})
+        self.assertIn('英文权限用途说明', text)
+        self.assertIn('Cross-App Tracking (ATT)', text)
+        self.assertIn('Measure campaigns & improve ads.', text)
+        self.assertIn('Measure campaigns &amp; improve ads.', text)
+        self.assertIn('Cross-app tracking permission is used', text)
+        self.assertIn('中文用途', text)
+
     def test_xml_escaping(self):
         profiles = c.load_profiles()
         key = next(p['id'] for p in profiles['permissions'] if c._ios_keys(p))

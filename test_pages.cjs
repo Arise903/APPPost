@@ -7,3 +7,12 @@ test('Full export/import preserves notes and validates permissions',async()=>{co
 test('Permission XML escapes custom descriptions',()=>{const {S}=setup();const cfg=S.config({selected:['camera'],descs:{camera:'A & B < C'},descsEn:{}});assert.match(cfg.iosPlist,/A &amp; B &lt; C/);});
 
 test('Imported checklist without guide gate remains usable',async()=>{const {S}=setup();const id=await S.create({name:'Simple',document:'# Simple\n\n## Tasks\n- [ ] One\n'});assert.equal(S.payload(S.get(id)).gateDone,true);});
+
+test('Permission appendix includes custom English copy and English policy',async()=>{
+ const {S,context}=setup();const id=await S.create({name:'Bilingual'});
+ context.location.search='?id='+id;context.window.fetch=async()=>{throw Error('Unexpected network request');};S.install();
+ const response=await context.window.fetch('/api/perm-write',{method:'POST',body:JSON.stringify({revision:'1',selected:['tracking'],descs:{tracking:'中文用途'},descsEn:{tracking:'Measure campaigns & improve ads.'}})});
+ assert.equal(response.status,200);const data=await response.json();
+ assert.match(data.mdText,/英文权限用途说明/);assert.match(data.mdText,/Measure campaigns & improve ads\./);assert.match(data.mdText,/Measure campaigns &amp; improve ads\./);assert.match(data.mdText,/Cross-app tracking permission is used/);assert.match(data.mdText,/中文用途/);
+ const count=S.parse(data.mdText).items.length;assert.equal(count,S.parse(S.export(id).document).items.length);
+});

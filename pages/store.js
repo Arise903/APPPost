@@ -63,7 +63,17 @@ function config(data){const profiles=PAGES_DATA.profiles,en=data.lang==='en',ios
  const text=en?(p.policy_text_en||p.policy_text):p.policy_text;if(text)policy.push('- **'+name+'**：'+text);for(const note of (en?p.review_notes_en||p.review_notes:p.review_notes)||[])checks.push('〔'+name+'〕'+note);
  }return {iosPlist:ios.join('\n'),androidManifest:android.join('\n'),appstore,privacyPolicy:policy.join('\n'),checks,missing};
 }
-function appendix(data){const cfg=config(data);return '<!-- PERMISSION_APPENDIX -->\n## 附录：权限与隐私配置\n\n### iOS Info.plist\n\n```xml\n'+cfg.iosPlist+'\n```\n\n### Android Manifest\n\n```xml\n'+cfg.androidManifest+'\n```\n\n### 隐私政策文案\n\n'+cfg.privacyPolicy+'\n\n### App Store 隐私信息\n\n'+cfg.appstore.map(x=>'- '+x).join('\n')+'\n\n### 核对提示\n\n'+cfg.checks.map(x=>'- '+x).join('\n')+'\n<!-- PERMISSION_APPENDIX_END -->\n';}
+function englishAppendix(data){
+ const english=config({...data,descs:{},lang:'en'});
+ const explanations=(data.selected||[]).map(id=>{
+  const p=PAGES_DATA.profiles.permissions.find(p=>p.id===id);if(!p)return '';
+  const defaults=[...new Set(keys(p).map(k=>k.desc_en).filter(Boolean))].join(' ');
+  const description=data.descsEn?.[id]||defaults||p.android?.desc_en||p.policy_text_en||"Please provide an English description of this permission's purpose.";
+  return '- **'+(p.name_en||p.id)+'**: '+description;
+ }).filter(Boolean).join('\n');
+ return ['### 英文权限用途说明（English Permission Descriptions）','',explanations,'','### iOS Info.plist（English）','','```xml',english.iosPlist||'<!-- No permission usage descriptions required -->','```','','### 英文隐私政策文案（Privacy Policy Copy）','',english.privacyPolicy||'_No permission-specific privacy policy copy configured._',''].join('\n');
+}
+function appendix(data){const cfg=config({...data,lang:'zh'});return '<!-- PERMISSION_APPENDIX -->\n## 附录：权限与隐私配置\n\n### iOS Info.plist\n\n```xml\n'+cfg.iosPlist+'\n```\n\n### Android Manifest\n\n```xml\n'+cfg.androidManifest+'\n```\n\n### 隐私政策文案\n\n'+cfg.privacyPolicy+'\n\n'+englishAppendix(data)+'\n### App Store 隐私信息\n\n'+cfg.appstore.map(x=>'- '+x).join('\n')+'\n\n### 核对提示\n\n'+cfg.checks.map(x=>'- '+x).join('\n')+'\n<!-- PERMISSION_APPENDIX_END -->\n';}
 function replaceAppendix(text,content){const start=text.indexOf('<!-- PERMISSION_APPENDIX -->');if(start<0)return text.trimEnd()+'\n\n'+content;const end=text.indexOf('<!-- PERMISSION_APPENDIX_END -->',start);if(end>=0)return text.slice(0,start)+content+text.slice(end+'<!-- PERMISSION_APPENDIX_END -->'.length);const tail=text.slice(start).match(/^## (?!附录：权限与隐私配置).+/m);return text.slice(0,start)+content+(tail?'\n'+text.slice(start+tail.index):'');}
 function english(data){const cfg=config({...data,lang:'en'});return ['# Privacy and Permissions — Draft','','Complete all placeholders and verify this draft against your actual data practices before publishing.','','App: [APP NAME]','Contact: [CONTACT EMAIL]','Last updated: [DATE]','','## Selected permissions',cfg.privacyPolicy,'','## iOS usage descriptions','```xml',cfg.iosPlist,'```','','## Android permissions','```xml',cfg.androidManifest,'```','','## Review checklist',...cfg.checks.map(x=>'- '+x),'','## Data practices to complete','- Data collected, purposes, retention and deletion','- Third-party SDKs, sharing and tracking','- User rights and contact information','- Children and regional requirements'].join('\n');}
 function download(name,text,type='application/json'){const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
