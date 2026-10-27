@@ -782,7 +782,7 @@ function mergeItems(d){
 /* ------------------------------------------------------------------ *
  * 交互
  * ------------------------------------------------------------------ */
-document.getElementById("list").addEventListener("change", e => {
+document.getElementById("list").addEventListener("change", async e => {
   const cb = e.target;
   if(cb.type !== "checkbox") return;
   const li = cb.closest("li.item");
@@ -791,6 +791,22 @@ document.getElementById("list").addEventListener("change", e => {
     cb.checked = false;
     toast("必须按顺序完成前面的条目");
     return;
+  }
+  if(li.dataset.gate === "1" && !cb.checked && gateDone){
+    // Restore the checked state while the user decides, so cancelling the
+    // confirmation leaves both the gate and checklist unchanged.
+    cb.checked = true;
+    const confirmed = await askConfirm({
+      title:"取消阅读确认？",
+      icon:"warn",
+      body:"取消后，所有尚未完成的检查项都会重新锁定。已完成记录会保留。",
+      detail:"你之后可以重新勾选阅读确认来解锁清单。",
+      confirmText:"取消确认",
+      cancelText:"保持已确认",
+      danger:true
+    });
+    if(!confirmed) return;
+    cb.checked = false;
   }
   state[id] = cb.checked ? "done" : "todo";
   if(li.dataset.gate === "1") gateDone = cb.checked;

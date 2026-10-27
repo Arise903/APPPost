@@ -24,6 +24,9 @@ const server=http.createServer((req,res)=>{
   await page.locator('#newProject').click();await page.locator('[name=name]').fill('初始化显示回归');await page.locator('#createForm [type=submit]').click();await page.waitForURL(/board.html\?id=/);await page.waitForFunction(()=>typeof online!=='undefined'&&online);
   const gate=page.locator('.gateitem input[type=checkbox]');assert.equal(await gate.isChecked(),false);assert.equal(await page.locator('#gateBar').isVisible(),true);
   await gate.check();assert.equal(await page.locator('#gateBar').isVisible(),false,'勾选阅读确认后顶部提醒应立即消失');assert.doesNotMatch(await page.locator('#seqline').innerText(),/清单未解锁/);assert.equal(await page.locator('#list li.item:not(.gateitem)').first().getAttribute('data-locked'),'0');
+  await gate.click();await page.locator('#ov').waitFor({state:'visible'});await page.locator('#dlgCancel').click();assert.equal(await gate.isChecked(),true,'取消确认框后阅读状态应保持');assert.equal(await page.locator('#gateBar').isVisible(),false);
+  await gate.click();await page.locator('#ov').waitFor({state:'visible'});await page.locator('#dlgOk').click();assert.equal(await gate.isChecked(),false);assert.equal(await page.locator('#gateBar').isVisible(),true,'确认取消后应重新显示阅读提醒');assert.equal(await page.locator('#list li.item:not(.gateitem)').first().getAttribute('data-locked'),'1');
+  await gate.check();assert.equal(await page.locator('#gateBar').isVisible(),false);
   await page.locator('#btnSave').click();await page.waitForFunction(()=>document.getElementById('btnSave').textContent==='保存进度');await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.equal(await page.locator('.gateitem input[type=checkbox]').isChecked(),true);assert.equal(await page.locator('#gateBar').isVisible(),false,'保存并重新载入后阅读确认仍应生效');
   const heading=()=>page.getByRole('heading').filter({hasText:/用户反馈.*feedbackApiKey/});
   const verifyHidden=async()=>{
@@ -40,6 +43,6 @@ const server=http.createServer((req,res)=>{
    assert.equal(await heading().count(),enabled?1:0);await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.equal(await heading().count(),enabled?1:0);
    assert.equal(await page.getByRole('heading').filter({hasText:'账号注销与数据主体权利'}).count(),0);
   }
-  await verifyHidden();assert.deepEqual(errors,[]);console.log('Pages DOM regression passed: guide confirmation, feedback visibility, reload, settings, review rebuild and continuous numbering.');
+  await verifyHidden();assert.deepEqual(errors,[]);console.log('Pages DOM regression passed: guide acknowledgement, cancellation confirmation, feedback visibility, reload, settings, review rebuild and continuous numbering.');
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
