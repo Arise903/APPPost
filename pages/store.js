@@ -103,8 +103,20 @@ function initialize(){
  });return initialization;
 }
 function exportAll(){const data=read(),drafts={};for(const id of Object.keys(data.projects)){const raw=localStorage.getItem('app-release-checklist-state-v2:pages:'+id);if(raw){try{drafts[id]=JSON.parse(raw);}catch(_){drafts[id]={unreadable:raw};}}}return {format:'release-desk-workspace/v1',exportedAt:new Date().toISOString(),projects:Object.values(data.projects).map(p=>({format:'release-desk/v1',...copy(p)})),drafts};}
-async function importAll(bundle){
+function inspectImportAll(bundle){
  if(!bundle||bundle.format!=='release-desk-workspace/v1'||!Array.isArray(bundle.projects)||bundle.projects.length>100)throw Error('请选择完整工作台备份，最多一次导入 100 个项目');
+ const names=[];let snapshots=0;
+ for(const input of bundle.projects){
+  validate(input);const name=String(input.name||'导入项目').trim();if(!name||name.length>100)throw Error('备份中有项目名称无效');names.push(name);
+  if(input.snapshots!==undefined&&!Array.isArray(input.snapshots))throw Error('项目快照格式无效');
+  const saved=(input.snapshots||[]).slice(0,10);snapshots+=saved.length;
+  for(const item of saved)validate(item.state);
+ }
+ const drafts=Object.keys(bundle.drafts||{}).filter(id=>bundle.drafts[id]&&bundle.drafts[id].state&&typeof bundle.drafts[id].state==='object').length;
+ return {projects:names.length,names,snapshots,drafts,exportedAt:bundle.exportedAt||null};
+}
+async function importAll(bundle){
+ inspectImportAll(bundle);
  const drafts=[];
  const ids=await transaction(data=>bundle.projects.map(input=>{
   const checked=validate(input),id=crypto.randomUUID(),name=String(input.name||'导入项目').slice(0,100);
@@ -156,5 +168,5 @@ async function handle(path,options={}){
  return updated;
 }
 function install(){global.RELEASE_PAGES={projectId:projectId()};initialize().catch(()=>{});const native=global.fetch.bind(global);global.fetch=async(path,options)=>{if(typeof path==='string'&&path.startsWith('/api/')){try{return new Response(JSON.stringify(await handle(path,options)),{status:200,headers:{'Content-Type':'application/json'}});}catch(error){return new Response(JSON.stringify({error:error.message}),{status:error.status||400,headers:{'Content-Type':'application/json'}});}}return native(path,options);};}
-global.PagesStore={KEY,initialize,exportAll,importAll,markExport,updateTemplate,stabilize,read,get,parse,apply,payload,create,mutate,config,english,download,escape,projectId,install,openProject:()=>payload(get(projectId())),list:()=>Object.values(read().projects).sort((a,b)=>b.updatedAt-a.updatedAt),export:id=>({format:'release-desk/v1',...state(get(id))}),remove:id=>transaction(data=>{delete data.projects[id];})};
+global.PagesStore={KEY,initialize,exportAll,inspectImportAll,importAll,markExport,updateTemplate,stabilize,read,get,parse,apply,payload,create,mutate,config,english,download,escape,projectId,install,openProject:()=>payload(get(projectId())),list:()=>Object.values(read().projects).sort((a,b)=>b.updatedAt-a.updatedAt),export:id=>({format:'release-desk/v1',...state(get(id))}),remove:id=>transaction(data=>{delete data.projects[id];})};
 })(window);

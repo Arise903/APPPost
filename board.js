@@ -11,14 +11,14 @@ function boardFetch(path, options){
 /* ------------------------------------------------------------------ *
  * 状态
  * ------------------------------------------------------------------ */
-let savingOperations=0, saveFailure="", lastSavedAt=null;
+let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=null;
 function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
  const permissionPending=typeof permDirty!=="undefined"&&permDirty;
  const pending=(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
- let label=saveFailure?"保存失败 · "+saveFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleTimeString():"尚无待保存修改";
- el.textContent=label;el.dataset.state=saveFailure?'error':savingOperations?'saving':pending?'pending':'saved';
+ let label=saveFailure?"保存失败 · "+saveFailure:localDraftFailure?localDraftFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleTimeString():"尚无待保存修改";
+ el.textContent=label;el.dataset.state=saveFailure||localDraftFailure?'error':savingOperations?'saving':pending?'pending':'saved';
  const mobile=document.getElementById("mobileStatus");if(mobile)mobile.textContent=label;
  const save=document.getElementById("mobileSave");if(save)save.disabled=savingOperations>0||!online;
 }
@@ -29,6 +29,7 @@ let DATA = null;          // 服务端返回的最新数据
 let state = {};           // id -> "done" | "skip" | "todo"
 let filter = "all";
 let query = "";
+let sectionFilter = "all";
 let dirty = false;        // 有未保存的改动
 let online = false;       // 是否连上本地服务
 let gen = 0;              // 世代号
@@ -50,7 +51,8 @@ function loadState(g){
   }catch(e){ return {}; }
 }
 function saveState(){
-  try{ localStorage.setItem(LS_KEY, JSON.stringify({__gen: gen, state: state, revision: baseRevision})); }catch(e){}
+  try{ localStorage.setItem(LS_KEY, JSON.stringify({__gen: gen, state: state, revision: baseRevision})); localDraftFailure=""; return true; }
+  catch(e){ localDraftFailure="本机草稿保存失败。请勿关闭页面，并尽快导出项目备份。"; updateSaveStatus(); return false; }
 }
 
 /* ------------------------------------------------------------------ *
@@ -59,6 +61,7 @@ function saveState(){
 const ov = document.getElementById("ov");
 let dlgResolve = null;
 let dlgOnOk = null;
+let dlgFocusReturn = null;
 
 function askConfirm(opts){
   // opts: {title, icon:'warn'|'danger'|'info', body(html), detail, confirmText, cancelText,
@@ -92,6 +95,7 @@ function askConfirm(opts){
     ok.className = "btn " + (opts.danger ? "danger" : "primary");
     document.getElementById("dlgCancel").textContent = opts.cancelText || "取消";
 
+    dlgFocusReturn = document.activeElement;
     dlgResolve = resolve;
     dlgOnOk = opts.onOk || null;
     ov.classList.add("on");
@@ -103,6 +107,16 @@ function closeDialog(result){
   const r = dlgResolve; dlgResolve = null;
   const cb = dlgOnOk; dlgOnOk = null;
   if(r) r(result);
+  const focus = dlgFocusReturn; dlgFocusReturn = null;
+  if(focus && focus.isConnected && typeof focus.focus === "function") setTimeout(() => focus.focus(), 0);
+}
+function trapDialogFocus(container,e){
+  if(e.key!=="Tab")return;
+  const controls=[...container.querySelectorAll("button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[href],[tabindex]:not([tabindex=\"-1\"])")].filter(el=>el.getClientRects().length);
+  if(!controls.length)return;
+  const first=controls[0],last=controls[controls.length-1];
+  if(e.shiftKey&&(document.activeElement===first||!container.contains(document.activeElement))){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&(document.activeElement===last||!container.contains(document.activeElement))){e.preventDefault();first.focus();}
 }
 document.getElementById("dlgCancel").addEventListener("click", () => closeDialog(false));
 document.getElementById("dlgOk").addEventListener("click", () => {
@@ -115,6 +129,7 @@ document.getElementById("dlgCheck").addEventListener("change", e => {
   document.getElementById("dlgOk").disabled = !e.target.checked;
 });
 ov.addEventListener("click", e => { if(e.target === ov) closeDialog(false); });
+ov.addEventListener("keydown", e => trapDialogFocus(ov,e));
 document.addEventListener("keydown", e => {
   if(e.key === "Escape" && ov.classList.contains("on")) closeDialog(false);
 });
@@ -541,6 +556,7 @@ function applyFilter(){
     else if(filter === "done") show = s === "done";
     else if(filter === "skip") show = s === "skip";
     if(show) show = matchQuery(li.dataset.text);
+    if(show && sectionFilter !== "all") show = li.closest("section.card")?.dataset.sec === sectionFilter;
     li.classList.toggle("hidden", !show);
     if(show) visible++;
   });
@@ -556,8 +572,29 @@ function applyFilter(){
     done:"仅显示已完成条目",
     skip:"仅显示已跳过条目"
   };
-  fn.textContent = (filter !== "all" ? labels[filter] + "（筛选中，说明性内容始终保留）" : "");
-  fn.classList.toggle("hidden", filter === "all" && !query);
+  const activeLabels=[];
+  if(filter!=="all")activeLabels.push(labels[filter]);
+  if(sectionFilter!=="all")activeLabels.push("章节："+(document.getElementById("sectionFilter").selectedOptions[0]?.textContent||""));
+  if(query)activeLabels.push("搜索："+query);
+  fn.textContent=activeLabels.length?activeLabels.join(" · ")+"（说明性内容始终保留）":"";
+  fn.classList.toggle("hidden", activeLabels.length===0);
+}
+function refreshSectionFilter(){
+  const select = document.getElementById("sectionFilter");
+  if(!select || !DATA) return;
+  const prior = sectionFilter;
+  const sections = (DATA.sections || []).filter(sec => !sec.guide_only && (sec.blocks || []).some(b => b.type === "item" && !b.gate && b.visible !== false));
+  select.replaceChildren(new Option("全部章节", "all"));
+  sections.forEach(sec => {
+    const items = sec.blocks.filter(b => b.type === "item" && !b.gate && b.visible !== false);
+    const done = items.filter(b => st(b.id) === "done").length;
+    const skipped = items.filter(b => st(b.id) === "skip").length;
+    const resolved = done + skipped;
+    const percent = items.length ? Math.round(done / items.length * 100) : 0;
+    select.add(new Option(`${sec.title} · 已处理 ${resolved}/${items.length} · 完成率 ${percent}%`, sec.id));
+  });
+  if(prior !== "all" && sections.some(sec => sec.id === prior)) select.value = prior;
+  else { sectionFilter = "all"; select.value = "all"; }
 }
 function refreshProgress(){
   const items = document.querySelectorAll("li.item");
@@ -572,9 +609,11 @@ function refreshProgress(){
   });
   const pct = total ? Math.round(done/total*100) : 0;
   document.getElementById("pct").textContent = pct + "%";
+  document.querySelector(".track[role=progressbar]").setAttribute("aria-valuenow", String(pct));
   document.getElementById("cnt").textContent =
     done + " / " + total + " 项已完成" + (skip ? " · 跳过 " + skip : "");
   document.getElementById("fill").style.width = pct + "%";
+  refreshSectionFilter();
 
   // 门禁横幅
   const gb = document.getElementById("gateBar");
@@ -611,18 +650,19 @@ function refreshProgress(){
 
 /* 跳转到当前应处理的条目 */
 function jumpToCurrent(){
+  // 若在筛选/搜索状态下，先切回「全部」并清空搜索
+  if(filter !== "all" || query || sectionFilter !== "all"){
+    filter = "all"; query = ""; sectionFilter = "all";
+    document.getElementById("q").value = "";
+    document.getElementById("sectionFilter").value = "all";
+    document.querySelectorAll("#seg button").forEach(b => {const active=b.dataset.f==="all";b.classList.toggle("on",active);b.setAttribute("aria-pressed",String(active));});
+    applyFilter();
+  }
   const target = [...document.querySelectorAll("li.item")].find(l => {
     const s = st(l.dataset.id);
     return s !== "done" && s !== "skip" && l.dataset.locked === "0";
   });
   if(!target) return;
-  // 若在筛选/搜索状态下，先切回「全部」并清空搜索
-  if(filter !== "all" || query){
-    filter = "all"; query = "";
-    document.getElementById("q").value = "";
-    document.querySelectorAll("#seg button").forEach(b => b.classList.toggle("on", b.dataset.f === "all"));
-    applyFilter();
-  }
   target.scrollIntoView({block:"center", behavior:"smooth"});
   target.animate(
     [{background:"#DCEAF9"},{background:"transparent"}],
@@ -702,6 +742,7 @@ async function loadFromServer(){
     serverBaseline = baselineFromData(d);
     baseRevision = d.revision;
     reviewData = d.review || reviewData;
+    updateSummaryReleaseOptions();
     DATA = mergeItems(d);
     // 门禁状态：md 为准。
     // 只有「从未确认过」（gateState=todo）才允许用本机的离线确认记录补写，
@@ -845,9 +886,10 @@ document.getElementById("seg").addEventListener("click", e => {
   const btn = e.target.closest("button[data-f]");
   if(!btn) return;
   filter = btn.dataset.f;
-  document.querySelectorAll("#seg button").forEach(b => b.classList.toggle("on", b === btn));
+  document.querySelectorAll("#seg button").forEach(b => {const active=b===btn;b.classList.toggle("on",active);b.setAttribute("aria-pressed",String(active));});
   applyFilter();
 });
+document.getElementById("sectionFilter").addEventListener("change", e => { sectionFilter = e.target.value || "all"; applyFilter(); });
 let qt = null;
 document.getElementById("q").addEventListener("input", e => {
   clearTimeout(qt);
@@ -998,6 +1040,7 @@ window.addEventListener("beforeunload", e => {
  * 权限与隐私配置面板
  * ------------------------------------------------------------------ */
 let PROFILES = null;         // 权限元数据
+let permFocusReturn = null;
 let permSelected = [];       // 选中的权限 id
 let permDescs = {};          // {permId: 中文用途描述}
 let permDescsEn = {};        // {permId: 英文用途描述}
@@ -1289,6 +1332,7 @@ function genLocally(){
 }
 
 async function openPermPanel(){
+  permFocusReturn=document.activeElement;
   await loadProfiles();
   document.getElementById("permHint").textContent = "权限资料待逐项核验；请核对目标平台版本与官方文档。";
   // 预填：优先服务端记录的面板状态（选中项 + 中英文自定义描述）
@@ -1312,9 +1356,12 @@ async function openPermPanel(){
   renderPerms();
   refreshPermGen();
   document.getElementById("permPanel").classList.add("on");
+  document.getElementById("permClose").focus();
 }
 function closePermPanel(){
   document.getElementById("permPanel").classList.remove("on");
+  if(permFocusReturn&&permFocusReturn.isConnected)permFocusReturn.focus();
+  permFocusReturn=null;
 }
 
 document.getElementById("btnPerm").addEventListener("click", openPermPanel);
@@ -1345,6 +1392,7 @@ document.getElementById("permEn").addEventListener("click", async () => {
 document.getElementById("permPanel").addEventListener("click", e => {
   if(e.target === document.getElementById("permPanel")) closePermPanel();
 });
+document.getElementById("permPanel").addEventListener("keydown",e=>trapDialogFocus(document.getElementById("permPanel"),e));
 document.addEventListener("keydown", e => {
   if(e.key === "Escape" && document.getElementById("permPanel").classList.contains("on")){
     closePermPanel();
@@ -1494,34 +1542,33 @@ function refreshFeatUI(){
   // 面板内的预览
   const pv = document.getElementById("featPreview");
   if(pv){
-    if(hidden.length === 0){
-      pv.innerHTML = "<b>项目功能开关没有隐藏检查项。</b><br>权限相关条目仍按「权限配置」面板的选择显示。";
-    }else{
-      const byCond = {};
-      hidden.forEach(it => { (byCond[it.cond] = byCond[it.cond] || []).push(it.text); });
-      const LABEL = {
-        hasAccountSystem: "无用户账号系统",
-        hasFeedbackSystem: "无用户反馈系统",
-        targetMinors: "不面向未成年用户"
-      };
-      let html = "<b>以下 " + hidden.length + " 项因项目功能设置隐藏：</b>";
-      Object.keys(byCond).forEach(c => {
-        html += "<span class=\"fx\"><b>" + (LABEL[c] || c) + "</b> — " + byCond[c].length + " 项<br>"
-              + byCond[c].map(x => "· " + escapeHtml(x.replace(/<[^>]+>/g, "").replace(/\*\*/g, ""))).join("<br>") + "</span>";
-      });
-      pv.innerHTML = html;
-    }
+    const visible = (DATA.sections || []).flatMap(sec => sec.blocks || []).filter(it => it.type === "item" && !it.gate && it.visible !== false);
+    const label = {hasAccountSystem:"无用户账号系统",hasFeedbackSystem:"无用户反馈系统",targetMinors:"不面向未成年用户"};
+    const clean = value => escapeHtml(String(value).replace(/<[^>]+>/g, "").replace(/\*\*/g, "").replace(/`/g, ""));
+    const grouped = {};
+    hidden.forEach(it => { (grouped[it.cond] = grouped[it.cond] || []).push(it.text); });
+    const shown = visible.slice(0, 12).map(it => "· " + clean(it.text)).join("<br>");
+    const hiddenHtml = Object.keys(grouped).map(key => "<span class=\"fx\"><b>" + (label[key] || key) + "</b> — " + grouped[key].length + " 项<br>" + grouped[key].map(text => "· " + clean(text)).join("<br>") + "</span>").join("");
+    pv.innerHTML = "<b>按当前开关预览（保存后生效）</b>" +
+      "<details class=\"feature-preview-group\"><summary>将显示 " + visible.length + " 项" + (visible.length > 12 ? "（先列出 12 项）" : "") + "</summary><span class=\"fx\">" + (shown || "当前没有适用条目") + "</span></details>" +
+      "<details class=\"feature-preview-group\"><summary>将隐藏 " + hidden.length + " 项</summary>" + (hiddenHtml || "<span class=\"fx\">没有隐藏检查项；权限相关条目由「权限配置」单独控制。</span>") + "</details>" +
+      "<span class=\"feature-preview-foot\">权限相关项目仍由「权限配置」控制。" + (featureHasChanges() ? "当前预览尚未保存。" : "") + "</span>";
   }
 }
 let featureSnapshot = null;
+let featFocusReturn = null;
 function openFeatPanel(){
+  featFocusReturn=document.activeElement;
   featureSnapshot = JSON.parse(JSON.stringify(DATA.features));
   refreshFeatUI();
   document.getElementById("featPanel").classList.add("on");
+  document.getElementById("featClose").focus();
 }
 function closeFeatPanel(){
   if(featureSnapshot){ DATA.features=featureSnapshot; featureSnapshot=null; render(); refreshFeatUI(); updateSaveStatus(); }
   document.getElementById("featPanel").classList.remove("on");
+  if(featFocusReturn&&featFocusReturn.isConnected)featFocusReturn.focus();
+  featFocusReturn=null;
 }
 document.getElementById("btnFeat").addEventListener("click", openFeatPanel);
 document.getElementById("featClose").addEventListener("click", closeFeatPanel);
@@ -1615,6 +1662,7 @@ async function persistReview(next){
     const d = await api("/api/review", {revision:baseRevision, review:next});
     baseRevision = d.revision;
     reviewData = d.review;
+    updateSummaryReleaseOptions();
     build(); refreshAll(); saveState();
     toast("检查记录已保存");
     return true;
@@ -1635,23 +1683,48 @@ function releaseSnapshot(){
   return {release:reviewData.release || {}, date:new Date().toISOString(), features:{...DATA.features}, selectedPermissions:[...(DATA.permSelected||[])], items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false, ...(reviewData.items || {})[b.id]}))};
 }
 document.getElementById("releaseArchive").onclick = async () => {
-  if(!online || dirty){ toast("请先连接服务并保存勾选进度"); return; }
+  if(!online || dirty || featureHasChanges() || permDirty || savingOperations>0){ toast("请先保存检查进度、项目设置和权限配置，再归档"); return; }
   if(!confirm("归档当前发布信息和检查结果？")) return;
   const next = JSON.parse(JSON.stringify(reviewData));
   next.history = next.history || [];
   next.history.push(releaseSnapshot());
   await persistReview(next);
 };
+function releaseMetrics(snapshot){
+  const applicable=(Array.isArray(snapshot.items)?snapshot.items:[]).filter(item=>item&&item.applicable!==false);
+  const done=applicable.filter(item=>item.state==="done").length;
+  const skipped=applicable.filter(item=>item.state==="skip").length;
+  const total=applicable.length;
+  return {total,done,skipped,pending:Math.max(0,total-done-skipped),percent:total?Math.round(done/total*100):0};
+}
+function updateSummaryReleaseOptions(){
+  const select=document.getElementById("summaryVersion");if(!select)return;
+  const previous=select.value,history=reviewData.history||[];
+  select.replaceChildren(new Option("当前发布 · "+(reviewData.release?.version||"未填写版本"),"current"));
+  history.forEach((snapshot,index)=>{
+    const version=snapshot.release?.version||snapshot.version||("历史发布 "+(index+1));
+    const date=snapshot.date?new Date(snapshot.date).toLocaleDateString():"";
+    select.add(new Option(version+(date?" · "+date:""),"history:"+index));
+  });
+  if([...select.options].some(option=>option.value===previous))select.value=previous;
+}
+updateSummaryReleaseOptions();
 document.getElementById("releaseSummary").onclick = () => {
-  const snapshot = releaseSnapshot();
-  const lines = ["# 发布检查摘要", "", ...Object.entries(snapshot.release).map(([k,v]) => k + ": " + v), "", "生成时间：" + new Date().toLocaleString(), dirty ? "包含尚未写回的进度" : "", ""];
-  for(const item of snapshot.items){
-    lines.push("- [" + ({done:"x",skip:"-",todo:" "}[item.state]) + "] " + item.text + (item.applicable ? "" : "（不适用）"));
-    for(const key of ["reason","notes","evidence"]) if(item[key]) lines.push("  " + key + ": " + item[key]);
+  const selection=document.getElementById("summaryVersion").value;
+  const history=reviewData.history||[];
+  const snapshot=selection.startsWith("history:")?history[Number(selection.split(":")[1])]:releaseSnapshot();
+  if(!snapshot){toast("找不到所选发布记录");return;}
+  const versions=[...history.map((value,index)=>({snapshot:value,label:value.release?.version||value.version||("历史发布 "+(index+1))})),{snapshot:releaseSnapshot(),label:reviewData.release?.version||"当前发布"}];
+  const pendingExport=selection==="current"&&(dirty||featureHasChanges()||permDirty||savingOperations>0);
+  const lines = ["# 发布检查摘要", "", "导出版本："+(snapshot.release?.version||snapshot.version||"未填写版本"), ...Object.entries(snapshot.release||{}).filter(([key])=>key!=="version").map(([k,v])=>k+"："+v), "", "生成时间："+new Date().toLocaleString(), pendingExport?"注意：包含尚未全部保存的当前页面内容。":"", "", "## 各版本进度对比", "", "完成率按适用检查项计算；不适用项不计入分母。", "", "| 版本 | 日期 | 已完成 | 已跳过 | 待处理 | 完成率 |", "| --- | --- | ---: | ---: | ---: | ---: |"];
+  versions.forEach(({snapshot:version,label})=>{const m=releaseMetrics(version);lines.push("| "+String(label).replace(/[|\n]/g," ")+" | "+(version.date?new Date(version.date).toLocaleDateString():"—")+" | "+m.done+" / "+m.total+" | "+m.skipped+" | "+m.pending+" | "+m.percent+"% |");});
+  lines.push("", "## 所选版本检查项");
+  for(const item of (Array.isArray(snapshot.items)?snapshot.items:[])){
+    lines.push("- [" + ({done:"x",skip:"-",todo:" "}[item.state]) + "] " + item.text + (item.applicable===false ? "（不适用）" : ""));
+    for(const [key,label] of [["reason","跳过原因"],["notes","备注"],["evidence","证据"]]) if(item[key]) lines.push("  "+label+"："+item[key]);
   }
-  lines.push("", "## 历史发布记录", "```json", JSON.stringify(reviewData.history || [], null, 2), "```");
   const url = URL.createObjectURL(new Blob([lines.join("\n")], {type:"text/markdown;charset=utf-8"}));
-  const a = document.createElement("a"); a.href=url; a.download="发布检查摘要.md"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const a = document.createElement("a"); a.href=url; a.download="发布检查摘要-"+String(snapshot.release?.version||snapshot.version||"版本").replace(/[^\w.-]+/g,"_")+".md"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 document.getElementById("backupRestore").onclick = async () => {
   if(!online){ toast("请先连接本地服务"); return; }
@@ -1660,9 +1733,12 @@ document.getElementById("backupRestore").onclick = async () => {
     if(!d.backups.length){ toast("暂无备份"); return; }
     const choice = prompt("输入要恢复的备份序号：\n" + d.backups.map((n,i) => (i+1) + ". " + (d.entries ? new Date(d.entries[i].created_at * 1000).toLocaleString() + " · " + d.entries[i].label : n)).join("\n"));
     if(choice === null) return;
-    const name = d.backups[Number(choice)-1];
+    const index = Number(choice)-1;
+    const name = d.backups[index];
     if(!name){ toast("序号无效"); return; }
-    if(!confirm("将恢复 Markdown 清单，当前文件会先备份。权限面板和发布记录保留当前值。未保存勾选将丢弃，是否继续？")) return;
+    const entry = d.entries && d.entries[index];
+    const detail = entry ? "\n\n备份时间：" + new Date(entry.created_at * 1000).toLocaleString() + "\n备份说明：" + entry.label : "";
+    if(!confirm("恢复前预览" + detail + "\n\n恢复会替换当前清单与检查状态；当前数据会先创建快照。未保存草稿不会并入恢复结果。是否继续？")) return;
     const result = await api("/api/restore", {name, revision:baseRevision});
     localStorage.removeItem(LS_KEY);
     dirty = false;
@@ -1674,6 +1750,7 @@ document.getElementById("mobileSave").onclick=()=>document.getElementById("btnSa
 document.getElementById("mobileCurrent").onclick=jumpToCurrent;
 document.getElementById("mobileExport").onclick=()=>document.getElementById("releaseSummary").click();
 document.getElementById("featPanel").addEventListener('click',e=>{if(e.target.id==='featPanel')closeFeatPanel();});
+document.getElementById("featPanel").addEventListener('keydown',e=>trapDialogFocus(document.getElementById("featPanel"),e));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('featPanel').classList.contains('on'))closeFeatPanel();});
 
 const newReleaseButton=document.getElementById('newRelease');
@@ -1688,7 +1765,7 @@ document.getElementById('newReleaseForm').onsubmit=async event=>{
  try{
   const release={...reviewData.release,version:form.elements.version.value.trim(),build:form.elements.build.value.trim(),date:new Date().toLocaleDateString('sv-SE')};
   const d=await api('/api/new-release',{release,keepNotes:form.elements.keepNotes.checked,keepEvidence:form.elements.keepEvidence.checked});
-  gen=d.generation;reviewData=d.review;state=seedFromData(d);serverBaseline=baselineFromData(d);DATA=mergeItems(d);dirty=false;saveState();render();refreshFeatUI();document.getElementById('newReleaseDialog').close();toast('上一轮已归档，新一轮发布已开始');
+  gen=d.generation;reviewData=d.review;updateSummaryReleaseOptions();state=seedFromData(d);serverBaseline=baselineFromData(d);DATA=mergeItems(d);dirty=false;saveState();render();refreshFeatUI();document.getElementById('newReleaseDialog').close();toast('上一轮已归档，新一轮发布已开始');
  }catch(error){document.getElementById('newReleaseError').textContent=error.message;}finally{button.disabled=false;updateSaveStatus();}
 };
 

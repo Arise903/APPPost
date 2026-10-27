@@ -20,26 +20,27 @@ __BOARD_CSS__
     <div class="hrow">
       <h1 id="ttl"></h1>
       <span class="grow"></span>
-      <span class="pill warn hidden" id="featPill" title="点击打开项目设置">已隐藏 <b>0</b> 项</span>
+      <button type="button" class="pill warn hidden" id="featPill" aria-label="打开项目设置并查看隐藏检查项" title="点击打开项目设置">已隐藏 <b>0</b> 项</button>
       <span class="mode" id="mode"><span class="dot"></span><span id="modeTxt">离线模式</span></span>
     </div>
 
     <div class="hprog">
-      <div class="track"><div class="fill" id="fill"></div></div>
-      <span class="pct" id="pct">0%</span>
-      <span class="cnt" id="cnt"></span>
+      <div class="track" role="progressbar" aria-label="项目检查进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill" id="fill"></div></div>
+      <span class="pct" id="pct" aria-hidden="true">0%</span>
+      <span class="cnt" id="cnt" role="status" aria-live="polite"></span>
     </div>
 
     <button class="seqline" id="seqline" title="点击跳到当前应处理的条目"></button>
 
     <div class="toolbar">
       <div class="seg" id="seg">
-        <button data-f="all" class="on">全部</button>
-        <button data-f="todo">待办</button>
-        <button data-f="done">已完成</button>
-        <button data-f="skip">已跳过</button>
+        <button type="button" data-f="all" class="on" aria-pressed="true">全部</button>
+        <button type="button" data-f="todo" aria-pressed="false">待办</button>
+        <button type="button" data-f="done" aria-pressed="false">已完成</button>
+        <button type="button" data-f="skip" aria-pressed="false">已跳过</button>
       </div>
-      <input type="search" id="q" placeholder="搜索…">
+      <input type="search" id="q" placeholder="搜索…" aria-label="搜索检查项">
+      <select id="sectionFilter" aria-label="按章节筛选" title="按章节查看进度"><option value="all">全部章节</option></select>
       <span class="grow"></span>
       <button class="btn" id="btnFeat">项目设置</button>
       <button class="btn" id="btnGuide2">使用说明</button>
@@ -65,7 +66,7 @@ __BOARD_CSS__
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">
 <button class="btn" id="releaseEdit">发布信息</button>
 <button class="btn" id="releaseArchive">归档本次发布</button><button class="btn" id="newRelease">开始新一轮发布</button>
-<button class="btn" id="releaseSummary">导出发布摘要</button>
+<label class="summary-version-label" for="summaryVersion">摘要版本</label><select id="summaryVersion" aria-label="选择要导出的发布版本"><option value="current">当前发布</option></select><button class="btn" id="releaseSummary">导出发布摘要</button>
 <button class="btn" id="backupRestore">恢复备份</button>
 </div>
 <footer>
@@ -75,7 +76,7 @@ __BOARD_CSS__
 </div>
 
 <!-- 通用确认对话框 -->
-<div class="overlay" id="ov" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+<div class="overlay" id="ov" role="dialog" aria-modal="true" aria-labelledby="dlgTitle" aria-describedby="dlgBody">
   <div class="dialog">
     <div class="dlg-head">
       <div class="dlg-title">
@@ -109,7 +110,7 @@ __BOARD_CSS__
         <p>按 App 实际功能选择。<b>不适用的检查项会自动隐藏</b> —— 不再出现在清单里，也不占用序号。<br>
            设置保存在清单文件里，可与团队共享。</p>
       </div>
-      <button class="panel-x" id="featClose" title="关闭">×</button>
+      <button class="panel-x" id="featClose" aria-label="关闭项目设置">×</button>
     </div>
 
     <div class="panel-body">
@@ -158,7 +159,7 @@ __BOARD_CSS__
            <b>ATT（跨应用追踪）也在这里配</b> —— 勾选后自动生成 <code>NSUserTrackingUsageDescription</code>
            与 <code>AD_ID</code>，清单里不再单独配置。</p>
       </div>
-      <button class="panel-x" id="permClose" title="关闭">×</button>
+      <button class="panel-x" id="permClose" aria-label="关闭权限配置">×</button>
     </div>
 
     <div class="panel-body">

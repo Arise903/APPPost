@@ -22,12 +22,19 @@ function boot(){
   document.getElementById('workspaceBackup').onclick=async()=>{try{await backup();showBackup();}catch(e){alert(e.message);}};
   document.getElementById('workspaceImport').onchange=async event=>{
    const file=event.target.files[0];if(!file)return;
-   try{if(file.size>20000000)throw Error('工作台备份请小于 20 MB');const result=await S.importAll(JSON.parse(await file.text()));alert('已导入 '+result.ids.length+' 个项目，不覆盖现有项目。'+(result.draftError?'项目已导入，但部分浏览器草稿空间不足；请保留原备份。':''));location.reload();}catch(e){alert('导入失败：'+e.message);}finally{event.target.value='';}
+   try{
+    if(file.size>20000000)throw Error('工作台备份请小于 20 MB');
+    const bundle=JSON.parse(await file.text()),preview=S.inspectImportAll(bundle);
+    const names=preview.names.length?preview.names.map((name,index)=>(index+1)+'. '+name).join('\n'):'（空备份）';
+    const date=preview.exportedAt?new Date(preview.exportedAt).toLocaleString():'未记录导出时间';
+    if(!confirm('导入前预览\n\n备份时间：'+date+'\n项目：'+preview.projects+' 个\n历史快照：'+preview.snapshots+' 份\n浏览器草稿：'+preview.drafts+' 份\n\n'+names+'\n\n导入会新增项目，不覆盖现有项目。继续吗？'))return;
+    const result=await S.importAll(bundle);alert('已导入 '+result.ids.length+' 个项目，不覆盖现有项目。'+(result.draftError?'部分浏览器草稿空间不足；请保留原备份。':''));location.reload();
+   }catch(e){alert('导入失败：'+e.message);}finally{event.target.value='';}
   };
   showBackup();window.addEventListener('backupchanged',showBackup);
  }
 }
-function showBackup(){const el=document.getElementById('backupReminder');if(!el)return;try{const data=S.read(),date=data.lastBackupAt;el.textContent=date?'上次发起全部导出：'+new Date(date).toLocaleString()+'，请确认文件已保存':'尚未导出全部项目。请定期备份，避免清理浏览器后丢失记录。';el.classList.toggle('backup-due',Object.keys(data.projects).length>0&&(!date||Date.now()-date>7*86400000));}catch(e){el.textContent=e.message;}}
+function showBackup(){const el=document.getElementById('backupReminder');if(!el)return;try{const data=S.read(),date=data.lastBackupAt;el.textContent=date?'最近一次发起备份下载：'+new Date(date).toLocaleString()+'。请确认 JSON 文件已下载并妥善保存；提醒记录不代表文件可恢复。':'尚未发起完整备份。清理浏览器数据或更换设备前，请导出并保存 JSON。';el.classList.toggle('backup-due',Object.keys(data.projects).length>0&&(!date||Date.now()-date>7*86400000));}catch(e){el.textContent=e.message;}}
 window.ReleaseExperience={backup,checkVersion,pending};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
