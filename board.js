@@ -264,13 +264,13 @@ function fillBlocks(el, blocks){
     if(b.type === "h3"){
       if(b.hiddenHead){ ul = null; bul = null; ord = null; continue; }
       const h3 = document.createElement("h3");
-      h3.textContent = b.title;
+      h3.textContent = b.displayTitle || b.title;
       el.appendChild(h3);
       ul = null; bul = null; ord = null;
     }else if(b.type === "h4"){
       if(b.hiddenHead){ ul = null; bul = null; ord = null; continue; }
       const h4 = document.createElement("h4");
-      h4.textContent = b.title;
+      h4.textContent = b.displayTitle || b.title;
       el.appendChild(h4);
       ul = null; bul = null; ord = null;
     }else if(b.type === "item"){
@@ -400,6 +400,7 @@ function build(){
 function condOk(cond){
   if(!cond) return true;
   const f = (DATA && DATA.features) || {};
+  if(cond === "hasFeedbackSystem") return f[cond] === true;
   return f[cond] !== false;      // 未声明的特性按「启用」处理（保守，不漏检）
 }
 function applyFeatures(){
@@ -433,6 +434,31 @@ function applyFeatures(){
       for(let k=i+1;k<j;k++){ if(bl[k].type !== "item") bl[k].hiddenByPermission = b.hiddenHead; }
     }
   });
+  // Display-only numbering: keep original titles and IDs stable for saved records.
+  for(const section of DATA.sections || []){
+    let top = 0, parent = null, children = 0;
+    const dotted = {};
+    for(const block of section.blocks || []){
+      if(block.type !== "h3" && block.type !== "h4") continue;
+      block.displayTitle = block.title;
+      if(block.hiddenHead) continue;
+      const match = block.title.match(/^(\d+)(?:\.(\d+))?([.、]?\s+)(.*)$/);
+      if(!match) continue;
+      if(block.type === "h3"){
+        children = 0;
+        if(match[2]){
+          dotted[match[1]] = (dotted[match[1]] || 0) + 1;
+          parent = match[1] + "." + dotted[match[1]];
+          block.displayTitle = parent + " " + match[4];
+        }else{
+          parent = String(++top);
+          block.displayTitle = parent + ". " + match[4];
+        }
+      }else if(match[2]){
+        block.displayTitle = (parent || match[1]) + "." + (++children) + " " + match[4];
+      }
+    }
+  }
   DATA.visibleTotal = n;
 }
 function hiddenItems(){
@@ -827,8 +853,8 @@ document.getElementById("mExport").addEventListener("click", () => {
   const walk = blocks => {
     for(const b of blocks){
       if(b.hiddenByPermission) continue;
-      if(b.type === "h3"){ if(!b.hiddenHead){ lines.push("### " + b.title); lines.push(""); } }
-      else if(b.type === "h4"){ if(!b.hiddenHead){ lines.push("#### " + b.title); lines.push(""); } }
+      if(b.type === "h3"){ if(!b.hiddenHead){ lines.push("### " + (b.displayTitle || b.title)); lines.push(""); } }
+      else if(b.type === "h4"){ if(!b.hiddenHead){ lines.push("#### " + (b.displayTitle || b.title)); lines.push(""); } }
       else if(b.type === "item"){
         if(b.visible === false) continue;   // 被项目特征隐藏的条目不进导出副本
         lines.push("  ".repeat(b.level||0) + "- " + (MARK[st(b.id)] || "[ ]") + " " + b.text);
