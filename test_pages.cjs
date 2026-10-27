@@ -16,3 +16,8 @@ test('Permission appendix includes custom English copy and English policy',async
  assert.match(data.mdText,/英文权限用途说明/);assert.match(data.mdText,/Measure campaigns & improve ads\./);assert.match(data.mdText,/Measure campaigns &amp; improve ads\./);assert.match(data.mdText,/Cross-app tracking permission is used/);assert.match(data.mdText,/中文用途/);
  const count=S.parse(data.mdText).items.length;assert.equal(count,S.parse(S.export(id).document).items.length);
 });
+
+test('Legacy guide confirmation keeps identity and does not consume checklist numbering',async()=>{
+ const {S}=setup();const id=await S.create({name:'Legacy',document:'# Test\n\n## Tasks\n- [ ] One\n\n## 七、确认已了解使用说明\n- [x] 我已阅读《使用说明》\n'});
+ const data=S.payload(S.get(id));assert.equal(data.gateDone,true);assert.equal(data.total,1);assert.equal(data.items[0].seq,1);assert.equal(data.items[1].seq,'');assert.equal(data.items[1].gate,true);
+});

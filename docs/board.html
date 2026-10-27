@@ -918,7 +918,7 @@ function makeItem(b){
   seq.className = "seq";
   seq.textContent = b.seq != null ? b.seq : "";
   seq.title = b.seq != null ? ("第 " + b.seq + " 项，共 " + ORDER.length + " 项") : "";
-  li.appendChild(seq);
+  if(!b.gate) li.appendChild(seq);
 
   const lab = document.createElement("label");
   const cb = document.createElement("input");
@@ -1084,7 +1084,9 @@ function build(){
     list.appendChild(pre);
   }
 
-  for(const sec of DATA.sections){
+  const isGateSection = sec => (sec.blocks || []).some(b => b.type === "item" && b.gate);
+  const orderedSections = [...DATA.sections.filter(isGateSection), ...DATA.sections.filter(sec => !isGateSection(sec))];
+  for(const sec of orderedSections){
     // 「怎么用」这一节只作独立说明页的内容源，不在看板首页重复展示
     if(sec.guide_only) continue;
     // 条件不满足的条目不渲染；整节都没有可见条目时连标题一起隐藏
@@ -1131,13 +1133,13 @@ function build(){
       const body = document.createElement("div");
       body.className = "cbody";
       const h2 = document.createElement("h2");
-      h2.textContent = sec.title;
+      h2.textContent = isGateSection(sec) ? "使用前确认 · 已了解使用说明" : sec.title;
       body.appendChild(h2);
       fillBlocks(body, sec.blocks);
       el.appendChild(body);
     }else{
       const h2 = document.createElement("h2");
-      h2.textContent = sec.title;
+      h2.textContent = isGateSection(sec) ? "使用前确认 · 已了解使用说明" : sec.title;
       el.appendChild(h2);
       fillBlocks(el, blocks);
     }
@@ -1165,6 +1167,7 @@ function applyFeatures(){
   const walk = blocks => {
     (blocks || []).forEach(b => {
       if(b.type !== "item") return;
+      if(b.gate){ b.visible = true; b.seq = ""; return; }
       b.visible = condOk(b.cond);
       if(b.visible){ n++; b.seq = n; } else { b.seq = ""; }
     });

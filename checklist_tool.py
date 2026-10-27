@@ -646,7 +646,7 @@ def write_features(md_path: Path, features: dict) -> bool:
 def find_gate_item(parsed: dict):
     """返回门禁章节里的确认条目（没有则返回 None）。"""
     for sec in parsed.get("sections", []):
-        if sec.get("is_gate"):
+        if sec.get("is_gate") or "确认已了解使用说明" in sec.get("title", ""):
             for b in sec["blocks"]:
                 if b.get("type") == "item":
                     return b
