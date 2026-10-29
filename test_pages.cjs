@@ -138,3 +138,13 @@ test('Subscription catalogue survives export, import, snapshots and release arch
  const saved=S.get(id);assert.deepEqual(JSON.parse(JSON.stringify(saved.review.subscriptions)),products);assert.deepEqual(JSON.parse(JSON.stringify(saved.review.history[0].subscriptions)),products);assert.deepEqual(JSON.parse(JSON.stringify(saved.snapshots[0].state.review.subscriptions)),products);
  await assert.rejects(S.create({...S.export(id),name:'Invalid catalogue',review:{release:{},items:{},history:[],subscriptions:{price:1}}}),/订阅商品/);
 });
+
+
+test('Push feature defaults off and toggles without losing progress, notes or permissions',async()=>{
+ const {S,context}=setup();const id=await S.create({name:'Optional push'});let project=S.get(id),data=S.payload(project);assert.equal(data.features.hasPush,false);
+ const push=data.items.filter(i=>i.cond==='hasPush');assert.equal(push.length,3);const task=push.find(i=>i.id==='t_c7c9aea7');
+ await S.mutate(id,1,'progress',p=>{p.document=S.apply(p.document,{[task.id]:'done'});p.review.items[task.id]={notes:'APNs checked'};p.permissions.selected=['notifications'];});
+ context.location.search='?id='+id;context.window.fetch=async()=>{throw Error('Unexpected network');};S.install();
+ const offTotal=S.payload(S.get(id)).total;
+ for(const enabled of [true,false,true]){project=S.get(id);const response=await context.window.fetch('/api/features',{method:'POST',body:JSON.stringify({revision:String(project.version),features:{...S.payload(project).features,hasPush:enabled}})});assert.equal(response.status,200);project=S.get(id);data=S.payload(project);assert.equal(data.total,offTotal+(enabled?3:0));assert.equal(data.items.find(i=>i.id===task.id).state,'done');assert.equal(project.review.items[task.id].notes,'APNs checked');assert.equal(project.permissions.selected[0],'notifications');}
+});

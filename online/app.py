@@ -379,10 +379,10 @@ def create_app(overrides=None):
             elif operation == 'features':
                 features = data.get('features')
                 if isinstance(features, dict):
-                    features = {'hasFeedbackSystem': False, 'hasSubscriptions': True, **features}
-                if not isinstance(features, dict) or any(type(features.get(k)) is not bool for k in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions')):
+                    features = {'hasFeedbackSystem': False, 'hasSubscriptions': True, 'hasPush': False, **features}
+                if not isinstance(features, dict) or any(type(features.get(k)) is not bool for k in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush')):
                     abort(400, '项目特征无效')
-                line = '<!-- FEATURES ' + ' '.join(k + '=' + str(int(features[k])) for k in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions')) + ' -->'
+                line = '<!-- FEATURES ' + ' '.join(k + '=' + str(int(features[k])) for k in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush')) + ' -->'
                 project['document'] = checklist.RE_FEATURES.sub(line, project['document']) if checklist.RE_FEATURES.search(project['document']) else line + '\n' + project['document']
             elif operation == 'review':
                 validate_review(data.get('review'))

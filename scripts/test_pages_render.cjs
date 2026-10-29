@@ -22,6 +22,13 @@ const server=http.createServer((req,res)=>{
   const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+server.address().port+'/APPPost/index.html');
   await page.locator('#newProject').click();await page.locator('[name=name]').fill('初始化显示回归');await page.locator('#createForm [type=submit]').click();await page.waitForURL(/board.html\?id=/);await page.waitForFunction(()=>typeof online!=='undefined'&&online);
+  // Push feature previews, cancels, saves and survives reload without losing state.
+  const pushRows=()=>page.locator('#list li.item').filter({hasText:/APNs 推送的 p8/});
+  assert.equal(await pushRows().count(),0);
+  await page.locator('#btnFeat').click();assert.equal(await page.locator('#featPush').isChecked(),false);await page.locator('#featPush').check();assert.equal(await pushRows().count(),1);await page.locator('#featCancel').click();assert.equal(await pushRows().count(),0);
+  await page.locator('#btnFeat').click();await page.locator('#featPush').check();await page.locator('#featSave').click();await page.waitForFunction(()=>!document.getElementById('featPanel').classList.contains('on'));
+  await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.equal(await pushRows().count(),1);
+  await page.locator('#btnFeat').click();await page.locator('#featPush').uncheck();await page.locator('#featSave').click();await page.waitForFunction(()=>!document.getElementById('featPanel').classList.contains('on'));assert.equal(await pushRows().count(),0);
   // Independent subscription catalogue: price validation, persistence and cancellation.
   await page.locator('#btnSubscriptions').click();
   for(const period of ['week','month','year'])await page.locator('[data-add-subscription="'+period+'"]').click();

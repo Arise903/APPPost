@@ -111,6 +111,18 @@
     {
       "contains": "（反馈功能）",
       "feature": "hasFeedbackSystem"
+    },
+    {
+      "contains": "Push Notifications（用了推送",
+      "feature": "hasPush"
+    },
+    {
+      "contains": "APNs 推送",
+      "feature": "hasPush"
+    },
+    {
+      "contains": "Android 13+ 通知用 `POST_NOTIFICATIONS`",
+      "feature": "hasPush"
     }
   ],
   "itemRules": {
@@ -198,6 +210,9 @@
     "t_65436aa0": "hasSubscriptions",
     "t_333df253": "hasSubscriptions",
     "t_91914237": "hasSubscriptions",
-    "t_89f68fa5": "hasSubscriptions"
+    "t_89f68fa5": "hasSubscriptions",
+    "t_36e3f51a": "hasPush",
+    "t_c7c9aea7": "hasPush",
+    "t_4cc648e9": "hasPush"
   }
 }
