@@ -77,3 +77,54 @@ test('New release archives completed state, retains chosen notes, clears evidenc
 test('Template update preserves modified built-in text, custom tasks and notes',async()=>{
  const {S}=setup();const id=await S.create({name:'Template'});const before=S.get(id),item=S.parse(before.document).items[0];await S.mutate(id,1,'custom edit',p=>{p.document=p.document.replace(item.text,'My custom wording')+'\n## Custom\n- [x] My custom task\n';p.review.items[item.id]={notes:'keep'};});await S.updateTemplate(id,2);const p=S.get(id);assert.match(p.document,/My custom wording/);assert.match(p.document,/My custom task/);assert.equal(p.review.items[item.id].notes,'keep');assert.ok(p.snapshots.length>=2);
 });
+
+test('Historical pull advances revisions and rejects stale pages',async()=>{
+ const {S}=setup(),id=await S.create({name:'Original'}),old=S.exportAll();
+ await S.mutate(id,1,'edit',p=>p.name='New');await S.mergeRemoteAll(old);
+ assert.equal(S.get(id).name,'Original');assert.equal(S.get(id).version,3);assert.equal(S.get(id).generation,2);
+ await assert.rejects(S.mutate(id,1,'stale',p=>p.name='Overwrite'),/另一个页面/);
+ await assert.rejects(S.mutate(id,2,'stale',p=>p.name='Overwrite'),/另一个页面/);
+});
+test('Pull confirmation detects edits, drafts, additions and deletions atomically',async()=>{
+ for(const change of ['edit','draft','add','delete']){const {S,context}=setup(),id=await S.create({name:'Before'}),remote=S.exportAll(),token=S.workspaceToken();
+ if(change==='edit')await S.mutate(id,1,'edit',p=>p.name='After');
+ if(change==='draft')context.localStorage.setItem('app-release-checklist-state-v2:pages:'+id,JSON.stringify({state:{one:'done'}}));
+ if(change==='add')await S.create({name:'Added'});if(change==='delete')await S.remove(id);
+ const before=S.workspaceToken();await assert.rejects(S.mergeRemoteAll(remote,token),e=>e.status===409);assert.equal(S.workspaceToken(),before);
+ }
+});
+test('Untrusted project IDs and invalid revisions are rejected before writes',async()=>{
+ const {S}=setup();await S.create({name:'Safe'});const original=S.workspaceToken();
+ for(const id of ['x" onmouseover="alert(1)','__proto__','constructor','prototype','../file','a b']){const bundle=S.exportAll();bundle.projects[0].id=id;assert.throws(()=>S.inspectImportAll(bundle),/项目 ID/);await assert.rejects(S.mergeRemoteAll(bundle));}
+ for(const version of [0,-1,'1',null,Number.MAX_SAFE_INTEGER]){const bundle=S.exportAll();bundle.projects[0].version=version;assert.throws(()=>S.inspectImportAll(bundle),/版本/);}
+ assert.equal(S.workspaceToken(),original);
+});
+test('No-op saves skip snapshots, revisions and storage writes',async()=>{
+ const {S,block}=setup(),id=await S.create({name:'Same'});block();await S.mutate(id,1,'noop',()=>{});assert.equal(S.get(id).version,1);assert.equal(S.get(id).snapshots.length,0);
+});
+test('Cached parses remain isolated and preserve section item identity',()=>{
+ const {S}=setup(),text='# Test\n## Tasks\n- [ ] One';const first=S.parse(text);first.items[0].state='done';const next=S.parse(text);assert.equal(next.items[0].state,'todo');assert.equal(next.sections[0].blocks[0],next.items[0]);
+});
+function syncSetup(){const result=setup(),{S,context}=result;context.PagesStore=S;context.document={getElementById:()=>null,readyState:'loading',addEventListener:()=>{}};
+ const source=fs.readFileSync('pages/github-sync.js','utf8').replace("if(document.readyState==='loading')", "window.syncTest={mergedForUpload,diff,diffHtml};if(document.readyState==='loading')");vm.runInContext(source,context);return {...result,sync:context.window.syncTest};}
+test('Upload merges snapshots even when project contents match, deduplicates and retains newest ten',async()=>{
+ const {S,sync}=syncSetup(),id=await S.create({name:'Same'}),local=S.exportAll(),remote=S.exportAll(),state=JSON.parse(JSON.stringify(local.projects[0]));delete state.snapshots;
+ local.projects[0].snapshots=[{id:'local',date:20,state}];remote.projects[0].snapshots=[{id:'remote',date:10,state}];
+ const merged=sync.mergedForUpload(local,remote);assert.deepEqual(Array.from(merged.projects[0].snapshots,x=>x.id),['local','remote']);
+ const snapshots=Array.from({length:15},(_,i)=>({id:'s'+i,date:i,state}));assert.equal(S.mergeSnapshots(snapshots,snapshots).length,10);assert.equal(S.mergeSnapshots(snapshots,snapshots)[0].id,'s14');
+});
+test('Pull preview describes cloud conflict choice and actual draft policy',async()=>{
+ const {S,sync}=syncSetup();await S.create({name:'Local'});const local=S.exportAll(),remote=S.exportAll();remote.projects[0].name='Cloud';const html=sync.diffHtml(sync.diff(local,remote),'','pull');assert.match(html,/采用所选云端版本/);assert.doesNotMatch(html,/采用本机版本/);assert.match(html,/保留本机版本/);
+});
+
+
+test('Subscription setting persists, hides checks and retains progress and notes',async()=>{
+ const {S,context}=setup();const id=await S.create({name:'Subscriptions'});const initial=S.payload(S.get(id));assert.equal(initial.features.hasSubscriptions,true);
+ const tasks=initial.items.filter(i=>i.cond==='hasSubscriptions');assert.ok(tasks.length>30);const task=tasks[0];
+ await S.mutate(id,1,'progress',p=>{p.document=S.apply(p.document,{[task.id]:'done'});p.review.items[task.id]={notes:'Keep evidence'};});
+ context.location.search='?id='+id;context.window.fetch=async()=>{throw Error('Unexpected network');};S.install();
+ for(const enabled of [false,true]){
+  const project=S.get(id);const response=await context.window.fetch('/api/features',{method:'POST',body:JSON.stringify({revision:String(project.version),features:{...S.payload(project).features,hasSubscriptions:enabled}})});assert.equal(response.status,200);
+  const saved=S.get(id),data=S.payload(saved);assert.equal(data.features.hasSubscriptions,enabled);assert.equal(data.total,initial.total-(enabled?0:tasks.length));assert.equal(data.items.find(i=>i.id===task.id).state,'done');assert.equal(saved.review.items[task.id].notes,'Keep evidence');
+ }
+});

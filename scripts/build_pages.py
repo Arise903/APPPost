@@ -10,6 +10,14 @@ import checklist_tool as c
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'docs'
 
+def replace_required(text, old, new):
+    """Fail loudly when a shared-board integration point changes."""
+    count = text.count(old)
+    if count != 1:
+        raise ValueError(f'Pages integration point expected once, found {count}: {old}')
+    return text.replace(old, new)
+
+
 def build():
     OUT.mkdir(exist_ok=True)
     inputs=[ROOT/'board.js',ROOT/'board.css',ROOT/'board_template.html',ROOT/'permission_rules.json',ROOT/'permission_visibility.js',ROOT/'permission_profiles.json',ROOT/'online/default_checklist.md',ROOT/'online/static/app.css',Path(__file__),*sorted(path for path in (ROOT/'pages').glob('*') if path.suffix in ('.js','.html','.css'))]
@@ -26,11 +34,11 @@ def build():
     (OUT/'data.js').write_text('const PAGES_DATA = '+json.dumps(data,ensure_ascii=False).replace('</','<\\/')+';\n',encoding='utf-8')
     page=(ROOT/'board_template.html').read_text(encoding='utf-8')
     js='document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;\n'+(ROOT/'board.js').read_text(encoding='utf-8')
-    js=js.replace('"app-guide-ack" + (window.RELEASE_CLOUD', '"app-guide-ack:pages:" + PagesStore.projectId() + (window.RELEASE_CLOUD')
-    js=js.replace('EMBEDDED.mdName);','"pages:" + PagesStore.projectId());')
-    js=js.replace('window.open(online ? (window.RELEASE_CLOUD', 'if(window.RELEASE_PAGES){ window.open("guide.html?id=" + encodeURIComponent(PagesStore.projectId()), "_blank"); return; }\n  window.open(online ? (window.RELEASE_CLOUD')
-    js=js.replace('if(window.RELEASE_CLOUD){ const link', 'if(window.RELEASE_CLOUD || window.RELEASE_PAGES){ const link')
-    js=js.replace('toast("已清空 " + d.cleared', 'toast("已清空 " + (d.cleared || 0)')
+    js=replace_required(js,'"app-guide-ack" + (window.RELEASE_CLOUD', '"app-guide-ack:pages:" + PagesStore.projectId() + (window.RELEASE_CLOUD')
+    js=replace_required(js,'EMBEDDED.mdName);','"pages:" + PagesStore.projectId());')
+    js=replace_required(js,'window.open(online ? (window.RELEASE_CLOUD', 'if(window.RELEASE_PAGES){ window.open("guide.html?id=" + encodeURIComponent(PagesStore.projectId()), "_blank"); return; }\n  window.open(online ? (window.RELEASE_CLOUD')
+    js=replace_required(js,'if(window.RELEASE_CLOUD){ const link', 'if(window.RELEASE_CLOUD || window.RELEASE_PAGES){ const link')
+    js=replace_required(js,'toast("已清空 " + d.cleared', 'toast("已清空 " + (d.cleared || 0)')
     replacements={
         '已连接 · 可写回文件':'Pages 个人版 · 保存到当前浏览器',
         '本地服务':'本机存储', '在线模式':'本机模式', '云端':'本机',
@@ -47,6 +55,8 @@ def build():
     page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="store.js"></script><script>PagesStore.install();</script><script defer src="experience.js"></script>')
     page=page.replace('<body>','<body><div style="padding:14px 24px;background:#17243a;color:white"><a href="index.html" style="color:white">← 返回个人工作台</a>　·　<span id="pagesProjectName"></span>　·　数据仅保存在当前浏览器，请定期导出备份</div>')
     page=page.replace('勾选状态保存在本机浏览器 · 需要写回文件请使用本地服务模式','所有记录保存在当前浏览器 · 换设备或清理网站数据前请导出完整 JSON')
+    unresolved=re.findall(r'__[A-Z][A-Z_]+__',page)
+    if unresolved: raise ValueError('Unresolved Pages placeholders: '+', '.join(sorted(set(unresolved))))
     (OUT/'board.html').write_text(page,encoding='utf-8')
     for target in OUT.glob('*.html'):
         html=target.read_text(encoding='utf-8')

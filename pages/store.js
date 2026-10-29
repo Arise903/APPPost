@@ -3,13 +3,21 @@
 'use strict';
 const KEY='release-desk-pages:v1';
 const copy=value=>JSON.parse(JSON.stringify(value));
+const validId=id=>typeof id==='string'&&/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)&&!['__proto__','constructor','prototype'].includes(id);
+const conflict=()=>Object.assign(Error('本机数据已变化，请重新查看差异后再拉取。'),{status:409});
 const empty=()=>({schema:1,projects:{}});
 function read(){const raw=localStorage.getItem(KEY);if(!raw)return empty();let data;try{data=JSON.parse(raw);}catch(_){throw Error('浏览器记录损坏，请先保留浏览器数据，不要清空存储。');}if((data.storageVersion||1)>2)throw Error('本地数据版本较新，请更新网页后再操作');if(data.schema!==1||!data.projects||typeof data.projects!=='object')throw Error('不支持的本地数据版本');return data;}
-function save(data){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(_){throw Error('浏览器空间不足或禁止存储，本次修改未保存。请先导出项目，再整理历史备份。');}}
-async function transaction(action){if(!navigator.locks)throw Error('此浏览器不支持安全保存，请使用新版 Chrome、Edge、Safari 或 Firefox，并通过 HTTP/HTTPS 打开。');return navigator.locks.request('release-desk-pages-write',()=>{const data=read();const result=action(data);save(data);return result;});}
+function save(data,serialized=JSON.stringify(data)){try{localStorage.setItem(KEY,serialized);}catch(_){throw Error('浏览器空间不足或禁止存储，本次修改未保存。请先导出项目，再整理历史备份。');}}
+async function transaction(action){if(!navigator.locks)throw Error('此浏览器不支持安全保存，请使用新版 Chrome、Edge、Safari 或 Firefox，并通过 HTTP/HTTPS 打开。');return navigator.locks.request('release-desk-pages-write',()=>{const before=localStorage.getItem(KEY);const data=read();const result=action(data);const serialized=JSON.stringify(data);if(serialized!==before)save(data,serialized);return result;});}
 function hash(text){let h=0x811c9dc5;for(const byte of new TextEncoder().encode(text)){h^=byte;h=Math.imul(h,0x01000193)>>>0;}return h.toString(16).padStart(8,'0');}
+const parseCache=new Map();
+function copyParsed(value){const result=copy(value),items=new Map(result.items.map(item=>[item.id,item]));for(const section of result.sections)section.blocks=section.blocks.map(block=>block.type==='item'?items.get(block.id):block);result.preamble=result.preamble.map(block=>block.type==='item'?items.get(block.id):block);return result;}
 function parse(text){
- const lines=text.split('\n'), result={title:'Checklist',preamble:[],sections:[],items:[],features:{hasAccountSystem:true,targetMinors:true,hasFeedbackSystem:false}};
+ if(parseCache.has(text)){const cached=parseCache.get(text);parseCache.delete(text);parseCache.set(text,cached);return copyParsed(cached);}
+ const result=parseDocument(text);parseCache.set(text,result);while(parseCache.size>16)parseCache.delete(parseCache.keys().next().value);return copyParsed(result);
+}
+function parseDocument(text){
+ const lines=text.split('\n'), result={title:'Checklist',preamble:[],sections:[],items:[],features:{hasAccountSystem:true,targetMinors:true,hasFeedbackSystem:false,hasSubscriptions:true}};
  let section=null,path=[],fence=null,pending=[];const counts={};const blocks=()=>section?section.blocks:result.preamble;
  const features=text.match(/<!--\s*FEATURES\s+([\s\S]*?)-->/);if(features)for(const kv of features[1].matchAll(/([A-Za-z0-9_]+)\s*=\s*([01])/g))result.features[kv[1]]=kv[2]==='1';
  for(let i=0;i<lines.length;i++){
@@ -45,7 +53,7 @@ function payload(project){const parsed=parse(project.document);global.Permission
  const items=parsed.items.filter(x=>!x.gate&&parsed.features[x.cond]!==false&&global.PermissionVisibility.visible(x.permissionRule,project.permissions.selected,PAGES_DATA.profiles));
  return {...parsed,mdName:project.name+'.md',mdText:project.document,generation:project.generation,revision:String(project.version),review:copy(project.review),permSelected:copy(project.permissions.selected),permDescs:copy(project.permissions.descs),permDescsEn:copy(project.permissions.descsEn),gateId:gate?.id||null,gateDone:!gate||gate.state==='done',gateState:gate?.state||'done',total:items.length,done:items.filter(x=>x.state==='done').length,skipped:items.filter(x=>x.state==='skip').length,built:'Pages 个人版'};
 }
-function get(id){const project=read().projects[id];if(!project)throw Error('项目不存在或已删除，请返回工作台。');return project;}
+function get(id){const project=validId(id)?read().projects[id]:null;if(!project)throw Error('项目不存在或已删除，请返回工作台。');return project;}
 function state(project){const value=copy(project);delete value.snapshots;return value;}
 function validate(input){
  if(!input||typeof input!=='object'||typeof input.document!=='string'||input.document.length>800000||!parse(input.document).items.length)throw Error('清单无效，至少需要一个 Markdown 检查项，且小于 800 KB。');
@@ -59,7 +67,7 @@ function validate(input){
  return {permissions:copy(permissions),review:copy(review)};
 }
 async function create(input){const checked=validate({...input,document:input.document??PAGES_DATA.document});const name=String(input.name||'').trim();if(!name||name.length>100)throw Error('项目名称需要 1–100 个字符');return transaction(data=>{const id=crypto.randomUUID();data.projects[id]={id,name,document:stabilize(input.document??PAGES_DATA.document),dataVersion:2,templateVersion:input.templateVersion||(input.document?'custom':PAGES_DATA.templateVersion),templateBaseline:Object.fromEntries(parse(input.document??PAGES_DATA.document).items.map(x=>[x.id,x.text])),...checked,version:1,generation:1,createdAt:Date.now(),updatedAt:Date.now(),snapshots:[]};return id;});}
-async function mutate(id,version,label,action){return transaction(data=>{const p=data.projects[id];if(!p)throw Error('项目不存在');if(String(version)!==String(p.version))throw Object.assign(Error('另一个页面已更新项目，请先导出草稿，再刷新核对。'),{status:409});const before=state(p);p.document=stabilize(p.document);p.dataVersion=2;action(p);p.snapshots.unshift({id:crypto.randomUUID(),date:Date.now(),label,state:before});p.snapshots=p.snapshots.slice(0,10);p.version++;p.updatedAt=Date.now();return payload(p);});}
+async function mutate(id,version,label,action){return transaction(data=>{const p=data.projects[id];if(!p)throw Error('项目不存在');if(String(version)!==String(p.version))throw Object.assign(Error('另一个页面已更新项目，请先导出草稿，再刷新核对。'),{status:409});const before=state(p);p.document=stabilize(p.document);p.dataVersion=2;action(p);if(JSON.stringify(before)===JSON.stringify(state(p)))return payload(p);p.snapshots.unshift({id:crypto.randomUUID(),date:Date.now(),label,state:before});p.snapshots=p.snapshots.slice(0,10);p.version++;p.updatedAt=Date.now();return payload(p);});}
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function keys(p){const ios=p.ios||{};return ios.infoplist_keys|| (ios.infoplist_key?[{key:ios.infoplist_key,desc:ios.desc||'',desc_en:ios.desc_en||''}]:[]);}
 function config(data){const profiles=PAGES_DATA.profiles,en=data.lang==='en',ios=[],android=[],appstore=[],policy=[],checks=[],missing=[];
@@ -108,29 +116,35 @@ function inspectImportAll(bundle){
  if(!bundle||bundle.format!=='release-desk-workspace/v1'||!Array.isArray(bundle.projects)||bundle.projects.length>100)throw Error('请选择完整工作台备份，最多一次导入 100 个项目');
  const names=[],ids=new Set();let snapshots=0;
  for(const input of bundle.projects){
-  if(typeof input.id!=='string'||!input.id||input.id.length>128||ids.has(input.id))throw Error('备份中有项目 ID 缺失、过长或重复');ids.add(input.id);
+  if(!validId(input.id)||ids.has(input.id))throw Error('备份中有项目 ID 格式无效或重复');ids.add(input.id);
   validate(input);const name=String(input.name||'导入项目').trim();if(!name||name.length>100)throw Error('备份中有项目名称无效');names.push(name);
   if(input.snapshots!==undefined&&!Array.isArray(input.snapshots))throw Error('项目快照格式无效');
   if((input.snapshots||[]).length>10)throw Error('单个项目最多保留 10 份快照');const saved=input.snapshots||[];snapshots+=saved.length;
-  for(const item of saved)validate(item.state);
+  for(const item of saved){if(!item||!validId(item.id)||!Number.isFinite(item.date))throw Error('快照 ID 或日期无效');validate(item.state);}
+  for(const key of ['version','generation'])if(!Number.isSafeInteger(input[key])||input[key]<1||input[key]>=Number.MAX_SAFE_INTEGER)throw Error('项目版本无效');
  }
  const draftMap=bundle.drafts||{};if(!draftMap||typeof draftMap!=='object'||Array.isArray(draftMap))throw Error('备份中的浏览器草稿格式无效');
  const draftIds=Object.keys(draftMap);if(draftIds.length>ids.size||draftIds.some(id=>!ids.has(id)))throw Error('备份中存在没有对应项目的浏览器草稿');let unreadableDrafts=0;
  for(const id of draftIds){const draft=draftMap[id];if(draft&&typeof draft==='object'&&!Array.isArray(draft)&&typeof draft.unreadable==='string'){unreadableDrafts++;continue;}if(!validDraft(draft))throw Error('浏览器草稿格式或检查状态无效：'+id);}
  return {projects:names.length,names,snapshots,drafts:draftIds.length-unreadableDrafts,unreadableDrafts,exportedAt:bundle.exportedAt||null};
 }
-async function mergeRemoteAll(bundle){
+function mergeSnapshots(...groups){const seen=new Set();return groups.flat().filter(item=>{if(seen.has(item.id))return false;seen.add(item.id);return true;}).sort((a,b)=>Number(b.date)-Number(a.date)).slice(0,10).map(copy);}
+function workspaceToken(){return JSON.stringify(exportAll(),(key,value)=>key==='exportedAt'?undefined:value);}
+async function mergeRemoteAll(bundle,expectedToken){
  inspectImportAll(bundle);const incomingIds=new Set(bundle.projects.map(p=>p.id)),localOnly=Object.keys(read().projects).filter(id=>!incomingIds.has(id)).length;let added=0,updated=0;
  await transaction(data=>{
+  if(expectedToken!==undefined&&workspaceToken()!==expectedToken)throw conflict();
   for(const input of bundle.projects){
    const checked=validate(input),current=data.projects[input.id],remote={...copy(input),...checked,id:input.id};
    remote.snapshots=(remote.snapshots||[]).map(snapshot=>({...snapshot,state:{...snapshot.state,id:input.id}}));
    if(current){
     const before=state(current),after=state(remote);
     if(JSON.stringify(before)!==JSON.stringify(after)){
-     remote.snapshots=[...(remote.snapshots||[]),{id:crypto.randomUUID(),date:Date.now(),label:'GitHub 同步前保留的本机版本',state:before}].sort((a,b)=>Number(b.date)-Number(a.date)).slice(0,10);
+     remote.snapshots=mergeSnapshots([{id:crypto.randomUUID(),date:Date.now(),label:'GitHub 同步前保留的本机版本',state:before}],remote.snapshots,current.snapshots||[]);
      updated++;
-    }
+    }else remote.snapshots=mergeSnapshots(remote.snapshots,current.snapshots||[]);
+    remote.version=Math.max(current.version,remote.version)+1;
+    remote.generation=Math.max(current.generation,remote.generation)+1;remote.updatedAt=Date.now();
    }else added++;
    data.projects[input.id]=remote;
   }
@@ -184,7 +198,7 @@ async function handle(path,options={}){
  const updated=await mutate(id,data.revision,op,project=>{
   if(op==='write'){const ids=new Set(parse(project.document).items.map(x=>x.id));if(!data.states||Object.keys(data.states).some(x=>!ids.has(x)))throw Error('检查项已变化');project.document=apply(project.document,data.states);}
   else if(op==='review'){validate({...project,review:data.review});project.review=copy(data.review);}
-  else if(op==='features'){const features={hasFeedbackSystem:false,...data.features};if(!features||['hasAccountSystem','targetMinors','hasFeedbackSystem'].some(k=>typeof features[k]!=='boolean'))throw Error('项目特征无效');const line='<!-- FEATURES '+Object.entries(features).filter(([k])=>['hasAccountSystem','targetMinors','hasFeedbackSystem'].includes(k)).map(([k,v])=>k+'='+(v?1:0)).join(' ')+' -->';project.document=/<!--\s*FEATURES\s+[\s\S]*?-->/.test(project.document)?project.document.replace(/<!--\s*FEATURES\s+[\s\S]*?-->/,line):line+'\n'+project.document;}
+  else if(op==='features'){const features={hasFeedbackSystem:false,hasSubscriptions:true,...data.features};if(!features||['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions'].some(k=>typeof features[k]!=='boolean'))throw Error('项目特征无效');const line='<!-- FEATURES '+Object.entries(features).filter(([k])=>['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions'].includes(k)).map(([k,v])=>k+'='+(v?1:0)).join(' ')+' -->';project.document=/<!--\s*FEATURES\s+[\s\S]*?-->/.test(project.document)?project.document.replace(/<!--\s*FEATURES\s+[\s\S]*?-->/,line):line+'\n'+project.document;}
   else if(op==='ack'||op==='unack'){const gate=payload(project).gateId;if(gate)project.document=apply(project.document,{[gate]:op==='ack'?'done':'skip'});}
   else if(op==='clear'){const d=payload(project);project.document=apply(project.document,Object.fromEntries(d.items.filter(x=>!x.gate).map(x=>[x.id,'todo'])));project.generation++;}
   else if(op==='perm-write'){const permissions={selected:data.selected||[],descs:data.descs||{},descsEn:data.descsEn||{}};validate({...project,permissions});project.permissions=copy(permissions);project.document=replaceAppendix(project.document,appendix(permissions));}
@@ -203,5 +217,5 @@ async function handle(path,options={}){
  return updated;
 }
 function install(){global.RELEASE_PAGES={projectId:projectId()};initialize().catch(()=>{});const native=global.fetch.bind(global);global.fetch=async(path,options)=>{if(typeof path==='string'&&path.startsWith('/api/')){try{return new Response(JSON.stringify(await handle(path,options)),{status:200,headers:{'Content-Type':'application/json'}});}catch(error){return new Response(JSON.stringify({error:error.message}),{status:error.status||400,headers:{'Content-Type':'application/json'}});}}return native(path,options);};}
-global.PagesStore={KEY,initialize,exportAll,inspectImportAll,importAll,mergeRemoteAll,markExport,updateTemplate,stabilize,read,get,parse,apply,payload,create,mutate,config,english,download,escape,projectId,install,openProject:()=>payload(get(projectId())),list:()=>Object.values(read().projects).sort((a,b)=>b.updatedAt-a.updatedAt),export:id=>({format:'release-desk/v1',...state(get(id))}),remove:id=>transaction(data=>{delete data.projects[id];})};
+global.PagesStore={KEY,validId,mergeSnapshots,workspaceToken,initialize,exportAll,inspectImportAll,importAll,mergeRemoteAll,markExport,updateTemplate,stabilize,read,get,parse,apply,payload,create,mutate,config,english,download,escape,projectId,install,openProject:()=>payload(get(projectId())),list:()=>Object.values(read().projects).sort((a,b)=>b.updatedAt-a.updatedAt),export:id=>({format:'release-desk/v1',...state(get(id))}),remove:id=>transaction(data=>{delete data.projects[id];})};
 })(window);

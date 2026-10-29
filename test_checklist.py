@@ -61,4 +61,12 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual(c.reset_md(self.path, backup=True), 1)
         self.assertNotIn('[x]', self.path.read_text())
 
+class PagesBuildContractTests(unittest.TestCase):
+    def test_missing_or_duplicate_integration_point_fails(self):
+        from scripts.build_pages import replace_required
+        self.assertEqual(replace_required('before HOOK after', 'HOOK', 'value'), 'before value after')
+        for text in ('missing', 'HOOK HOOK'):
+            with self.assertRaises(ValueError):
+                replace_required(text, 'HOOK', 'value')
+
 if __name__ == '__main__': unittest.main()

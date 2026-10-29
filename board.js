@@ -12,7 +12,7 @@ function boardFetch(path, options){
  * 状态
  * ------------------------------------------------------------------ */
 let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=null;
-function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
+function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
  const permissionPending=typeof permDirty!=="undefined"&&permDirty;
@@ -499,7 +499,7 @@ function hiddenItems(){
 }
 
 function featureHiddenItems(){
-  const keys = ["hasAccountSystem", "hasFeedbackSystem", "targetMinors"];
+  const keys = ["hasAccountSystem", "hasFeedbackSystem", "targetMinors", "hasSubscriptions"];
   return hiddenItems().filter(it => keys.includes(it.cond) && !condOk(it.cond));
 }
 
@@ -1515,6 +1515,7 @@ document.getElementById("seqline").addEventListener("click", jumpToCurrent);
  * 项目设置：账号系统 / 未成年用户
  * 切换后立即重算可见条目并重新连续编号；保存时写回 md 的 FEATURES 行。
  * -------------------------------------------------------------- */
+const featSubscription = document.getElementById("featSubscription");
 const featFeedback = document.getElementById("featFeedback");
 const featAcc = document.getElementById("featAcc");
 const featMinor = document.getElementById("featMinor");
@@ -1522,12 +1523,14 @@ const featMinor = document.getElementById("featMinor");
 function currentFeatures(){
   return {
     hasAccountSystem: !!(DATA && DATA.features && DATA.features.hasAccountSystem),
+    hasSubscriptions: DATA?.features?.hasSubscriptions !== false,
     hasFeedbackSystem: !!(DATA && DATA.features && DATA.features.hasFeedbackSystem),
     targetMinors: !!(DATA && DATA.features && DATA.features.targetMinors)
   };
 }
 function refreshFeatUI(){
   const f = currentFeatures();
+  featSubscription.checked = f.hasSubscriptions;
   featFeedback.checked = f.hasFeedbackSystem;
   featAcc.checked = f.hasAccountSystem;
   featMinor.checked = f.targetMinors;
@@ -1543,7 +1546,7 @@ function refreshFeatUI(){
   const pv = document.getElementById("featPreview");
   if(pv){
     const visible = (DATA.sections || []).flatMap(sec => sec.blocks || []).filter(it => it.type === "item" && !it.gate && it.visible !== false);
-    const label = {hasAccountSystem:"无用户账号系统",hasFeedbackSystem:"无用户反馈系统",targetMinors:"不面向未成年用户"};
+    const label = {hasAccountSystem:"无用户账号系统",hasFeedbackSystem:"无用户反馈系统",hasSubscriptions:"无订阅商品",targetMinors:"不面向未成年用户"};
     const clean = value => escapeHtml(String(value).replace(/<[^>]+>/g, "").replace(/\*\*/g, "").replace(/`/g, ""));
     const grouped = {};
     hidden.forEach(it => { (grouped[it.cond] = grouped[it.cond] || []).push(it.text); });
@@ -1580,7 +1583,7 @@ function onFeatToggle(){
   saveFailure="";
   if(!DATA) return;
   DATA.features = {
-    hasFeedbackSystem: featFeedback.checked,
+    hasSubscriptions: featSubscription.checked, hasFeedbackSystem: featFeedback.checked,
     hasAccountSystem: featAcc.checked,
     targetMinors: featMinor.checked
   };
@@ -1589,13 +1592,14 @@ function onFeatToggle(){
   refreshFeatUI();
   updateSaveStatus();
 }
+featSubscription.addEventListener("change", onFeatToggle);
 featFeedback.addEventListener("change", onFeatToggle);
 featAcc.addEventListener("change", onFeatToggle);
 featMinor.addEventListener("change", onFeatToggle);
 
 // 保存到 md
 document.getElementById("featSave").addEventListener("click", async () => {
-  const f = {hasAccountSystem: featAcc.checked, targetMinors: featMinor.checked, hasFeedbackSystem: featFeedback.checked};
+  const f = {hasAccountSystem: featAcc.checked, targetMinors: featMinor.checked, hasSubscriptions: featSubscription.checked, hasFeedbackSystem: featFeedback.checked};
   if(!online){
     toast("离线模式无法写入文件，请启动本地服务");
     return;

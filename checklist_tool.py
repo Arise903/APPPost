@@ -120,7 +120,7 @@ def parse_md(text: str) -> dict:
     path = []
 
     # 项目特征（决定哪些条目显示）
-    features = {"hasAccountSystem": True, "targetMinors": True, "hasFeedbackSystem": False}
+    features = {"hasAccountSystem": True, "targetMinors": True, "hasFeedbackSystem": False, "hasSubscriptions": True}
     fm = RE_FEATURES.search(text)
     if fm:
         for k, v in RE_FEATURE_KV.findall(fm.group(1)):
@@ -643,8 +643,8 @@ def write_features(md_path: Path, features: dict) -> bool:
     """把项目特征写回 md 的 FEATURES 注释行。返回是否发生变更。"""
     text = md_path.read_text(encoding="utf-8")
     parts = []
-    for k in ("hasAccountSystem", "targetMinors", "hasFeedbackSystem"):
-        parts.append(f"{k}={1 if features.get(k) else 0}")
+    for k in ("hasAccountSystem", "targetMinors", "hasFeedbackSystem", "hasSubscriptions"):
+        parts.append(f"{k}={1 if features.get(k, k == 'hasSubscriptions') else 0}")
     line = "<!-- FEATURES " + " ".join(parts) + " -->"
 
     m = RE_FEATURES.search(text)

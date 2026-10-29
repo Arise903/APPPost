@@ -101,6 +101,10 @@
     {
       "heading": "用户反馈|feedbackApiKey",
       "feature": "hasFeedbackSystem"
+    },
+    {
+      "heading": "^(?:4\\.\\s*订阅|4\\.[123]\\s)",
+      "feature": "hasSubscriptions"
     }
   ],
   "featureText": [
@@ -162,6 +166,38 @@
     "t_bc434831": "hasAccountSystem",
     "t_ce994e06": "hasAccountSystem",
     "t_6a5d3450": "hasAccountSystem",
-    "t_f642b1a5": "hasAccountSystem"
+    "t_f642b1a5": "hasAccountSystem",
+    "t_278d76f1": "hasSubscriptions",
+    "t_9e1e4c91": "hasSubscriptions",
+    "t_e85df36d": "hasSubscriptions",
+    "t_bbd686b3": "hasSubscriptions",
+    "t_4d9284e8": "hasSubscriptions",
+    "t_d207883b": "hasSubscriptions",
+    "t_64e0e769": "hasSubscriptions",
+    "t_1e030895": "hasSubscriptions",
+    "t_07b2558b": "hasSubscriptions",
+    "t_5cc6822e": "hasSubscriptions",
+    "t_b8e9dda7": "hasSubscriptions",
+    "t_a89e5957": "hasSubscriptions",
+    "t_4b247aa0": "hasSubscriptions",
+    "t_685b49b8": "hasSubscriptions",
+    "t_d7c8cfe1": "hasSubscriptions",
+    "t_f6aa2929": "hasSubscriptions",
+    "t_2a16cdca": "hasSubscriptions",
+    "t_df902052": "hasSubscriptions",
+    "t_d405c325": "hasSubscriptions",
+    "t_b7322922": "hasSubscriptions",
+    "t_70632a61": "hasSubscriptions",
+    "t_8effa955": "hasSubscriptions",
+    "t_a94dce5f": "hasSubscriptions",
+    "t_b660c898": "hasSubscriptions",
+    "t_189e7fc0": "hasSubscriptions",
+    "t_9c18ce64": "hasSubscriptions",
+    "t_59a647f8": "hasSubscriptions",
+    "t_ffcee7b0": "hasSubscriptions",
+    "t_65436aa0": "hasSubscriptions",
+    "t_333df253": "hasSubscriptions",
+    "t_91914237": "hasSubscriptions",
+    "t_89f68fa5": "hasSubscriptions"
   }
 }
