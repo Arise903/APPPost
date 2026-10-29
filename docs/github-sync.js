@@ -2,101 +2,42 @@
 (function(){
 'use strict';
 const S=PagesStore,OWNER='Arise903',REPO='APPdata',BRANCH='main',FILE='release-desk/workspace.json';
-const TOKEN_KEY='release-desk-github-token:session:v1',STATE_KEY='release-desk-github-sync:v1';
+const TOKEN_KEY='release-desk-github-token:session:v1',STATE_KEY='release-desk-github-sync:v1',ENCRYPTED='release-desk-encrypted/v1',ITERATIONS=310000;
 const $=id=>document.getElementById(id);let token='',busy=false;
 const state=()=>{try{return JSON.parse(localStorage.getItem(STATE_KEY)||'{}')}catch(_){return {}}};
 function remember(value){try{localStorage.setItem(STATE_KEY,JSON.stringify(value))}catch(_){}}
 function status(text,kind=''){const el=$('githubSyncStatus');if(!el)return;el.textContent=text;el.dataset.state=kind;}
-function setBusy(value){busy=value;for(const id of ['githubSyncPush','githubSyncPull','githubSyncConnect','githubSyncDisconnect'])if($(id))$(id).disabled=value||($(id).dataset.needsToken==='true'&&!token);}
-function renderConnection(){
- const connected=!!token;
- $('githubSyncConnect').hidden=connected;$('githubSyncDisconnect').hidden=!connected;
- $('githubSyncPush').disabled=!connected||busy;$('githubSyncPull').disabled=!connected||busy;
- if(!connected){status('未连接。上传前请先生成仅授权 APPdata 仓库的 Fine-grained token。');return;}
- const sync=state();status('已连接 '+OWNER+'/'+REPO+' · 授权仅保存在当前标签页会话中'+(sync.lastSyncedAt?' · 上次同步 '+new Date(sync.lastSyncedAt).toLocaleString():''),'connected');
-}
-async function request(path,options={}){
- const response=await fetch('https://api.github.com'+path,{...options,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
- const text=await response.text();let body={};try{body=text?JSON.parse(text):{}}catch(_){body={message:text.slice(0,300)}}
- if(!response.ok){const error=new Error(body.message||('GitHub API 返回 '+response.status));error.status=response.status;throw error;}
- return body;
-}
+function setBusy(value){busy=value;for(const id of ['githubSyncPush','githubSyncPull','githubSyncHistory','githubSyncConnect','githubSyncDisconnect'])if($(id))$(id).disabled=value;}
+function renderConnection(){const connected=!!token;$('githubSyncConnect').hidden=connected;$('githubSyncDisconnect').hidden=!connected;for(const id of ['githubSyncPush','githubSyncPull','githubSyncHistory'])$(id).disabled=!connected||busy;if(!connected){status('未连接。Token 仅存于当前标签页；同源脚本仍能访问，请勿在共享设备上连接。');return;}const sync=state();status('已连接 '+OWNER+'/'+REPO+' · 当前标签页会话'+(sync.lastSyncedAt?' · 上次同步 '+new Date(sync.lastSyncedAt).toLocaleString():''),'connected');}
+async function request(path,options={}){const response=await fetch('https://api.github.com'+path,{...options,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});const text=await response.text();let body={};try{body=text?JSON.parse(text):{}}catch(_){body={message:text.slice(0,300)}}if(!response.ok){const error=new Error(body.message||('GitHub API 返回 '+response.status));error.status=response.status;throw error;}return body;}
 function norm(bundle){return {format:'release-desk-workspace/v1',projects:bundle.projects||[],drafts:bundle.drafts||{}};}
-async function hash(bundle){const bytes=new TextEncoder().encode(JSON.stringify(norm(bundle)));const digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');}
-function decodeBase64(value){const bytes=Uint8Array.from(atob(value.replace(/\s/g,'')),char=>char.charCodeAt(0));return new TextDecoder().decode(bytes);}
-async function getRemote(){
- const repo=await request('/repos/'+OWNER+'/'+REPO);if(!repo.private)throw Error('目标仓库不是私有仓库，已停止读取。');
- const branch=repo.default_branch||BRANCH;let ref;
- try{ref=await request('/repos/'+OWNER+'/'+REPO+'/git/ref/heads/'+encodeURIComponent(branch));}
- catch(error){if(error.status===404&&Number(repo.size)===0)return {repo,branch,empty:true,branchSha:null,workspace:null,fileSha:null};throw Error(error.status===404?'私有仓库没有可读取的默认分支；请先在 GitHub 初始化 README。':error.message);}
- const branchSha=ref.object.sha,commit=await request('/repos/'+OWNER+'/'+REPO+'/git/commits/'+branchSha);
- const tree=await request('/repos/'+OWNER+'/'+REPO+'/git/trees/'+commit.tree.sha+'?recursive=1');
- if(tree.truncated)throw Error('APPdata 仓库文件过多，无法安全定位同步文件。');
- const entry=(tree.tree||[]).find(item=>item.path===FILE&&item.type==='blob');
- if(!entry)return {repo,branch,empty:false,branchSha,workspace:null,fileSha:null};
- const blob=await request('/repos/'+OWNER+'/'+REPO+'/git/blobs/'+entry.sha);
- if(blob.encoding!=='base64')throw Error('GitHub 返回了不支持的文件编码。');
- let workspace;try{workspace=JSON.parse(decodeBase64(blob.content));}catch(_){throw Error('GitHub 里的工作台 JSON 无效；本机数据没有改动。');}
- S.inspectImportAll(workspace);
- return {repo,branch,empty:false,branchSha,workspace,fileSha:entry.sha};
-}
-async function writeRemote(bundle,remote){
- const content=JSON.stringify(norm(bundle),null,2);
- if(new Blob([content]).size>20000000)throw Error('工作台备份超过 20 MB，请先清理历史项目或使用本机 JSON 备份。');
- const blob=await request('/repos/'+OWNER+'/'+REPO+'/git/blobs',{method:'POST',body:JSON.stringify({content,encoding:'utf-8'})});
- const treeBody={tree:[{path:FILE,mode:'100644',type:'blob',sha:blob.sha}]};if(remote.branchSha)treeBody.base_tree=(await request('/repos/'+OWNER+'/'+REPO+'/git/commits/'+remote.branchSha)).tree.sha;
- const tree=await request('/repos/'+OWNER+'/'+REPO+'/git/trees',{method:'POST',body:JSON.stringify(treeBody)});
- const commit=await request('/repos/'+OWNER+'/'+REPO+'/git/commits',{method:'POST',body:JSON.stringify({message:'Sync Release Desk workspace',tree:tree.sha,...(remote.branchSha?{parents:[remote.branchSha]}:{})})});
- let ref;
- if(remote.branchSha)ref=await request('/repos/'+OWNER+'/'+REPO+'/git/refs/heads/'+encodeURIComponent(remote.branch),{method:'PATCH',body:JSON.stringify({sha:commit.sha,force:false})});
- else ref=await request('/repos/'+OWNER+'/'+REPO+'/git/refs',{method:'POST',body:JSON.stringify({ref:'refs/heads/'+remote.branch,sha:commit.sha})});
- return {commit:commit.sha,ref:ref.object.sha};
-}
+async function hash(bundle){const bytes=new TextEncoder().encode(JSON.stringify(norm(bundle))),digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');}
+function b64(bytes){let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(binary);}
+function unb64(value){return Uint8Array.from(atob(value),c=>c.charCodeAt(0));}
+async function derive(password,salt){const source=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:ITERATIONS,hash:'SHA-256'},source,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
+async function encrypt(bundle,password){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await derive(password,salt),plain=new TextEncoder().encode(JSON.stringify(norm(bundle))),cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,plain);return {format:ENCRYPTED,algorithm:'AES-256-GCM',kdf:'PBKDF2-SHA256',iterations:ITERATIONS,salt:b64(salt),iv:b64(iv),ciphertext:b64(new Uint8Array(cipher))};}
+async function decrypt(envelope,password){try{if(envelope.algorithm!=='AES-256-GCM'||envelope.kdf!=='PBKDF2-SHA256'||envelope.iterations!==ITERATIONS)throw Error('不支持的加密参数');const key=await derive(password,unb64(envelope.salt)),plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(envelope.iv)},key,unb64(envelope.ciphertext)),bundle=JSON.parse(new TextDecoder().decode(plain));S.inspectImportAll(bundle);return bundle;}catch(_){throw Error('解密失败：口令不正确或云端加密文件损坏。');}}
+function decodeBase64(value){const bytes=unb64(value.replace(/\s/g,''));return new TextDecoder().decode(bytes);}
+async function loadCommit(repo,branch,commitSha,password){const commit=await request('/repos/'+OWNER+'/'+REPO+'/git/commits/'+commitSha),tree=await request('/repos/'+OWNER+'/'+REPO+'/git/trees/'+commit.tree.sha+'?recursive=1');if(tree.truncated)throw Error('APPdata 仓库文件过多，无法安全定位同步文件。');const entry=(tree.tree||[]).find(item=>item.path===FILE&&item.type==='blob');if(!entry)return {repo,branch,branchSha:commitSha,workspace:null,fileSha:null};const blob=await request('/repos/'+OWNER+'/'+REPO+'/git/blobs/'+entry.sha);if(blob.encoding!=='base64')throw Error('GitHub 返回了不支持的文件编码。');let document;try{document=JSON.parse(decodeBase64(blob.content));}catch(_){throw Error('GitHub 里的工作台文件无效；本机数据没有改动。');}if(document.format===ENCRYPTED){if(!password)return {repo,branch,branchSha:commitSha,workspace:null,fileSha:entry.sha,encrypted:true};document=await decrypt(document,password);return {repo,branch,branchSha:commitSha,workspace:document,fileSha:entry.sha,encrypted:true};}S.inspectImportAll(document);return {repo,branch,branchSha:commitSha,workspace:document,fileSha:entry.sha,encrypted:false};}
+async function getRemote(password){const repo=await request('/repos/'+OWNER+'/'+REPO);if(!repo.private)throw Error('目标仓库不是私有仓库，已停止读取。');const branch=repo.default_branch||BRANCH;let ref;try{ref=await request('/repos/'+OWNER+'/'+REPO+'/git/ref/heads/'+encodeURIComponent(branch));}catch(error){if(error.status===404&&Number(repo.size)===0)return {repo,branch,empty:true,branchSha:null,workspace:null,fileSha:null};throw Error(error.status===404?'私有仓库没有可读取的默认分支；请先在 GitHub 初始化 README。':error.message);}return loadCommit(repo,branch,ref.object.sha,password);}
+async function getAtCommit(commitSha,password){const repo=await request('/repos/'+OWNER+'/'+REPO);if(!repo.private)throw Error('目标仓库不是私有仓库，已停止读取。');return loadCommit(repo,repo.default_branch||BRANCH,commitSha,password);}
+async function writeRemote(bundle,remote,password){const document=password?await encrypt(bundle,password):norm(bundle),content=JSON.stringify(document,null,2);if(new Blob([content]).size>20000000)throw Error('工作台备份超过 20 MB，请先清理历史项目或使用本机 JSON 备份。');const blob=await request('/repos/'+OWNER+'/'+REPO+'/git/blobs',{method:'POST',body:JSON.stringify({content,encoding:'utf-8'})}),treeBody={tree:[{path:FILE,mode:'100644',type:'blob',sha:blob.sha}]};if(remote.branchSha)treeBody.base_tree=(await request('/repos/'+OWNER+'/'+REPO+'/git/commits/'+remote.branchSha)).tree.sha;const tree=await request('/repos/'+OWNER+'/'+REPO+'/git/trees',{method:'POST',body:JSON.stringify(treeBody)}),commit=await request('/repos/'+OWNER+'/'+REPO+'/git/commits',{method:'POST',body:JSON.stringify({message:'Sync Release Desk workspace'+(password?' (encrypted)':''),tree:tree.sha,...(remote.branchSha?{parents:[remote.branchSha]}:{})})});let ref;if(remote.branchSha)ref=await request('/repos/'+OWNER+'/'+REPO+'/git/refs/heads/'+encodeURIComponent(remote.branch),{method:'PATCH',body:JSON.stringify({sha:commit.sha,force:false})});else ref=await request('/repos/'+OWNER+'/'+REPO+'/git/refs',{method:'POST',body:JSON.stringify({ref:'refs/heads/'+remote.branch,sha:commit.sha})});return {commit:commit.sha,ref:ref.object.sha};}
 function saveSyncState(sha,digest){remember({fileSha:sha,hash:digest,lastSyncedAt:Date.now(),repo:OWNER+'/'+REPO});}
-async function connect(value){
- token=value.trim();
- try{
-  const repo=await request('/repos/'+OWNER+'/'+REPO);if(!repo.private)throw Error('APPdata 必须是私有仓库。');
-  sessionStorage.setItem(TOKEN_KEY,token);$('githubToken').value='';$('githubSyncDialog').close();renderConnection();
- }catch(error){token='';renderConnection();throw Error(error.status===401?'Token 无效或已过期。':error.status===403?'Token 缺少 APPdata 的 Contents 读写权限。':error.message);}
-}
-async function push(){
- if(!token)return $('githubSyncDialog').showModal();setBusy(true);status('正在检查私有仓库…','busy');
- try{
-  const local=S.exportAll(),digest=await hash(local),remote=await getRemote();
-  if(remote.workspace&&await hash(remote.workspace)===digest){saveSyncState(remote.fileSha,digest);status('本机和 GitHub 数据一致，无需上传。','connected');return;}
-  const count=local.projects.length,remoteCount=remote.workspace?.projects?.length||0;
-  const changed=remote.workspace&&remote.fileSha!==state().fileSha;
-  const message=(remote.workspace?'GitHub 中已有 '+remoteCount+' 个项目。':'APPdata 尚无 Release Desk 备份。')+'\n\n将把当前浏览器的 '+count+' 个项目和草稿写入私有仓库 '+OWNER+'/'+REPO+'。'+(changed?'\n云端版本与上次同步不同；此次会创建新提交，旧版本仍可从 Git 历史恢复。':'')+'\n\n继续上传？';
-  if(!confirm(message)){status('已取消上传。');return;}
-  status('正在创建 Git 提交…','busy');const result=await writeRemote(local,remote),updated=await getRemote(),remoteHash=await hash(updated.workspace);
-  saveSyncState(updated.fileSha||result.commit,remoteHash);status('上传完成 · 提交 '+result.commit.slice(0,7)+' · '+count+' 个项目。','connected');
- }catch(error){status(error.message==='Failed to fetch'?'无法连接 GitHub API；请检查网络和仓库授权。':error.message,'error');}
- finally{setBusy(false);}
-}
-async function pull(){
- if(!token)return $('githubSyncDialog').showModal();setBusy(true);status('正在读取 GitHub 备份…','busy');
- try{
-  const remote=await getRemote();if(!remote.workspace){status('私有仓库里还没有工作台备份，请先上传本机数据。');return;}
-  const preview=S.inspectImportAll(remote.workspace),local=S.exportAll();
-  if(!confirm('从 GitHub 拉取预览\n\n云端项目：'+preview.projects+' 个\n云端历史快照：'+preview.snapshots+' 份\n本机项目：'+local.projects.length+' 个\n\n同 ID 项目会以云端版本为当前版本，并将不同的本机版本保留为项目快照；本机独有项目和已有草稿会保留。拉取前会下载一份完整本机备份。继续吗？')){status('已取消拉取。');return;}
-  S.download('release-workspace-before-github-pull-'+new Date().toLocaleDateString('sv-SE')+'.json',JSON.stringify(local,null,2));
-  const result=await S.mergeRemoteAll(remote.workspace),digest=await hash(remote.workspace);saveSyncState(remote.fileSha,digest);
-  status('拉取完成 · 新增 '+result.added+' 个，更新 '+result.updated+' 个；本机独有项目已保留。'+(result.draftError?'部分草稿写入失败，请保留刚下载的备份。':''),'connected');
-  setTimeout(()=>location.reload(),1200);
- }catch(error){status(error.message==='Failed to fetch'?'无法连接 GitHub API；请检查网络和仓库授权。':error.message,'error');}
- finally{setBusy(false);}
-}
-function boot(){
- if(!$('githubSyncStatus'))return;
- try{token=sessionStorage.getItem(TOKEN_KEY)||'';}catch(_){token='';}
- renderConnection();
- $('githubSyncConnect').onclick=()=>$('githubSyncDialog').showModal();
- $('githubSyncDisconnect').onclick=()=>{sessionStorage.removeItem(TOKEN_KEY);token='';renderConnection();status('已断开本次会话。GitHub 中的数据未删除。');};
- $('githubSyncCancel').onclick=()=>$('githubSyncDialog').close();
- $('githubSyncForm').onsubmit=async event=>{event.preventDefault();const button=$('githubTokenSubmit');button.disabled=true;try{await connect($('githubToken').value);}catch(error){$('githubTokenError').textContent=error.message;}finally{button.disabled=false;}};
- $('githubSyncPush').onclick=push;$('githubSyncPull').onclick=pull;
- if(token){getRemote().then(remote=>{if(remote.workspace)status('已连接 '+OWNER+'/'+REPO+' · 检测到 '+remote.workspace.projects.length+' 个云端项目；选择上传或拉取。','connected');}).catch(error=>{if(error.status===401){sessionStorage.removeItem(TOKEN_KEY);token='';renderConnection();status('Token 已过期，请重新连接。','error');}else status('连接检查失败：'+error.message,'error');});}
-}
+function projectCore(p){return {name:p.name,document:p.document,permissions:p.permissions,review:p.review,templateVersion:p.templateVersion,templateBaseline:p.templateBaseline};}
+function same(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+function diff(local,remote){const l=new Map(local.projects.map(p=>[p.id,p])),r=new Map((remote?.projects||[]).map(p=>[p.id,p])),added=[],changed=[],cloudOnly=[];for(const [id,p] of l){const other=r.get(id);if(!other)added.push(p);else if(!same(projectCore(p),projectCore(other)))changed.push({local:p,remote:other});}for(const [id,p] of r)if(!l.has(id))cloudOnly.push(p);const ld=local.drafts||{},rd=remote?.drafts||{},draftIds=new Set([...Object.keys(ld),...Object.keys(rd)]),draftChanges=[...draftIds].filter(id=>!same(ld[id]||null,rd[id]||null)).length;return {added,changed,cloudOnly,draftChanges};}
+function mergedForUpload(local,remote){const out=norm(local),byId=new Map((remote?.projects||[]).map(p=>[p.id,JSON.parse(JSON.stringify(p))]));for(let p of local.projects){const cloud=byId.get(p.id);if(cloud&&!same(projectCore(p),projectCore(cloud))){const old={...cloud};delete old.snapshots;const snaps=[...(p.snapshots||[]),...(cloud.snapshots||[]),{id:crypto.randomUUID(),date:Date.now(),label:'上传前保留的 GitHub 版本',state:old}];p={...p,snapshots:snaps.sort((a,b)=>Number(b.date)-Number(a.date)).slice(0,10)};byId.set(p.id,p);}else if(!cloud)byId.set(p.id,p);}out.projects=[...byId.values()];out.drafts={...(remote?.drafts||{}),...(local.drafts||{})};return out;}
+function esc(value){return String(value||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function listHtml(items,label){return items.length?items.map(p=>'<li>'+esc(p.name)+' <span>'+label+'</span></li>').join(''):'<li class="empty">无</li>';}
+function diffHtml(d,extra=''){const conflicts=d.changed.length?d.changed.map(x=>'<li>'+esc(x.local.name)+' <span>采用本机版本；云端旧版存为快照</span></li>').join(''):'<li class="empty">无</li>';return '<div class="github-diff-counts"><span>本机新增 '+d.added.length+'</span><span>同 ID 内容不同 '+d.changed.length+'</span><span>仅云端有 '+d.cloudOnly.length+'</span><span>草稿有差异 '+d.draftChanges+'</span></div>'+extra+'<div class="github-diff-columns"><section><h3>新增到云端</h3><ul>'+listHtml(d.added,'上传')+'</ul><h3>内容冲突</h3><ul>'+conflicts+'</ul></section><section><h3>仅云端项目</h3><ul>'+listHtml(d.cloudOnly,'保留在云端')+'</ul><p class="subtle small">上传不会删除仅存在于云端的项目。需要删除时，请先导出备份，再到私有仓库管理。</p><p class="subtle small">草稿冲突采用当前操作方向的来源版本。</p></section></div>';}
+function review(title,html,label,action){return new Promise(resolve=>{const dialog=$('githubReviewDialog');$('githubReviewTitle').textContent=title;$('githubReviewBody').innerHTML=html;$('githubReviewConfirm').textContent=label;$('githubReviewConfirm').hidden=!action;$('githubReviewCancel').textContent=action?'返回':'关闭';let settled=false;const onCancel=event=>{event.preventDefault();done(false);};const done=value=>{if(settled)return;settled=true;dialog.removeEventListener('cancel',onCancel);dialog.close();resolve(value);};dialog.addEventListener('cancel',onCancel,{once:true});$('githubReviewConfirm').onclick=()=>done(true);$('githubReviewCancel').onclick=$('githubReviewClose').onclick=()=>done(false);dialog.showModal();});}
+function downloadBefore(local,label='操作前'){S.download('release-workspace-'+label+'-'+new Date().toLocaleDateString('sv-SE')+'.json',JSON.stringify(local,null,2));}
+async function unlock(remote){if(!remote.encrypted)return remote;const password=prompt('此 GitHub 备份经过加密。请输入加密口令；口令不会保存。');if(!password)throw Error('已取消解密。');return getRemote(password);}
+async function connect(value){token=value.trim();try{const repo=await request('/repos/'+OWNER+'/'+REPO);if(!repo.private)throw Error('APPdata 必须是私有仓库。');sessionStorage.setItem(TOKEN_KEY,token);$('githubToken').value='';$('githubSyncDialog').close();renderConnection();}catch(error){token='';renderConnection();throw Error(error.status===401?'Token 无效或已过期。':error.status===403?'Token 缺少 APPdata 的 Contents 读写权限。':error.message);}}
+async function push(){if(!token)return $('githubSyncDialog').showModal();setBusy(true);status('正在检查私有仓库…','busy');try{const local=norm(S.exportAll());let remote=await getRemote();if(remote.encrypted)remote=await unlock(remote);const d=diff(local,remote.workspace),merged=mergedForUpload(local,remote.workspace);if(remote.workspace&&same(await hash(remote.workspace),await hash(merged))){saveSyncState(remote.fileSha,await hash(merged));status('本机与云端数据一致，无需上传。','connected');return;}const encryptBlock='<label class="github-encrypt-choice"><input id="githubEncryptUpload" type="checkbox" '+(remote.encrypted?'checked':'')+'> 加密存入 APPdata（AES-256-GCM）</label><label id="githubEncryptPasswordWrap" hidden>加密口令（至少 12 位）<input id="githubEncryptPassword" type="password" minlength="12" autocomplete="new-password"></label><p class="subtle small">'+(remote.encrypted?'云端原备份已加密；默认继续加密。':'不勾选时，私有仓库中的 JSON 可被有仓库访问权的人直接读取。')+' 加密口令不会上传或保存，遗失后无法恢复。</p>';const ok=await review('上传差异预览',diffHtml(d,encryptBlock),'确认并上传',true);if(!ok){status('已取消上传。');return;}const toggle=$('githubEncryptUpload'),password=$('githubEncryptPassword')?.value||'';if(toggle.checked&&password.length<12)throw Error('加密口令至少需要 12 位。');const result=await writeRemote(merged,remote,toggle.checked?password:'');const updated=await getRemote(toggle.checked?password:undefined);saveSyncState(updated.fileSha,await hash(merged));status('上传完成 · '+merged.projects.length+' 个项目 · 提交 '+result.commit.slice(0,7)+(toggle.checked?' · 已加密':''),'connected');}catch(error){status(error.message==='Failed to fetch'?'无法连接 GitHub API；请检查网络和仓库授权。':error.message,'error');}finally{if($('githubEncryptPassword'))$('githubEncryptPassword').value='';setBusy(false);}}
+async function pullFrom(remote,label='GitHub 当前版本'){if(!remote.workspace)throw Error('该 GitHub 版本没有工作台备份文件。');const local=norm(S.exportAll()),d=diff(local,remote.workspace),html=diffHtml(d,'<p class="subtle small">将从 '+esc(label)+' 恢复。冲突项目采用该版本；本机旧版保留为快照，本机独有项目和已有草稿保留。操作前会下载完整本机备份。</p>');if(!await review('拉取差异预览',html,'备份并拉取',true))return;downloadBefore(local,'拉取前');const result=await S.mergeRemoteAll(remote.workspace);saveSyncState(remote.fileSha,await hash(remote.workspace));status('拉取完成 · 新增 '+result.added+' 个，更新 '+result.updated+' 个，本机独有 '+result.localOnly+' 个保留。'+(result.draftError?'部分草稿保存失败，请使用刚下载的备份恢复。':''),'connected');setTimeout(()=>location.reload(),1200);}
+async function pull(){if(!token)return $('githubSyncDialog').showModal();setBusy(true);status('正在读取 GitHub 备份…','busy');try{let remote=await getRemote();if(!remote.workspace&&remote.encrypted)remote=await unlock(remote);if(!remote.workspace)throw Error('私有仓库里还没有工作台备份，请先上传本机数据。');await pullFrom(remote);}catch(error){status(error.message==='Failed to fetch'?'无法连接 GitHub API；请检查网络和仓库授权。':error.message,'error');}finally{setBusy(false);}}
+async function history(){if(!token)return $('githubSyncDialog').showModal();setBusy(true);status('正在读取同步历史…','busy');try{const repo=await request('/repos/'+OWNER+'/'+REPO);if(!repo.private)throw Error('目标仓库不是私有仓库。');const commits=await request('/repos/'+OWNER+'/'+REPO+'/commits?path='+encodeURIComponent(FILE)+'&per_page=20');if(!Array.isArray(commits)||!commits.length)throw Error('尚无同步版本历史。');const rows=commits.map((c,i)=>'<button type="button" class="github-history-row" data-commit="'+esc(c.sha)+'"><strong>'+(i+1)+'. '+esc(c.commit?.message||'同步版本')+'</strong><span>'+esc(c.commit?.author?.date||'')+' · '+esc(c.sha.slice(0,8))+'</span></button>').join('');$('githubReviewTitle').textContent='GitHub 同步历史';$('githubReviewBody').innerHTML='<p class="subtle small">选择一个历史提交预览并恢复。恢复不会重写 Git 历史；本机会先下载备份。</p><div class="github-history-list">'+rows+'</div>';$('githubReviewConfirm').hidden=true;$('githubReviewCancel').textContent='关闭';$('githubReviewCancel').onclick=$('githubReviewClose').onclick=()=>$('githubReviewDialog').close();$('githubReviewBody').onclick=async event=>{const button=event.target.closest('[data-commit]');if(!button)return;try{let old=await getAtCommit(button.dataset.commit);if(old.encrypted)old=await (async()=>{const password=prompt('此历史版本已加密。请输入加密口令；口令不会保存。');if(!password)throw Error('已取消解密。');return getAtCommit(button.dataset.commit,password);})();await pullFrom(old,'历史提交 '+button.dataset.commit.slice(0,8));}catch(error){status(error.message,'error');}};$('githubReviewDialog').showModal();}catch(error){status(error.message,'error');}finally{setBusy(false);}}
+function boot(){if(!$('githubSyncStatus'))return;try{token=sessionStorage.getItem(TOKEN_KEY)||'';}catch(_){token='';}renderConnection();$('githubSyncConnect').onclick=()=>$('githubSyncDialog').showModal();$('githubSyncDisconnect').onclick=()=>{sessionStorage.removeItem(TOKEN_KEY);token='';renderConnection();status('已断开本次会话。GitHub 中的数据未删除。');};$('githubSyncCancel').onclick=()=>$('githubSyncDialog').close();$('githubSyncForm').onsubmit=async event=>{event.preventDefault();const button=$('githubTokenSubmit');button.disabled=true;try{await connect($('githubToken').value);}catch(error){$('githubTokenError').textContent=error.message;}finally{button.disabled=false;}};$('githubSyncPush').onclick=push;$('githubSyncPull').onclick=pull;$('githubSyncHistory').onclick=history;$('githubReviewBody').addEventListener('change',event=>{if(event.target.id==='githubEncryptUpload')$('githubEncryptPasswordWrap').hidden=!event.target.checked;});if(token){getRemote().then(remote=>{if(remote.encrypted)status('已连接 · 备份已加密；使用拉取或历史查看时输入口令。','connected');else if(remote.workspace)status('已连接 '+OWNER+'/'+REPO+' · 检测到 '+remote.workspace.projects.length+' 个云端项目；可查看差异或历史版本。','connected');}).catch(error=>{if(error.status===401){sessionStorage.removeItem(TOKEN_KEY);token='';renderConnection();status('Token 已过期，请重新连接。','error');}else status('连接检查失败：'+error.message,'error');});}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

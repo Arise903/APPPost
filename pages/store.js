@@ -102,19 +102,22 @@ function initialize(){
   return {migrated};
  });return initialization;
 }
-function exportAll(){const data=read(),drafts={};for(const id of Object.keys(data.projects)){const raw=localStorage.getItem('app-release-checklist-state-v2:pages:'+id);if(raw){try{drafts[id]=JSON.parse(raw);}catch(_){drafts[id]={unreadable:raw};}}}return {format:'release-desk-workspace/v1',exportedAt:new Date().toISOString(),projects:Object.values(data.projects).map(p=>({format:'release-desk/v1',...copy(p)})),drafts};}
+function validDraft(draft){return !!draft&&typeof draft==='object'&&!Array.isArray(draft)&&!!draft.state&&typeof draft.state==='object'&&!Array.isArray(draft.state)&&Object.entries(draft.state).every(([id,value])=>!!id&&['todo','done','skip',true,false].includes(value));}
+function exportAll(){const data=read(),drafts={};for(const id of Object.keys(data.projects)){const raw=localStorage.getItem('app-release-checklist-state-v2:pages:'+id);if(raw){try{const parsed=JSON.parse(raw);drafts[id]=validDraft(parsed)?parsed:{unreadable:raw};}catch(_){drafts[id]={unreadable:raw};}}}return {format:'release-desk-workspace/v1',exportedAt:new Date().toISOString(),projects:Object.values(data.projects).map(p=>({format:'release-desk/v1',...copy(p)})),drafts};}
 function inspectImportAll(bundle){
  if(!bundle||bundle.format!=='release-desk-workspace/v1'||!Array.isArray(bundle.projects)||bundle.projects.length>100)throw Error('请选择完整工作台备份，最多一次导入 100 个项目');
  const names=[],ids=new Set();let snapshots=0;
  for(const input of bundle.projects){
-  if(typeof input.id!=='string'||!input.id||ids.has(input.id))throw Error('备份中有项目 ID 缺失或重复');ids.add(input.id);
+  if(typeof input.id!=='string'||!input.id||input.id.length>128||ids.has(input.id))throw Error('备份中有项目 ID 缺失、过长或重复');ids.add(input.id);
   validate(input);const name=String(input.name||'导入项目').trim();if(!name||name.length>100)throw Error('备份中有项目名称无效');names.push(name);
   if(input.snapshots!==undefined&&!Array.isArray(input.snapshots))throw Error('项目快照格式无效');
-  const saved=(input.snapshots||[]).slice(0,10);snapshots+=saved.length;
+  if((input.snapshots||[]).length>10)throw Error('单个项目最多保留 10 份快照');const saved=input.snapshots||[];snapshots+=saved.length;
   for(const item of saved)validate(item.state);
  }
- const drafts=Object.keys(bundle.drafts||{}).filter(id=>bundle.drafts[id]&&bundle.drafts[id].state&&typeof bundle.drafts[id].state==='object').length;
- return {projects:names.length,names,snapshots,drafts,exportedAt:bundle.exportedAt||null};
+ const draftMap=bundle.drafts||{};if(!draftMap||typeof draftMap!=='object'||Array.isArray(draftMap))throw Error('备份中的浏览器草稿格式无效');
+ const draftIds=Object.keys(draftMap);if(draftIds.length>ids.size||draftIds.some(id=>!ids.has(id)))throw Error('备份中存在没有对应项目的浏览器草稿');let unreadableDrafts=0;
+ for(const id of draftIds){const draft=draftMap[id];if(draft&&typeof draft==='object'&&!Array.isArray(draft)&&typeof draft.unreadable==='string'){unreadableDrafts++;continue;}if(!validDraft(draft))throw Error('浏览器草稿格式或检查状态无效：'+id);}
+ return {projects:names.length,names,snapshots,drafts:draftIds.length-unreadableDrafts,unreadableDrafts,exportedAt:bundle.exportedAt||null};
 }
 async function mergeRemoteAll(bundle){
  inspectImportAll(bundle);const incomingIds=new Set(bundle.projects.map(p=>p.id)),localOnly=Object.keys(read().projects).filter(id=>!incomingIds.has(id)).length;let added=0,updated=0;
@@ -132,7 +135,7 @@ async function mergeRemoteAll(bundle){
    data.projects[input.id]=remote;
   }
  });
- let draftError=false;
+ let draftError=Object.values(bundle.drafts||{}).some(draft=>typeof draft?.unreadable==='string');
  for(const id of incomingIds){
   const targetId=id,localKey='app-release-checklist-state-v2:pages:'+targetId,existing=localStorage.getItem(localKey),remote=bundle.drafts?.[id];
   const project=get(targetId),validIds=new Set(parse(project.document).items.map(item=>item.id));
@@ -158,7 +161,7 @@ async function importAll(bundle){
   if(bundle.drafts?.[input.id]?.state)drafts.push([id,{...bundle.drafts[input.id],revision:'1',__gen:1}]);
   return id;
  }));
- let draftError=false;for(const [id,draft] of drafts){try{localStorage.setItem('app-release-checklist-state-v2:pages:'+id,JSON.stringify(draft));}catch(_){draftError=true;}}
+ let draftError=Object.values(bundle.drafts||{}).some(draft=>typeof draft?.unreadable==='string');for(const [id,draft] of drafts){try{localStorage.setItem('app-release-checklist-state-v2:pages:'+id,JSON.stringify(draft));}catch(_){draftError=true;}}
  return {ids,draftError};
 }
 async function markExport(){return transaction(data=>{data.lastBackupAt=Date.now();return data.lastBackupAt;});}
