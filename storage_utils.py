@@ -46,6 +46,9 @@ def save_review(path, value):
     for item in value.get("items", {}).values():
         if not isinstance(item, dict) or any(not isinstance(v, str) for v in item.values()):
             raise ValueError("备注和证据必须为文本")
+    subscriptions = value.get('subscriptions', [])
+    if not isinstance(subscriptions, list) or len(subscriptions) > 100 or any(not isinstance(p, dict) or any(not isinstance(v, str) or len(v) > 4000 for v in p.values()) for p in subscriptions):
+        raise ValueError('订阅商品配置无效')
     target = review_path(path)
     if target.exists():
         atomic_write(target.with_name(target.name + ".previous"), target.read_text(encoding="utf-8"))

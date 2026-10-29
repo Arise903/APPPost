@@ -63,6 +63,7 @@ function validate(input){
  for(const descs of [permissions.descs,permissions.descsEn])if(Array.isArray(descs)||Object.values(descs).some(v=>typeof v!=='string'||v.length>10000))throw Error('权限用途描述必须为文本');
  const known=new Set(PAGES_DATA.profiles.permissions.map(p=>p.id));if(permissions.selected.some(id=>!known.has(id)))throw Error('包含不支持的权限');
  if(!review||typeof review.release!=='object'||!review.release||typeof review.items!=='object'||!review.items||!Array.isArray(review.history))throw Error('发布记录无效');
+ if(review.subscriptions!==undefined&&(!Array.isArray(review.subscriptions)||review.subscriptions.length>100||review.subscriptions.some(p=>!p||typeof p!=='object'||Array.isArray(p)||Object.values(p).some(v=>typeof v!=='string'||v.length>4000))))throw Error('订阅商品配置无效，最多 100 个商品，字段须为文本');
  for(const item of Object.values(review.items)){if(!item||typeof item!=='object'||Object.values(item).some(v=>typeof v!=='string'))throw Error('备注字段必须为文本');}
  return {permissions:copy(permissions),review:copy(review)};
 }
@@ -205,7 +206,7 @@ async function handle(path,options={}){
   else if(op==='new-release'){
    if(typeof data.keepNotes!=='boolean'||typeof data.keepEvidence!=='boolean'||!data.release||typeof data.release.version!=='string'||!data.release.version.trim())throw Error('请填写新版本号及备注保留选项');
    const before=payload(project);project.review.history=project.review.history||[];
-   project.review.history.push({release:copy(project.review.release),date:new Date().toISOString(),features:copy(before.features),permissions:copy(project.permissions),items:before.items.filter(x=>!x.gate).map(x=>({id:x.id,text:x.text,state:x.state,applicable:before.features[x.cond]!==false&&global.PermissionVisibility.visible(x.permissionRule,project.permissions.selected,PAGES_DATA.profiles),...project.review.items[x.id]}))});
+   project.review.history.push({subscriptions:copy(project.review.subscriptions||[]),release:copy(project.review.release),date:new Date().toISOString(),features:copy(before.features),permissions:copy(project.permissions),items:before.items.filter(x=>!x.gate).map(x=>({id:x.id,text:x.text,state:x.state,applicable:before.features[x.cond]!==false&&global.PermissionVisibility.visible(x.permissionRule,project.permissions.selected,PAGES_DATA.profiles),...project.review.items[x.id]}))});
    project.document=apply(project.document,Object.fromEntries(before.items.filter(x=>!x.gate).map(x=>[x.id,'todo'])));
    const next={};for(const [key,item] of Object.entries(project.review.items)){const saved={};if(data.keepNotes){if(item.notes)saved.notes=item.notes;if(item.reason)saved.reason=item.reason;}if(data.keepEvidence&&item.evidence)saved.evidence=item.evidence;if(Object.keys(saved).length)next[key]=saved;}
    project.review.items=next;project.review.release=copy(data.release);project.generation++;

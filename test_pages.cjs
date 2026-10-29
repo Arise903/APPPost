@@ -128,3 +128,13 @@ test('Subscription setting persists, hides checks and retains progress and notes
   const saved=S.get(id),data=S.payload(saved);assert.equal(data.features.hasSubscriptions,enabled);assert.equal(data.total,initial.total-(enabled?0:tasks.length));assert.equal(data.items.find(i=>i.id===task.id).state,'done');assert.equal(saved.review.items[task.id].notes,'Keep evidence');
  }
 });
+
+test('Subscription catalogue survives export, import, snapshots and release archive',async()=>{
+ const {S,context}=setup();const id=await S.create({name:'Catalogue'});const products=[{id:'weekly',name:'周订阅',period:'week',price:'18.50',currency:'CNY',offerPrice:'6.00',offerCycles:'3'}];
+ await S.mutate(id,1,'catalogue',p=>p.review.subscriptions=products);
+ const imported=await S.create({...S.export(id),name:'Imported catalogue'});assert.deepEqual(JSON.parse(JSON.stringify(S.get(imported).review.subscriptions)),products);
+ context.location.search='?id='+id;context.window.fetch=async()=>{throw Error('Unexpected network');};S.install();
+ const response=await context.window.fetch('/api/new-release',{method:'POST',body:JSON.stringify({revision:'2',release:{version:'2'},keepNotes:true,keepEvidence:true})});assert.equal(response.status,200);
+ const saved=S.get(id);assert.deepEqual(JSON.parse(JSON.stringify(saved.review.subscriptions)),products);assert.deepEqual(JSON.parse(JSON.stringify(saved.review.history[0].subscriptions)),products);assert.deepEqual(JSON.parse(JSON.stringify(saved.snapshots[0].state.review.subscriptions)),products);
+ await assert.rejects(S.create({...S.export(id),name:'Invalid catalogue',review:{release:{},items:{},history:[],subscriptions:{price:1}}}),/订阅商品/);
+});

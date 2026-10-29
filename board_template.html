@@ -43,6 +43,7 @@ __BOARD_CSS__
       <select id="sectionFilter" aria-label="按章节筛选" title="按章节查看进度"><option value="all">全部章节</option></select>
       <span class="grow"></span>
       <button class="btn" id="btnFeat">项目设置</button>
+      <button class="btn" id="btnSubscriptions">订阅商品</button>
       <button class="btn" id="btnGuide2">使用说明</button>
       <button class="btn" id="btnPerm">权限配置</button>
       <button class="btn primary" id="btnSave" disabled>保存进度</button>
@@ -245,6 +246,13 @@ __BOARD_CSS__
   </div>
 </div>
 
+<dialog id="subscriptionDialog" aria-labelledby="subscriptionTitle">
+<form id="subscriptionForm">
+<div class="subscription-head"><div><h2 id="subscriptionTitle">订阅商品</h2><p>按商品记录周期、价格、试用和优惠；支持同一周期的多个档位。保存于当前项目，不会自动修改商店后台。</p></div><button class="btn" type="button" id="subscriptionClose" aria-label="关闭订阅商品">关闭</button></div>
+<div class="subscription-actions"><button class="btn" type="button" data-add-subscription="week">＋ 周订阅</button><button class="btn" type="button" data-add-subscription="month">＋ 月订阅</button><button class="btn" type="button" data-add-subscription="year">＋ 年订阅</button><button class="btn" type="button" data-add-subscription="custom">＋ 自定义周期</button></div>
+<div id="subscriptionProducts"></div><p id="subscriptionError" role="alert"></p>
+<div class="subscription-footer"><span id="subscriptionStatus" role="status"></span><button class="btn" type="button" id="subscriptionCancel">取消</button><button class="btn" type="button" id="subscriptionExport">导出商品 JSON</button><button class="btn primary" type="submit" id="subscriptionSave">保存订阅商品</button></div>
+</form></dialog>
 <dialog id="newReleaseDialog" style="max-width:460px;width:calc(100% - 32px);border:1px solid #dce2df;border-radius:14px;padding:24px">
 <form id="newReleaseForm"><h2>开始新一轮发布</h2><p>先归档当前发布，再清空检查进度。权限选择、项目功能设置和阅读确认保留。</p><label>新版本号<input name="version" required maxlength="80" style="display:block;width:100%;margin:8px 0 16px;padding:10px"></label><label>构建号<input name="build" maxlength="80" style="display:block;width:100%;margin:8px 0 16px;padding:10px"></label><p><label><input name="keepNotes" type="checkbox" checked> 保留检查备注和跳过原因</label></p><p><label><input name="keepEvidence" type="checkbox"> 保留证据路径和链接</label></p><p id="newReleaseError" role="alert"></p><button class="btn" type="button" id="cancelNewRelease">取消</button><button class="btn primary" type="submit">归档并开始</button></form></dialog>
 <div class="mobile-actions"><span id="mobileStatus" role="status"></span><button id="mobileCurrent" class="btn">当前检查项</button><button id="mobileSave" class="btn primary">保存进度</button><button id="mobileExport" class="btn">导出摘要</button></div>

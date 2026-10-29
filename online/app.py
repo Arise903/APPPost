@@ -402,7 +402,7 @@ def create_app(overrides=None):
                     abort(400, '请填写新版本号和保留选项')
                 review = json.loads(project['review'])
                 before = project_payload(project)
-                review.setdefault('history', []).append({'release': review.get('release', {}), 'date': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'features': before['features'], 'permissions': json.loads(project['permissions']), 'items': [{**item, 'applicable': before['features'].get(item.get('cond'), True) and checklist.permission_visibility.visible(item.get('permissionRule'), json.loads(project['permissions'])['selected'], checklist.load_profiles()), **review.get('items', {}).get(item['id'], {})} for item in before['items'] if not item['gate']]})
+                review.setdefault('history', []).append({'subscriptions': review.get('subscriptions', []), 'release': review.get('release', {}), 'date': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'features': before['features'], 'permissions': json.loads(project['permissions']), 'items': [{**item, 'applicable': before['features'].get(item.get('cond'), True) and checklist.permission_visibility.visible(item.get('permissionRule'), json.loads(project['permissions'])['selected'], checklist.load_profiles()), **review.get('items', {}).get(item['id'], {})} for item in before['items'] if not item['gate']]})
                 parsed = checklist.parse_md(project['document'])
                 gate = checklist.find_gate_item(parsed)
                 project['document'] = checklist.apply_states(project['document'], parsed, {item['id']: 'todo' for item in parsed['items'] if not gate or item['id'] != gate['id']})
@@ -516,6 +516,9 @@ def create_app(overrides=None):
 def validate_review(value):
     if not isinstance(value, dict) or not isinstance(value.get('release', {}), dict) or not isinstance(value.get('items', {}), dict) or not isinstance(value.get('history', []), list):
         abort(400, '发布记录无效')
+    subscriptions = value.get('subscriptions', [])
+    if not isinstance(subscriptions, list) or len(subscriptions) > 100 or any(not isinstance(p, dict) or any(not isinstance(v, str) or len(v) > 4000 for v in p.values()) for p in subscriptions):
+        abort(400, '订阅商品配置无效')
     if len(encode(value).encode()) > 800_000:
         abort(400, '发布记录超过 800 KB，请先导出历史并整理')
     for item in value.get('items', {}).values():

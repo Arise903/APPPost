@@ -22,6 +22,27 @@ const server=http.createServer((req,res)=>{
   const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+server.address().port+'/APPPost/index.html');
   await page.locator('#newProject').click();await page.locator('[name=name]').fill('初始化显示回归');await page.locator('#createForm [type=submit]').click();await page.waitForURL(/board.html\?id=/);await page.waitForFunction(()=>typeof online!=='undefined'&&online);
+  // Independent subscription catalogue: price validation, persistence and cancellation.
+  await page.locator('#btnSubscriptions').click();
+  for(const period of ['week','month','year'])await page.locator('[data-add-subscription="'+period+'"]').click();
+  assert.equal(await page.locator('[data-subscription-product]').count(),3);
+  const product=page.locator('[data-subscription-product]').first();
+  await product.locator('[data-field="price"]').fill('18.50');
+  await product.locator('[data-field="offerEnabled"]').selectOption('on');
+  await product.locator('[data-field="offerPrice"]').fill('6.00');
+  await product.locator('[data-field="offerPeriodCount"]').fill('1');
+  await product.locator('[data-field="offerCycles"]').fill('3');
+  await product.locator('[data-field="offerStart"]').fill('2026-10-29T08:00');
+  await product.locator('[data-field="offerEnd"]').fill('2026-10-28T08:00');
+  await page.locator('#subscriptionSave').click();assert.match(await page.locator('#subscriptionError').textContent(),/结束时间/);
+  await product.locator('[data-field="offerEnd"]').fill('2026-11-29T08:00');
+  await product.locator('[data-field="benefits"]').fill('<script>alert(1)</script>');
+  await page.locator('#subscriptionSave').click();await page.waitForFunction(()=>document.getElementById('subscriptionStatus').textContent.includes('已保存'));
+  await page.locator('#subscriptionClose').click();await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);
+  await page.locator('#btnSubscriptions').click();assert.equal(await page.locator('[data-subscription-product]').count(),3);
+  assert.equal(await page.locator('[data-field="price"]').first().inputValue(),'18.50');assert.equal(await page.locator('[data-field="offerCycles"]').first().inputValue(),'3');assert.equal(await page.locator('[data-field="benefits"]').first().inputValue(),'<script>alert(1)</script>');
+  await page.locator('[data-field="price"]').first().fill('999');page.once('dialog',dialog=>dialog.accept());await page.locator('#subscriptionCancel').click();
+  await page.locator('#btnSubscriptions').click();assert.equal(await page.locator('[data-field="price"]').first().inputValue(),'18.50');await page.locator('#subscriptionClose').click();
   const chapters=page.locator('#sectionFilter');assert.ok(await chapters.locator('option').count()>2);const chapter=await chapters.locator('option').nth(1).getAttribute('value');assert.match(await chapters.locator(`option[value="${chapter}"]`).innerText(),/已处理 \d+\/\d+ · 完成率 \d+%/);await chapters.selectOption(chapter);assert.ok(await page.locator('#list li.item:not(.gateitem):not(.hidden)').count()>0);assert.equal(await page.locator('#list li.item:not(.gateitem):not(.hidden)').evaluateAll(items=>items.every(item=>item.closest('section.card').dataset.sec===document.getElementById('sectionFilter').value)),true);await chapters.selectOption('all');
   const gate=page.locator('.gateitem input[type=checkbox]');assert.equal(await gate.isChecked(),false);assert.equal(await page.locator('#gateBar').isVisible(),true);
   await gate.check();assert.equal(await page.locator('#gateBar').isVisible(),false,'勾选阅读确认后顶部提醒应立即消失');assert.doesNotMatch(await page.locator('#seqline').innerText(),/清单未解锁/);assert.equal(await page.locator('#list li.item:not(.gateitem)').first().getAttribute('data-locked'),'0');
