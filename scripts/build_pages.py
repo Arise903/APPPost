@@ -26,7 +26,7 @@ def build():
         if path.is_file(): digest.update(path.read_bytes())
     version=digest.hexdigest()[:12]
     template_version=hashlib.sha256((ROOT/'online/default_checklist.md').read_bytes()).hexdigest()[:10]
-    for name in ('index.html','dashboard.js','store.js','github-sync.js','guide.html','guide.js','experience.js'):
+    for name in ('index.html','dashboard.js','store.js','github-sync.js','guide.html','guide.js','experience.js','history.js','history.css'):
         shutil.copyfile(ROOT/'pages'/name,OUT/name)
     shutil.copyfile(ROOT/'online/static/app.css',OUT/'app.css')
     shutil.copyfile(ROOT/'permission_visibility.js',OUT/'permission_visibility.js')
@@ -52,7 +52,7 @@ def build():
     for old,new in replacements.items():js=js.replace(old,new)
     page=page.replace('__PERMISSION_RULES__',(ROOT/'permission_rules.json').read_text(encoding='utf-8')).replace('__PERMISSION_VISIBILITY__',(ROOT/'permission_visibility.js').read_text(encoding='utf-8')).replace('__BOARD_CSS__',(ROOT/'board.css').read_text(encoding='utf-8')).replace('__BOARD_JS__',js)
     page=page.replace('const EMBEDDED = __DATA__;','const EMBEDDED = PagesStore.openProject();').replace('const EMBEDDED_PROFILES = __PROFILES__;','const EMBEDDED_PROFILES = PAGES_DATA.profiles;').replace('__TITLE__','检查项目 · Pages 个人版')
-    page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="store.js"></script><script>PagesStore.install();</script><script defer src="experience.js"></script>')
+    page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="store.js"></script><script>PagesStore.install();</script><script defer src="experience.js"></script><link rel="stylesheet" href="history.css"><script defer src="history.js"></script>')
     page=page.replace('<body>','<body><div style="padding:14px 24px;background:#17243a;color:white"><a href="index.html" style="color:white">← 返回个人工作台</a>　·　<span id="pagesProjectName"></span>　·　数据仅保存在当前浏览器，请定期导出备份</div>')
     page=page.replace('勾选状态保存在本机浏览器 · 需要写回文件请使用本地服务模式','所有记录保存在当前浏览器 · 换设备或清理网站数据前请导出完整 JSON')
     unresolved=re.findall(r'__[A-Z][A-Z_]+__',page)

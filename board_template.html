@@ -32,6 +32,7 @@ __BOARD_CSS__
 
     <button class="seqline" id="seqline" title="点击跳到当前应处理的条目"></button>
 
+    <nav class="workflow" aria-label="发布流程"><div><b>1 配置</b><span>按实际功能设置项目、商品和权限</span></div><div><b>2 检查</b><span>逐项处理，保存检查进度</span></div><div><b>3 发布</b><span>填写版本、归档，再开始下一轮</span></div></nav>
     <div class="toolbar">
       <div class="seg" id="seg">
         <button type="button" data-f="all" class="on" aria-pressed="true">全部</button>
@@ -44,7 +45,6 @@ __BOARD_CSS__
       <span class="grow"></span>
       <button class="btn" id="btnFeat">项目设置</button>
       <button class="btn" id="btnSubscriptions">订阅商品</button>
-      <button class="btn" id="btnGuide2">使用说明</button>
       <button class="btn" id="btnPerm">权限配置</button>
       <button class="btn primary" id="btnSave" disabled>保存进度</button>
       <span class="morewrap">
@@ -59,17 +59,18 @@ __BOARD_CSS__
     </div>
     <div id="saveStatus" role="status" aria-live="polite"></div><div class="save-explanation">检查进度：点击保存；备注、发布信息和权限配置：分别即时保存。项目设置点击保存后生效。</div>
     <div class="secnote hidden" id="filtNote"></div>
-  </header>
-
-  <div id="list"></div>
-  <div class="empty hidden" id="empty">没有匹配的条目</div>
-
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">
+  <div class="release-actions" aria-label="发布与归档">
 <button class="btn" id="releaseEdit">发布信息</button>
 <button class="btn" id="releaseArchive">归档本次发布</button><button class="btn" id="newRelease">开始新一轮发布</button>
 <label class="summary-version-label" for="summaryVersion">摘要版本</label><select id="summaryVersion" aria-label="选择要导出的发布版本"><option value="current">当前发布</option></select><button class="btn" id="releaseSummary">导出发布摘要</button>
 <button class="btn" id="backupRestore">恢复备份</button>
 </div>
+  </header>
+
+  <div id="list"></div>
+  <div class="empty hidden" id="empty">没有匹配的条目</div>
+
+
 <footer>
     <div id="built"></div>
     <div>勾选状态保存在本机浏览器 · 需要写回文件请使用本地服务模式</div>

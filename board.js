@@ -11,13 +11,13 @@ function boardFetch(path, options){
 /* ------------------------------------------------------------------ *
  * 状态
  * ------------------------------------------------------------------ */
-let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=null;
+let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=EMBEDDED.updatedAt||null;
 function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
  const permissionPending=typeof permDirty!=="undefined"&&permDirty;
  const pending=(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
- let label=saveFailure?"保存失败 · "+saveFailure:localDraftFailure?localDraftFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleTimeString():"尚无待保存修改";
+ let label=saveFailure?"保存失败 · "+saveFailure:localDraftFailure?localDraftFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleString():"尚无待保存修改";
  el.textContent=label;el.dataset.state=saveFailure||localDraftFailure?'error':savingOperations?'saving':pending?'pending':'saved';
  const mobile=document.getElementById("mobileStatus");if(mobile)mobile.textContent=label;
  const save=document.getElementById("mobileSave");if(save)save.disabled=savingOperations>0||!online;
@@ -1629,7 +1629,7 @@ function openGuide(){
   window.open(online ? (window.RELEASE_CLOUD ? "/projects/" + window.RELEASE_CLOUD.projectId + "/guide" : "/guide") : "使用说明.html", "_blank");
 }
 document.getElementById("btnGuide").addEventListener("click", openGuide);
-document.getElementById("btnGuide2").addEventListener("click", openGuide);
+
 
 /* ------------------------------------------------------------------ *
  * 启动

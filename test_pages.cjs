@@ -148,3 +148,17 @@ test('Push feature defaults off and toggles without losing progress, notes or pe
  const offTotal=S.payload(S.get(id)).total;
  for(const enabled of [true,false,true]){project=S.get(id);const response=await context.window.fetch('/api/features',{method:'POST',body:JSON.stringify({revision:String(project.version),features:{...S.payload(project).features,hasPush:enabled}})});assert.equal(response.status,200);project=S.get(id);data=S.payload(project);assert.equal(data.total,offTotal+(enabled?3:0));assert.equal(data.items.find(i=>i.id===task.id).state,'done');assert.equal(project.review.items[task.id].notes,'APNs checked');assert.equal(project.permissions.selected[0],'notifications');}
 });
+
+test('Activity records successful changes with dates; no-op and failed writes leave history intact',async()=>{
+ const {S,block}=setup();const id=await S.create({name:'Audit'});const task=S.payload(S.get(id)).items.find(i=>!i.gate);
+ await S.mutate(id,1,'write',p=>p.document=S.apply(p.document,{[task.id]:'done'}));let project=S.get(id);assert.equal(project.activity.length,1);assert.equal(project.activity[0].label,'保存检查进度');assert.ok(project.activity[0].changes.some(c=>c.includes('待检查 → 已完成')));assert.equal(project.activity[0].date,project.updatedAt);assert.equal(project.snapshots[0].state.activity,undefined);
+ await S.mutate(id,2,'write',()=>{});assert.equal(S.get(id).activity.length,1);assert.equal(S.get(id).version,2);
+ const exported=S.export(id),imported=await S.create({...exported,name:'Imported audit'});assert.equal(S.get(imported).activity[0].id,project.activity[0].id);
+ block();await assert.rejects(S.mutate(id,2,'failed',p=>p.name='Fail'),/未保存/);assert.equal(S.get(id).activity.length,1);assert.equal(S.get(id).version,2);
+});
+test('Restoring a snapshot retains later activity and preserves the pre-restore state',async()=>{
+ const {S}=setup();const id=await S.create({name:'Before'});await S.mutate(id,1,'edit',p=>p.name='After');const snapshot=S.get(id).snapshots[0];await S.mutate(id,2,'restore',p=>{const version=p.version;Object.assign(p,JSON.parse(JSON.stringify(snapshot.state)));p.version=version;p.generation++;});const p=S.get(id);assert.equal(p.name,'Before');assert.equal(p.activity.length,2);assert.equal(p.activity[0].label,'恢复历史快照');assert.equal(p.snapshots[0].state.name,'After');assert.equal(p.snapshots.length,2);
+});
+test('Activity merge deduplicates and limits retained records',()=>{
+ const {S}=setup();const entries=Array.from({length:110},(_,i)=>({id:'event-'+i,date:i,label:'edit',changes:['changed']}));const merged=S.mergeActivity(entries,entries);assert.equal(merged.length,100);assert.equal(merged[0].id,'event-109');assert.equal(new Set(merged.map(e=>e.id)).size,100);
+});

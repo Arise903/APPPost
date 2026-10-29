@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 const S=PagesStore;
-function pending(){return (typeof dirty!=='undefined'&&dirty)||(typeof permDirty!=='undefined'&&permDirty)||(typeof featureHasChanges==='function'&&featureHasChanges())||(typeof savingOperations!=='undefined'&&savingOperations>0);}
+function pending(){return (typeof subscriptionDialog!=='undefined'&&subscriptionDialog.open&&JSON.stringify(subscriptionRead())!==subscriptionBaseline)|| (typeof dirty!=='undefined'&&dirty)||(typeof permDirty!=='undefined'&&permDirty)||(typeof featureHasChanges==='function'&&featureHasChanges())||(typeof savingOperations!=='undefined'&&savingOperations>0);}
 async function backup(){S.download('release-workspace-'+new Date().toLocaleDateString('sv-SE')+'.json',JSON.stringify(S.exportAll(),null,2));await S.markExport();window.dispatchEvent(new Event('backupchanged'));}
 let offered=false;
 async function checkVersion(){
@@ -10,7 +10,7 @@ async function checkVersion(){
   const response=await fetch('version.json?check='+Date.now(),{cache:'no-store'});if(!response.ok)return;const latest=await response.json();
   if(latest.version===PAGES_DATA.version||offered)return;offered=true;
   const banner=document.createElement('div');banner.className='upgrade-banner'+(document.querySelector('.app-shell')?' dashboard-upgrade':'');banner.setAttribute('role','status');banner.textContent='发现网页新版本。刷新前可导出全部项目和浏览器草稿。';
-  const refresh=document.createElement('button');refresh.className='button secondary';refresh.textContent='备份并刷新';refresh.onclick=async()=>{if((typeof featureHasChanges==='function'&&featureHasChanges())||(typeof permDirty!=='undefined'&&permDirty)||(typeof savingOperations!=='undefined'&&savingOperations>0)){alert('请先保存或取消项目设置，并等待权限保存完成，再刷新。检查进度草稿可以随备份导出。');return;}if(pending()&&!confirm('存在未保存修改。将先导出包含浏览器草稿的备份，再刷新页面，是否继续？'))return;try{await backup();const url=new URL(location.href);url.searchParams.set("v",latest.version);location.replace(url.href);}catch(e){alert('备份失败，未刷新：'+e.message);}};
+  const refresh=document.createElement('button');refresh.className='button secondary';refresh.textContent='备份并刷新';refresh.onclick=async()=>{if((typeof subscriptionDialog!=='undefined'&&subscriptionDialog.open&&JSON.stringify(subscriptionRead())!==subscriptionBaseline)||(typeof featureHasChanges==='function'&&featureHasChanges())||(typeof permDirty!=='undefined'&&permDirty)||(typeof savingOperations!=='undefined'&&savingOperations>0)){alert('请先保存或取消项目设置、订阅商品，并等待保存完成，再刷新。检查进度草稿可以随备份导出。');return;}if(pending()&&!confirm('存在未保存修改。将先导出包含浏览器草稿的备份，再刷新页面，是否继续？'))return;try{await backup();const url=new URL(location.href);url.searchParams.set("v",latest.version);location.replace(url.href);}catch(e){alert('备份失败，未刷新：'+e.message);}};
   const later=document.createElement('button');later.className='button secondary';later.textContent='稍后';later.onclick=()=>banner.remove();banner.append(refresh,later);document.body.prepend(banner);
  }catch(_){/* Offline use keeps the currently loaded edition available. */}
 }

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=37b0c0fcd912"></script><script src="store.js?v=37b0c0fcd912"></script><script>PagesStore.install();</script><script defer src="experience.js?v=37b0c0fcd912"></script>
+<script src="data.js?v=1709c4272d94"></script><script src="store.js?v=1709c4272d94"></script><script>PagesStore.install();</script><script defer src="experience.js?v=1709c4272d94"></script><link rel="stylesheet" href="history.css?v=1709c4272d94"><script defer src="history.js?v=1709c4272d94"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -544,6 +544,9 @@ li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size
 #subscriptionDialog::backdrop{background:#17243a66}.subscription-head{display:flex;align-items:start;gap:16px}.subscription-head>div{flex:1}.subscription-head h2{margin-top:0}.subscription-head p{color:var(--text-3);line-height:1.7;font-size:13px}.subscription-actions,.subscription-footer{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 0}.subscription-footer{position:sticky;bottom:-24px;background:var(--surface,#fff);border-top:1px solid var(--border,#ddd);padding-bottom:16px}.subscription-footer>span{flex:1;font-size:12px}.subscription-product{border:1px solid var(--border,#ddd);border-radius:12px;margin:14px 0;padding:16px}.subscription-product summary{font-weight:650;cursor:pointer}.subscription-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.subscription-grid label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-2,#555)}.subscription-grid input,.subscription-grid select,.subscription-grid textarea{box-sizing:border-box;width:100%;min-width:0;padding:10px;border:1px solid var(--border,#ddd);border-radius:7px;background:var(--surface,#fff);color:inherit;font:inherit}.subscription-grid textarea{min-height:72px}.subscription-wide{grid-column:1/-1}.subscription-product h3{font-size:13px;margin:22px 0 12px}#subscriptionError{color:#b03939}.subscription-empty{padding:40px 12px;text-align:center;color:var(--text-3)}
 @media(max-width:700px){#subscriptionDialog{padding:16px}.subscription-grid{grid-template-columns:1fr 1fr}.subscription-head{flex-wrap:wrap}.subscription-footer{bottom:-16px}.subscription-footer>span{flex-basis:100%}}
 
+.workflow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.workflow>div{background:var(--surface-2,#f5f7f6);border:1px solid var(--border,#ddd);border-radius:10px;padding:12px}.workflow b{display:block;font-size:13px}.workflow span{display:block;color:var(--text-3,#777);font-size:11px;line-height:1.7;margin-top:5px}.release-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border,#ddd);padding-top:14px;margin-top:14px}@media(max-width:700px){.workflow{gap:6px}.workflow>div{padding:9px}.workflow span{font-size:10px}.release-actions>.btn{flex:1 1 auto}}
+@media(max-width:700px){#sectionFilter{box-sizing:border-box;width:100%;min-width:0}.txt code,.note code,.para code,section.card code{overflow-wrap:anywhere;word-break:break-word}}
+
 </style>
 </head>
 <body><div style="padding:14px 24px;background:#17243a;color:white"><a href="index.html" style="color:white">← 返回个人工作台</a>　·　<span id="pagesProjectName"></span>　·　数据仅保存在当前浏览器，请定期导出备份</div>
@@ -570,6 +573,7 @@ li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size
 
     <button class="seqline" id="seqline" title="点击跳到当前应处理的条目"></button>
 
+    <nav class="workflow" aria-label="发布流程"><div><b>1 配置</b><span>按实际功能设置项目、商品和权限</span></div><div><b>2 检查</b><span>逐项处理，保存检查进度</span></div><div><b>3 发布</b><span>填写版本、归档，再开始下一轮</span></div></nav>
     <div class="toolbar">
       <div class="seg" id="seg">
         <button type="button" data-f="all" class="on" aria-pressed="true">全部</button>
@@ -582,7 +586,6 @@ li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size
       <span class="grow"></span>
       <button class="btn" id="btnFeat">项目设置</button>
       <button class="btn" id="btnSubscriptions">订阅商品</button>
-      <button class="btn" id="btnGuide2">使用说明</button>
       <button class="btn" id="btnPerm">权限配置</button>
       <button class="btn primary" id="btnSave" disabled>保存进度</button>
       <span class="morewrap">
@@ -597,17 +600,18 @@ li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size
     </div>
     <div id="saveStatus" role="status" aria-live="polite"></div><div class="save-explanation">检查进度：点击保存；备注、发布信息和权限配置：分别即时保存。项目设置点击保存后生效。</div>
     <div class="secnote hidden" id="filtNote"></div>
-  </header>
-
-  <div id="list"></div>
-  <div class="empty hidden" id="empty">没有匹配的条目</div>
-
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">
+  <div class="release-actions" aria-label="发布与归档">
 <button class="btn" id="releaseEdit">发布信息</button>
 <button class="btn" id="releaseArchive">归档本次发布</button><button class="btn" id="newRelease">开始新一轮发布</button>
 <label class="summary-version-label" for="summaryVersion">摘要版本</label><select id="summaryVersion" aria-label="选择要导出的发布版本"><option value="current">当前发布</option></select><button class="btn" id="releaseSummary">导出发布摘要</button>
 <button class="btn" id="backupRestore">恢复备份</button>
 </div>
+  </header>
+
+  <div id="list"></div>
+  <div class="empty hidden" id="empty">没有匹配的条目</div>
+
+
 <footer>
     <div id="built"></div>
     <div>所有记录保存在当前浏览器 · 换设备或清理网站数据前请导出完整 JSON</div>
@@ -1069,13 +1073,13 @@ function boardFetch(path, options){
 /* ------------------------------------------------------------------ *
  * 状态
  * ------------------------------------------------------------------ */
-let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=null;
+let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=EMBEDDED.updatedAt||null;
 function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
  const permissionPending=typeof permDirty!=="undefined"&&permDirty;
  const pending=(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
- let label=saveFailure?"保存失败 · "+saveFailure:localDraftFailure?localDraftFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleTimeString():"尚无待保存修改";
+ let label=saveFailure?"保存失败 · "+saveFailure:localDraftFailure?localDraftFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleString():"尚无待保存修改";
  el.textContent=label;el.dataset.state=saveFailure||localDraftFailure?'error':savingOperations?'saving':pending?'pending':'saved';
  const mobile=document.getElementById("mobileStatus");if(mobile)mobile.textContent=label;
  const save=document.getElementById("mobileSave");if(save)save.disabled=savingOperations>0||!online;
@@ -2688,7 +2692,7 @@ function openGuide(){
   window.open(online ? (window.RELEASE_CLOUD ? "/projects/" + window.RELEASE_CLOUD.projectId + "/guide" : "/guide") : "使用说明.html", "_blank");
 }
 document.getElementById("btnGuide").addEventListener("click", openGuide);
-document.getElementById("btnGuide2").addEventListener("click", openGuide);
+
 
 /* ------------------------------------------------------------------ *
  * 启动
