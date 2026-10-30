@@ -5,7 +5,7 @@ async function persistReview(next){
     baseRevision = d.revision;
     reviewData = d.review;
     updateSummaryReleaseOptions();
-    if(previousPlatform!==reviewData.release?.platform)build();else document.querySelectorAll('li.item').forEach(row=>{let summary=row.querySelector('.item-evidence-summary');const item=reviewData.items?.[row.dataset.id];if(!item){summary?.remove();return;}if(!summary){summary=document.createElement('small');summary.className='item-evidence-summary';row.append(summary);}summary.textContent=[item.reason,item.notes,item.evidence].filter(Boolean).join(' · ');});refreshAll();saveState();
+    if(previousPlatform!==reviewData.release?.platform)build();else document.querySelectorAll('li.item').forEach(row=>updateItemSummary(row,reviewData.items?.[row.dataset.id]));refreshAll();saveState();
     toast("检查记录已保存");
     return true;
   }catch(e){ toast("保存失败：" + e.message); return false; }

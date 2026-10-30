@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=726d73883e33"></script><script src="release_analysis.js?v=726d73883e33"></script><script src="storage.js?v=726d73883e33"></script><script src="store.js?v=726d73883e33"></script><script>PagesStore.install();</script><script defer src="experience.js?v=726d73883e33"></script><link rel="stylesheet" href="history.css?v=726d73883e33"><script defer src="history.js?v=726d73883e33"></script><link rel="stylesheet" href="workflows.css?v=726d73883e33"><script defer src="workflows.js?v=726d73883e33"></script>
+<script src="data.js?v=577efbd3591f"></script><script src="release_analysis.js?v=577efbd3591f"></script><script src="storage.js?v=577efbd3591f"></script><script src="store.js?v=577efbd3591f"></script><script>PagesStore.install();</script><script defer src="experience.js?v=577efbd3591f"></script><link rel="stylesheet" href="history.css?v=577efbd3591f"><script defer src="history.js?v=577efbd3591f"></script><link rel="stylesheet" href="workflows.css?v=577efbd3591f"><script defer src="workflows.js?v=577efbd3591f"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -105,7 +105,7 @@
   .mode .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
   ul{list-style:none;margin:0;padding:0}
   li.item{
-    display:flex;gap:10px;align-items:flex-start;padding:6px 8px;line-height:1.6;position:relative;
+    display:grid;grid-template-columns:minmax(26px,max-content) minmax(0,1fr) auto;gap:8px 12px;align-items:start;padding:10px 8px;line-height:1.7;position:relative;
     border-radius:9px;transition:background .14s ease;
   }
   li.item + li.item{margin-top:1px}
@@ -114,7 +114,12 @@
   li.item.l2{padding-left:44px}
   li.item.l3{padding-left:66px}
   li.item.hidden{display:none}
-  li.item > label{display:flex;gap:10px;align-items:flex-start;cursor:pointer;flex:1;min-width:0}
+  li.item > label{grid-column:2;grid-row:1;display:flex;gap:10px;align-items:flex-start;cursor:pointer;min-width:0;padding-top:3px;margin:0}
+  li.item .txt{white-space:normal;overflow-wrap:anywhere;word-break:normal}
+  .item-actions{grid-column:3;grid-row:1;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;min-width:0}
+  .item-actions > .btn{font-size:12px;min-height:32px;padding:4px 10px;justify-content:center;flex:0 0 auto}
+  .item-actions > .lockbadge{max-width:100%;white-space:normal}
+  li.item.gateitem > label{grid-column:1 / 3}
   /* 序号徽标 */
   .seq{
     flex:0 0 auto;min-width:26px;height:21px;margin-top:2px;padding:0 6px;
@@ -130,12 +135,12 @@
     box-shadow:0 1px 5px rgba(24,95,165,.32);
   }
   /* 锁定态 */
-  li.item.locked{opacity:.42}
+  li.item.locked{opacity:1}
+  li.item.locked .txt{color:var(--text-2)}
   li.item.locked > label{cursor:not-allowed}
   li.item.locked input[type=checkbox]{cursor:not-allowed}
   li.item.current{
     background:var(--accent-soft);border-radius:9px;
-    padding-left:11px;margin-left:-11px;
     box-shadow:inset 3px 0 0 var(--accent);
   }
   li.item.current .txt{color:var(--text)}
@@ -166,7 +171,7 @@
     border:1px solid var(--border-2);background:var(--surface);color:var(--text-2);
     opacity:0;transition:opacity .12s;
   }
-  li.item:hover .skipbtn,li.item.current .skipbtn,li.item.skip .skipbtn{opacity:1}
+  li.item:hover .skipbtn,li.item:focus-within .skipbtn,li.item.current .skipbtn,li.item.skip .skipbtn{opacity:1}
   .skipbtn.locked-hint{display:none}
   .skipbtn:hover{background:var(--surface-2);border-color:var(--text-3);color:var(--text)}
   .skipbtn.undo{border-color:var(--border);color:var(--text-3)}
@@ -536,8 +541,19 @@
 @media(max-width:700px){body{padding-bottom:110px}.mobile-actions{position:fixed;bottom:0;left:0;right:0;z-index:90;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:8px 12px calc(10px + env(safe-area-inset-bottom));background:var(--surface,#fff);border-top:1px solid var(--border,#ddd);box-shadow:0 -4px 18px #17243a12}.mobile-actions>span{width:100%;font-size:10px;text-align:center}.mobile-actions>.btn{flex:1;min-height:40px}}
 
 [hidden]{display:none!important}
-li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size:11px;line-height:1.7}
-@media(max-width:700px){li.item{flex-wrap:wrap;gap:8px}li.item>label{flex:1 1 calc(100% - 46px);min-width:0}li.item.gateitem>label{flex-basis:100%}li.item>.btn,li.item>.skipbtn{flex:0 0 auto;min-height:34px}li.item .txt{min-width:0;overflow-wrap:anywhere}li.item>small{width:100%;flex-basis:100%}.toast{bottom:110px}}
+li.item>.item-evidence-summary{grid-column:2 / -1;min-width:0;margin:0;padding-left:27px;overflow-wrap:anywhere;color:var(--text-2);font-size:12px;line-height:1.7}
+li.item.gateitem>.item-evidence-summary{grid-column:1 / -1}
+@media(max-width:700px){
+  li.item{grid-template-columns:minmax(26px,max-content) minmax(0,1fr);gap:8px 10px;padding-top:12px;padding-bottom:12px}
+  li.item.l1{padding-left:16px}li.item.l2{padding-left:24px}li.item.l3{padding-left:32px}
+  li.item.gateitem > label{grid-column:1 / -1}
+  .item-actions{grid-column:2 / -1;grid-row:2;justify-content:flex-start;gap:8px}
+  li.item.gateitem .item-actions{grid-column:1 / -1}
+  .item-actions>.btn{margin-left:auto;min-height:34px;max-width:100%;white-space:normal}
+  .item-actions>.skipbtn{min-height:34px;opacity:1}
+  li.item>.item-evidence-summary{grid-row:3}
+  .toast{bottom:110px}
+}
 @media(max-width:700px){.toolbar>.grow{display:none}.toolbar .seg button,.toolbar>.btn{min-height:40px}#q{flex:1 1 100%;min-width:0;min-height:40px}#sectionFilter{flex:1 1 100%;max-width:none;min-height:40px}.summary-version-label{flex:1 1 auto}.summary-version-label+#summaryVersion{flex:1 1 100%;max-width:none}#releaseSummary{flex:1 1 100%;min-height:42px}.feature-preview-group .fx{max-height:150px}}
 
 #subscriptionDialog{width:min(1000px,calc(100% - 28px));max-height:90vh;border:1px solid var(--border,#ddd);border-radius:16px;padding:24px;color:var(--text,#222);background:var(--surface,#fff)}
@@ -1462,6 +1478,19 @@ function matchQuery(text){
   if(!query) return true;
   return String(text).toLowerCase().includes(query.toLowerCase());
 }
+function updateItemSummary(row, details){
+  const text = [details?.reason, details?.notes, details?.evidence]
+    .filter(value => typeof value === "string" && value.trim()).join(" · ");
+  let summary = row.querySelector(".item-evidence-summary");
+  if(!text){ summary?.remove(); return; }
+  if(!summary){
+    summary = document.createElement("small");
+    summary.className = "item-evidence-summary";
+    row.appendChild(summary);
+  }
+  summary.textContent = text;
+}
+
 function makeItem(b){
   const li = document.createElement("li");
   li.className = "item l" + (b.level||0);
@@ -1489,11 +1518,15 @@ function makeItem(b){
   lab.appendChild(sp);
   li.appendChild(lab);
 
+  const actions = document.createElement("div");
+  actions.className = "item-actions";
+  li.appendChild(actions);
+
   // 锁定提示
   const lock = document.createElement("span");
   lock.className = "lockbadge";
   lock.textContent = "需先完成前项";
-  li.appendChild(lock);
+  actions.appendChild(lock);
 
   // 跳过按钮
   const sb = document.createElement("button");
@@ -1501,20 +1534,14 @@ function makeItem(b){
   sb.className = "skipbtn";
   sb.dataset.act = "skip";
   sb.dataset.id = b.id;
-  li.appendChild(sb);
+  actions.appendChild(sb);
   const note = document.createElement("button");
   note.className = "btn";
   note.type = "button";
   note.textContent = "备注 / 证据";
   note.onclick = () => openItemReview(b);
-  li.appendChild(note);
-  const details = (reviewData.items || {})[b.id];
-  if(details){
-    const small = document.createElement("small");
-    small.className="item-evidence-summary";
-    small.textContent = [details.reason, details.notes, details.evidence].filter(Boolean).join(" · ");
-    li.appendChild(small);
-  }
+  actions.appendChild(note);
+  updateItemSummary(li, reviewData.items?.[b.id]);
 
   return li;
 }
@@ -2966,7 +2993,7 @@ async function persistReview(next){
     baseRevision = d.revision;
     reviewData = d.review;
     updateSummaryReleaseOptions();
-    if(previousPlatform!==reviewData.release?.platform)build();else document.querySelectorAll('li.item').forEach(row=>{let summary=row.querySelector('.item-evidence-summary');const item=reviewData.items?.[row.dataset.id];if(!item){summary?.remove();return;}if(!summary){summary=document.createElement('small');summary.className='item-evidence-summary';row.append(summary);}summary.textContent=[item.reason,item.notes,item.evidence].filter(Boolean).join(' · ');});refreshAll();saveState();
+    if(previousPlatform!==reviewData.release?.platform)build();else document.querySelectorAll('li.item').forEach(row=>updateItemSummary(row,reviewData.items?.[row.dataset.id]));refreshAll();saveState();
     toast("检查记录已保存");
     return true;
   }catch(e){ toast("保存失败：" + e.message); return false; }
@@ -3239,5 +3266,5 @@ installSaveRecovery();
 installBoardExperience();
 
 </script>
-<script defer src="bootstrap.js?v=726d73883e33"></script></body>
+<script defer src="bootstrap.js?v=577efbd3591f"></script></body>
 </html>

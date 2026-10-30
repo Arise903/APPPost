@@ -57,5 +57,6 @@ jobs:
           npx playwright install --with-deps chromium
           node scripts/test_pages_render.cjs
           node scripts/test_workflows.cjs
+          node scripts/test_checklist_layout.cjs
       - name: Build production image
         run: docker build -t release-desk:test .

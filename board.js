@@ -174,6 +174,19 @@ function matchQuery(text){
   if(!query) return true;
   return String(text).toLowerCase().includes(query.toLowerCase());
 }
+function updateItemSummary(row, details){
+  const text = [details?.reason, details?.notes, details?.evidence]
+    .filter(value => typeof value === "string" && value.trim()).join(" · ");
+  let summary = row.querySelector(".item-evidence-summary");
+  if(!text){ summary?.remove(); return; }
+  if(!summary){
+    summary = document.createElement("small");
+    summary.className = "item-evidence-summary";
+    row.appendChild(summary);
+  }
+  summary.textContent = text;
+}
+
 function makeItem(b){
   const li = document.createElement("li");
   li.className = "item l" + (b.level||0);
@@ -201,11 +214,15 @@ function makeItem(b){
   lab.appendChild(sp);
   li.appendChild(lab);
 
+  const actions = document.createElement("div");
+  actions.className = "item-actions";
+  li.appendChild(actions);
+
   // 锁定提示
   const lock = document.createElement("span");
   lock.className = "lockbadge";
   lock.textContent = "需先完成前项";
-  li.appendChild(lock);
+  actions.appendChild(lock);
 
   // 跳过按钮
   const sb = document.createElement("button");
@@ -213,20 +230,14 @@ function makeItem(b){
   sb.className = "skipbtn";
   sb.dataset.act = "skip";
   sb.dataset.id = b.id;
-  li.appendChild(sb);
+  actions.appendChild(sb);
   const note = document.createElement("button");
   note.className = "btn";
   note.type = "button";
   note.textContent = "备注 / 证据";
   note.onclick = () => openItemReview(b);
-  li.appendChild(note);
-  const details = (reviewData.items || {})[b.id];
-  if(details){
-    const small = document.createElement("small");
-    small.className="item-evidence-summary";
-    small.textContent = [details.reason, details.notes, details.evidence].filter(Boolean).join(" · ");
-    li.appendChild(small);
-  }
+  actions.appendChild(note);
+  updateItemSummary(li, reviewData.items?.[b.id]);
 
   return li;
 }
