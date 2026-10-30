@@ -20,25 +20,41 @@ const server=http.createServer((req,res)=>{
  try{
   browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{})});
   const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  async function openCommand(selector){const control=page.locator(selector),id=await control.evaluate(el=>el.closest('details.board-menu')?.id);if(id&&!await page.locator('#'+id).evaluate(el=>el.open))await page.locator('#'+id+' > summary').click();}
+  async function clickCommand(selector){await openCommand(selector);await page.locator(selector).click();}
   await page.goto('http://127.0.0.1:'+server.address().port+'/APPPost/index.html');
   await page.locator('#newProject').click();await page.locator('[name=name]').fill('初始化显示回归');await page.locator('#createTemplate').selectOption('original');await page.locator('#createForm [type=submit]').click();await page.waitForURL(/board.html\?id=/);await page.waitForFunction(()=>typeof online!=='undefined'&&online);
   // Push feature previews, cancels, saves and survives reload without losing state.
   const pushRows=()=>page.locator('#list li.item').filter({hasText:/APNs 推送的 p8/});
   assert.equal(await pushRows().count(),0);
-  await page.locator('#btnFeat').click();assert.equal(await page.locator('#featPush').isChecked(),false);await page.locator('#featPush').check();assert.equal(await pushRows().count(),1);await page.locator('#featCancel').click();assert.equal(await pushRows().count(),0);
-  await page.locator('#btnFeat').click();await page.locator('#featPush').check();await page.locator('#featSave').click();await page.waitForFunction(()=>!document.getElementById('featPanel').classList.contains('on'));
+  await clickCommand('#btnFeat');assert.equal(await page.locator('#featPush').isChecked(),false);await page.locator('#featPush').check();assert.equal(await pushRows().count(),1);await page.locator('#featCancel').click();assert.equal(await pushRows().count(),0);
+  await clickCommand('#btnFeat');await page.locator('#featPush').check();await page.locator('#featSave').click();await page.waitForFunction(()=>!document.getElementById('featPanel').classList.contains('on'));
   await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.equal(await pushRows().count(),1);
-  await page.locator('#btnFeat').click();await page.locator('#featPush').uncheck();await page.locator('#featSave').click();await page.waitForFunction(()=>!document.getElementById('featPanel').classList.contains('on'));assert.equal(await pushRows().count(),0);
+  await clickCommand('#btnFeat');await page.locator('#featPush').uncheck();await page.locator('#featSave').click();await page.waitForFunction(()=>!document.getElementById('featPanel').classList.contains('on'));assert.equal(await pushRows().count(),0);
   // Independent subscription catalogue: price validation, persistence and cancellation.
-  await page.locator('#btnSubscriptions').click();
+  await clickCommand('#btnSubscriptions');
   for(const period of ['week','month','year'])await page.locator('[data-add-subscription="'+period+'"]').click();
   assert.equal(await page.locator('[data-subscription-product]').count(),3);
   const product=page.locator('[data-subscription-product]').first();
+  // Optional groups stay hidden until enabled, preserve values while off, and restore on reopening.
+  for(const field of ['trialCount','trialUnit','trialEligibility','offerPrice','offerCycles'])assert.equal(await product.locator('[data-field="'+field+'"]').isVisible(),false,field);
+  await product.locator('[data-field="trialEnabled"]').selectOption('on');
+  await product.locator('[data-field="trialCount"]').fill('7');
+  await product.locator('[data-field="trialUnit"]').selectOption('day');
+  await product.locator('[data-field="trialEnabled"]').selectOption('off');
+  assert.equal(await product.locator('[data-field="trialCount"]').isVisible(),false);
+  assert.equal(await product.locator('[data-field="trialCount"]').isDisabled(),true);
+  await product.locator('[data-field="trialEnabled"]').selectOption('on');
+  assert.equal(await product.locator('[data-field="trialCount"]').inputValue(),'7');
   await product.locator('[data-field="price"]').fill('18.50');
   await product.locator('[data-field="offerEnabled"]').selectOption('on');
   await product.locator('[data-field="offerPrice"]').fill('6.00');
   await product.locator('[data-field="offerPeriodCount"]').fill('1');
   await product.locator('[data-field="offerCycles"]').fill('3');
+  await product.locator('[data-field="offerEnabled"]').selectOption('off');
+  assert.equal(await product.locator('[data-field="offerCycles"]').isVisible(),false);
+  await product.locator('[data-field="offerEnabled"]').selectOption('on');
+  assert.equal(await product.locator('[data-field="offerCycles"]').inputValue(),'3');
   await product.locator('[data-field="offerStart"]').fill('2026-10-29T08:00');
   await product.locator('[data-field="offerEnd"]').fill('2026-10-28T08:00');
   await page.locator('#subscriptionSave').click();assert.match(await page.locator('#subscriptionError').textContent(),/结束时间/);
@@ -46,12 +62,13 @@ const server=http.createServer((req,res)=>{
   await product.locator('[data-field="benefits"]').fill('<script>alert(1)</script>');
   await page.locator('#subscriptionSave').click();await page.waitForFunction(()=>document.getElementById('subscriptionStatus').textContent.includes('已保存'));
   await page.locator('#subscriptionClose').click();await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);
-  await page.locator('#btnSubscriptions').click();assert.equal(await page.locator('[data-subscription-product]').count(),3);
+  await clickCommand('#btnSubscriptions');assert.equal(await page.locator('[data-subscription-product]').count(),3);
+  assert.equal(await page.locator('[data-field="trialCount"]').first().inputValue(),'7');
   assert.equal(await page.locator('[data-field="price"]').first().inputValue(),'18.50');assert.equal(await page.locator('[data-field="offerCycles"]').first().inputValue(),'3');assert.equal(await page.locator('[data-field="benefits"]').first().inputValue(),'<script>alert(1)</script>');
   await page.locator('[data-field="price"]').first().fill('999');page.once('dialog',dialog=>dialog.accept());await page.locator('#subscriptionCancel').click();
-  await page.locator('#btnSubscriptions').click();assert.equal(await page.locator('[data-field="price"]').first().inputValue(),'18.50');await page.locator('#subscriptionClose').click();
+  await clickCommand('#btnSubscriptions');assert.equal(await page.locator('[data-field="price"]').first().inputValue(),'18.50');await page.locator('#subscriptionClose').click();
   // History is always reachable; viewing does not save, and snapshots show saved content.
-  await page.locator('#btnHistory').click();assert.match(await page.locator('#historyMeta').innerText(),/创建于.*最近修改/);
+  await clickCommand('#btnHistory');assert.match(await page.locator('#historyMeta').innerText(),/创建于.*最近修改/);
   await page.locator('#historyFilter').selectOption('activity');assert.ok(await page.locator('.history-event').count()>0);
   const auditVersion=await page.evaluate(()=>PagesStore.get(PagesStore.projectId()).version);
   await page.locator('#historyFilter').selectOption('snapshot');await page.locator('.history-event details').first().locator('summary').first().click();assert.match(await page.locator('.history-preview').first().innerText(),/版本：/);
@@ -74,11 +91,11 @@ const server=http.createServer((req,res)=>{
    const numbers=await page.locator('#list li.item:not(.gateitem) .seq').allTextContents();assert.deepEqual(numbers.map(Number),numbers.map((_,i)=>i+1));
   };
   await verifyHidden();await page.reload();await verifyHidden();
-  await page.locator('#btnFeat').click();assert.equal(await page.locator('#featFeedback').isChecked(),false);assert.equal(await heading().count(),0);await page.locator('#featCancel').click();
+  await clickCommand('#btnFeat');assert.equal(await page.locator('#featFeedback').isChecked(),false);assert.equal(await heading().count(),0);await page.locator('#featCancel').click();
   await page.evaluate(()=>persistReview({...reviewData,release:{version:'1'},history:[{release:{version:'0.9'},date:'2026-01-01T00:00:00Z',items:[{id:'old',text:'历史跳过项',state:'skip',applicable:true,reason:'暂不适用',notes:'旧版本备注',evidence:'audit.png'}]}]}));await verifyHidden();
-  await page.locator('#summaryVersion').selectOption('history:0');const downloadPromise=page.waitForEvent('download');await page.locator('#releaseSummary').click();const summary=await downloadPromise;assert.match(summary.suggestedFilename(),/0\.9/);const summaryText=fs.readFileSync(await summary.path(),'utf8');assert.match(summaryText,/暂不适用/);assert.match(summaryText,/旧版本备注/);assert.match(summaryText,/各版本进度对比/);await page.locator('#summaryVersion').selectOption('current');
+  await openCommand('#summaryVersion');await page.locator('#summaryVersion').selectOption('history:0');const downloadPromise=page.waitForEvent('download');await clickCommand('#releaseSummary');const summary=await downloadPromise;assert.match(summary.suggestedFilename(),/0\.9/);const summaryText=fs.readFileSync(await summary.path(),'utf8');assert.match(summaryText,/暂不适用/);assert.match(summaryText,/旧版本备注/);assert.match(summaryText,/各版本进度对比/);await openCommand('#summaryVersion');await page.locator('#summaryVersion').selectOption('current');
   for(const enabled of [true,false]){
-   await page.locator('#btnFeat').click();await page.locator('#featFeedback').setChecked(enabled);await page.locator('#featAcc').uncheck();await page.locator('#featMinor').uncheck();const featurePreview=await page.locator('#featPreview').textContent();assert.match(featurePreview,/按当前开关预览/);assert.match(featurePreview,/将显示/);assert.match(featurePreview,/将隐藏/);assert.equal(featurePreview.includes('无用户反馈系统'),!enabled);await page.locator('#featSave').click();await page.waitForFunction(()=>!document.getElementById('featPanel').classList.contains('on'));
+   await clickCommand('#btnFeat');await page.locator('#featFeedback').setChecked(enabled);await page.locator('#featAcc').uncheck();await page.locator('#featMinor').uncheck();const featurePreview=await page.locator('#featPreview').textContent();assert.match(featurePreview,/按当前开关预览/);assert.match(featurePreview,/将显示/);assert.match(featurePreview,/将隐藏/);assert.equal(featurePreview.includes('无用户反馈系统'),!enabled);await page.locator('#featSave').click();await page.waitForFunction(()=>!document.getElementById('featPanel').classList.contains('on'));
    assert.equal(await heading().count(),enabled?1:0);await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.equal(await heading().count(),enabled?1:0);
    assert.equal(await page.getByRole('heading').filter({hasText:'账号注销与数据主体权利'}).count(),0);
   }
@@ -109,18 +126,18 @@ const server=http.createServer((req,res)=>{
   // Restore from the visible history dialog; block while a draft is pending.
   const restoreProject=await page.evaluate(async()=>{const id=await PagesStore.create({name:'History restore test',document:'# Restore\n## Items\n- [ ] First\n'});const p=PagesStore.get(id),task=PagesStore.payload(p).items[0];await PagesStore.mutate(id,p.version,'write',p=>p.document=PagesStore.apply(p.document,{[task.id]:'done'}));return id;});
   await page.goto('http://127.0.0.1:'+server.address().port+'/APPPost/board.html?id='+restoreProject);await page.waitForFunction(()=>typeof online!=='undefined'&&online);
-  await page.locator('#btnHistory').click();await page.locator('#historyFilter').selectOption('snapshot');await page.evaluate(()=>dirty=true);await page.getByRole('button',{name:'恢复此快照',exact:true}).first().click();assert.match(await page.locator('.history-error').innerText(),/未保存/);await page.evaluate(()=>dirty=false);
+  await clickCommand('#btnHistory');await page.locator('#historyFilter').selectOption('snapshot');await page.evaluate(()=>dirty=true);await page.getByRole('button',{name:'恢复此快照',exact:true}).first().click();assert.match(await page.locator('.history-error').innerText(),/未保存/);await page.evaluate(()=>dirty=false);
   page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'恢复此快照',exact:true}).first().click();await page.waitForFunction(()=>typeof online!=='undefined'&&online&&PagesStore.payload(PagesStore.get(PagesStore.projectId())).items[0].state==='todo');
   assert.equal(await page.evaluate(()=>PagesStore.get(PagesStore.projectId()).activity.length),2);assert.deepEqual(errors,[]);
   // New creation setup, explicit release drafts and readiness evidence policy.
-  await page.goto('http://127.0.0.1:'+server.address().port+'/APPPost/index.html');await page.locator('#newProject').click();await page.locator('[name=name]').fill('Android 向导');await page.locator('[name=platform]').selectOption('Android');await page.locator('[name=hasSubscriptions]').uncheck();assert.match(await page.locator('#createPreview').innerText(),/适用 \d+ 项/);await page.locator('#createForm [type=submit]').click();await page.waitForURL(/board.html\?id=/);await page.waitForFunction(()=>typeof online!=='undefined'&&online);
+  await page.goto('http://127.0.0.1:'+server.address().port+'/APPPost/index.html');await page.locator('#newProject').click();await page.locator('[name=name]').fill('Android 向导');await page.locator('[name=platform]').selectOption('Android');assert.match(await page.locator('#createPreview').innerText(),/适用 \d+ 项/);await page.locator('#createForm [type=submit]').click();await page.waitForURL(/board.html\?id=/);await page.waitForFunction(()=>typeof online!=='undefined'&&online);
   assert.equal(await page.evaluate(()=>DATA.features.hasSubscriptions),false);assert.equal(await page.locator('#list li.item').filter({hasText:'Xcode 的 Team'}).count(),0);
-  await page.locator('#releaseEdit').click();await page.locator('#releaseEditForm [name=version]').fill('3.0');assert.match(await page.locator('#saveStatus').innerText(),/发布信息/);await page.locator('#releaseEditForm [type=submit]').click();await page.waitForFunction(()=>!document.getElementById('releaseEditDialog').open);assert.equal(await page.evaluate(()=>reviewData.release.version),'3.0');
+  await clickCommand('#releaseEdit');await page.locator('#releaseEditForm [name=version]').fill('3.0');assert.match(await page.locator('#saveStatus').innerText(),/发布信息/);await page.locator('#releaseEditForm [type=submit]').click();await page.waitForFunction(()=>!document.getElementById('releaseEditDialog').open);assert.equal(await page.evaluate(()=>reviewData.release.version),'3.0');
   const policyId=await page.evaluate(async()=>PagesStore.create({name:'就绪检查验证',document:'# 就绪检查验证\n## Tasks\n- [x] 证据检查 <!-- task:proof -->\n- [-] 平台例外 <!-- task:exception -->\n',review:{release:{version:'1.0'},items:{proof:{evidenceRequired:'on'}},history:[]}}));
   await page.goto('http://127.0.0.1:'+server.address().port+'/APPPost/board.html?id='+policyId);await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.match(await page.locator('#readinessSummary').innerText(),/阻塞 2/);await page.locator('#readinessSummary').click();await page.locator('#readinessIssues button').first().click();
-  await page.locator('#list li.item').filter({hasText:'证据检查'}).getByRole('button',{name:'备注 / 证据'}).click();await page.locator('#itemReviewForm [name=evidence]').fill('evidence/release.png');assert.match(await page.locator('#saveStatus').innerText(),/备注与检查要求/);await page.locator('#itemReviewForm [type=submit]').click();await page.waitForFunction(()=>!document.getElementById('itemReviewDialog').open);assert.match(await page.locator('#readinessSummary').innerText(),/阻塞 1/);
-  await page.locator('#list li.item').filter({hasText:'平台例外'}).getByRole('button',{name:'备注 / 证据'}).click();await page.locator('#itemReviewForm [name=reason]').fill('此版本未启用');await page.locator('#itemReviewForm [type=submit]').click();await page.waitForFunction(()=>!document.getElementById('itemReviewDialog').open);assert.match(await page.locator('#readinessSummary').innerText(),/发布就绪/);
-  page.once('dialog',dialog=>dialog.accept());await page.locator('#releaseArchive').click();await page.waitForFunction(()=>reviewData.history.length===1);assert.equal(await page.evaluate(()=>reviewData.history[0].readiness.ready),true);await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.match(await page.locator('#readinessSummary').innerText(),/发布就绪/);
+  await page.locator('#list li.item').filter({hasText:'证据检查'}).getByRole('button',{name:'详情 · 备注 / 证据'}).click();await page.locator('#itemReviewForm [name=evidence]').fill('evidence/release.png');assert.match(await page.locator('#saveStatus').innerText(),/备注与检查要求/);await page.locator('#itemReviewForm [type=submit]').click();await page.waitForFunction(()=>!document.getElementById('itemReviewDialog').open);assert.match(await page.locator('#readinessSummary').innerText(),/阻塞 1/);
+  await page.locator('#list li.item').filter({hasText:'平台例外'}).getByRole('button',{name:'详情 · 备注 / 证据'}).click();await page.locator('#itemReviewForm [name=reason]').fill('此版本未启用');await page.locator('#itemReviewForm [type=submit]').click();await page.waitForFunction(()=>!document.getElementById('itemReviewDialog').open);assert.match(await page.locator('#readinessSummary').innerText(),/发布就绪/);
+  page.once('dialog',dialog=>dialog.accept());await clickCommand('#releaseArchive');await page.waitForFunction(()=>reviewData.history.length===1);assert.equal(await page.evaluate(()=>reviewData.history[0].readiness.ready),true);await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.match(await page.locator('#readinessSummary').innerText(),/发布就绪/);
   if(process.env.RELEASE_QA_DIR){await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(200);await page.screenshot({path:process.env.RELEASE_QA_DIR+'/release-readiness-desktop.png'});await page.setViewportSize({width:390,height:844});await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(200);await page.screenshot({path:process.env.RELEASE_QA_DIR+'/release-readiness-mobile.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.goto('http://127.0.0.1:'+server.address().port+'/APPPost/index.html');await page.waitForFunction(()=>document.getElementById('projectCount').textContent==='4');await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(200);await page.screenshot({path:process.env.RELEASE_QA_DIR+'/dashboard-mobile.png'});await page.setViewportSize({width:1280,height:800});await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(200);await page.screenshot({path:process.env.RELEASE_QA_DIR+'/dashboard-desktop.png'});await page.locator('#openDataManager').click();await page.screenshot({path:process.env.RELEASE_QA_DIR+'/data-manager.png'});}
   assert.deepEqual(errors,[]);console.log('Pages DOM regression passed: creation setup, platform visibility, explicit drafts, readiness evidence, archives, guide, settings, backups, private sync, history and mobile layout.');
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "adjust",
+    "feature": "hasAdjust",
+    "title": "Adjust（广告归因）",
+    "legacyTaskId": "t_8867619d",
+    "items": [
+      [
+        "module_adjust_tokens",
+        "Adjust 的 iOS / Android 正式 appToken、运行环境和生产开关已核对"
+      ],
+      [
+        "module_adjust_consent",
+        "Adjust 初始化遵循用户同意及 ATT 结果，关闭归因时不初始化 SDK，也不触发无用授权弹窗"
+      ],
+      [
+        "module_adjust_init",
+        "Adjust 初始化有幂等保护，授权等待和重试不阻塞应用主流程"
+      ],
+      [
+        "module_adjust_links",
+        "Adjust 深度链接、归因回调和安装事件已在真机及后台验证"
+      ]
+    ]
+  },
+  {
+    "id": "analysis_api",
+    "feature": "hasAnalysisApi",
+    "title": "AnalysisApi（自有统计）",
+    "legacyTaskId": "t_69393d68",
+    "items": [
+      [
+        "module_analysis_environment",
+        "AnalysisApi 的 _baseUrl、projectId 与生产环境一致，Release 包不会指向测试环境"
+      ],
+      [
+        "module_analysis_identity",
+        "AnalysisApi 的 UUID 生成、读取及重装策略已验证，并符合隐私披露"
+      ],
+      [
+        "module_analysis_reports",
+        "AnalysisApi 用户、token、行为队列三条上报路径及离线重试已验证"
+      ],
+      [
+        "module_analysis_fallback",
+        "AnalysisApi token 失效、超时及上报失败会降级，不影响应用主流程"
+      ],
+      [
+        "module_analysis_parallel",
+        "AnalysisApi 与 Adjust 归因链路独立，按适用的隐私同意策略启动，不等待 Adjust 初始化"
+      ]
+    ]
+  },
+  {
+    "id": "initialization",
+    "feature": "hasInitialization",
+    "title": "初始化流程核对",
+    "legacyTaskId": "t_98829c38",
+    "items": [
+      [
+        "module_init_start",
+        "已启用的 Adjust / AnalysisApi 按约定时序启动，初始化等待与重试不阻塞应用主流程"
+      ],
+      [
+        "module_init_consent",
+        "初始化遵循前台状态及适用的隐私同意结果；未启用的链路不初始化、不触发授权请求"
+      ],
+      [
+        "module_init_lifecycle",
+        "重复启动、网络失败、超时及前后台切换已验证，重试有上限且初始化保持幂等"
+      ]
+    ]
+  }
+]

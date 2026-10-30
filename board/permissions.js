@@ -325,7 +325,7 @@ async function openPermPanel(){
 }
 function closePermPanel(){
   document.getElementById("permPanel").classList.remove("on");
-  if(permFocusReturn&&permFocusReturn.isConnected)permFocusReturn.focus();
+  if(permFocusReturn&&permFocusReturn.isConnected)window.BoardForms?BoardForms.returnFocus(permFocusReturn):permFocusReturn.focus();
   permFocusReturn=null;
 }
 

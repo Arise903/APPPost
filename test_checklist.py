@@ -56,6 +56,35 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual(revision(self.path), before)
         self.assertEqual(load_review(self.path), saved)
 
+    def test_optional_sdk_modules_keep_stable_ids(self):
+        base = self.path.read_text()
+        enabled = c.configure_document_features(base, {'hasAdjust': True, 'hasAnalysisApi': True})
+        self.assertEqual(enabled.count('task:module_adjust_'), 4)
+        self.assertEqual(enabled.count('task:module_analysis_'), 5)
+        self.assertEqual(c.configure_document_features(enabled, {'hasAdjust': True, 'hasAnalysisApi': True}), enabled)
+        completed = enabled.replace('- [ ] Adjust 的', '- [x] Adjust 的')
+        off = c.configure_document_features(completed, {'hasAdjust': False})
+        back = c.configure_document_features(off, {'hasAdjust': True})
+        self.assertIn('- [x] Adjust 的', back)
+        self.assertEqual(back.count('task:module_adjust_'), 4)
+
+    def test_subscription_settings_atomic_save_and_rollback(self):
+        from unittest.mock import patch
+        products = [{'id': 'monthly', 'name': '月订阅', 'trialEnabled': 'off', 'trialCount': '7', 'offerEnabled': 'off', 'offerPrice': '6'}]
+        c.save_subscription_settings(self.path, False, products)
+        self.assertFalse(c.parse_md(self.path.read_text())['features']['hasSubscriptions'])
+        self.assertEqual(load_review(self.path)['subscriptions'], products)
+        before_document, before_review = self.path.read_bytes(), load_review(self.path)
+        with patch.object(c, 'save_review', side_effect=OSError('disk full')):
+            with self.assertRaises(OSError):
+                c.save_subscription_settings(self.path, True, [])
+        self.assertEqual(self.path.read_bytes(), before_document)
+        self.assertEqual(load_review(self.path), before_review)
+        self.assertFalse(list(self.path.parent.glob('*.subscription-txn.json')))
+        with self.assertRaises(ValueError):
+            c.save_subscription_settings(self.path, True, [{'price': 1}])
+        self.assertEqual(self.path.read_bytes(), before_document)
+
     def test_atomic_failure_keeps_original(self):
         before = self.path.read_bytes()
         with self.assertRaises(TypeError): atomic_write(self.path, None)

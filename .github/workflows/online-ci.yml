@@ -58,5 +58,14 @@ jobs:
           node scripts/test_pages_render.cjs
           node scripts/test_workflows.cjs
           node scripts/test_checklist_layout.cjs
+          node scripts/test_workspace.cjs
+          pip install "Pillow>=11,<13"
+          node scripts/test_visual.cjs
+      - name: Upload visual comparison on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-comparison
+          path: artifacts/visual
       - name: Build production image
         run: docker build -t release-desk:test .

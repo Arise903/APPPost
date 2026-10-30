@@ -16,60 +16,20 @@ __BOARD_CSS__
     <button class="btn gbtn" id="btnGuide">立即阅读</button>
   </div>
 
-  <header class="card">
-    <div class="hrow">
-      <h1 id="ttl"></h1>
-      <span class="grow"></span>
-      <button type="button" class="pill warn hidden" id="featPill" aria-label="打开项目设置并查看隐藏检查项" title="点击打开项目设置">已隐藏 <b>0</b> 项</button>
-      <span class="mode" id="mode"><span class="dot"></span><span id="modeTxt">离线模式</span></span>
-    </div>
-
-    <div class="hprog">
-      <div class="track" role="progressbar" aria-label="项目检查进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill" id="fill"></div></div>
-      <span class="pct" id="pct" aria-hidden="true">0%</span>
-      <span class="cnt" id="cnt" role="status" aria-live="polite"></span>
-    </div>
-
-    <details class="release-readiness" id="readinessPanel"><summary id="readinessSummary">发布就绪检查</summary><p>适用项默认必需；在「备注 / 证据」可调整必需性与证据要求。填写原因的跳过项可通过检查。</p><ul id="readinessIssues"></ul></details><button class="seqline" id="seqline" title="点击跳到当前应处理的条目"></button>
-
-    <nav class="workflow" aria-label="发布流程"><div><b>1 配置</b><span>按实际功能设置项目、商品和权限</span></div><div><b>2 检查</b><span>逐项处理，保存检查进度</span></div><div><b>3 发布</b><span>填写版本、归档，再开始下一轮</span></div></nav>
-    <div class="toolbar">
-      <div class="seg" id="seg">
-        <button type="button" data-f="all" class="on" aria-pressed="true">全部</button>
-        <button type="button" data-f="todo" aria-pressed="false">待办</button>
-        <button type="button" data-f="done" aria-pressed="false">已完成</button>
-        <button type="button" data-f="skip" aria-pressed="false">已跳过</button>
-      </div>
-      <input type="search" id="q" placeholder="搜索…" aria-label="搜索检查项">
-      <select id="sectionFilter" aria-label="按章节筛选" title="按章节查看进度"><option value="all">全部章节</option></select>
-      <span class="grow"></span>
-      <button class="btn" id="btnFeat">项目设置</button>
-      <button class="btn" id="btnSubscriptions">订阅商品</button>
-      <button class="btn" id="btnPerm">权限配置</button>
-      <button class="btn primary" id="btnSave" disabled>保存进度</button>
-      <span class="morewrap">
-        <button class="btn" id="btnMore" aria-haspopup="true" aria-expanded="false">更多</button>
-        <div class="moremenu" id="moreMenu">
-          <button id="mExport">导出 Markdown 副本</button>
-          <button id="mGuide">查看使用说明</button>
-          <div class="msep"></div>
-          <button class="danger" id="mClear">清空完成状态</button>
-        </div>
-      </span>
-    </div>
-    <div id="saveStatus" role="status" aria-live="polite"></div><div class="save-explanation">检查进度、备注、项目设置和商品：点击各自保存按钮；权限自动保存；发布信息填写完成后保存。下方显示当前未保存内容。</div>
-    <div class="secnote hidden" id="filtNote"></div>
-  <div class="release-actions" aria-label="发布与归档">
-<button class="btn" id="releaseEdit">发布信息</button>
-<button class="btn" id="releaseArchive">归档本次发布</button><button class="btn" id="newRelease">开始新一轮发布</button>
-<label class="summary-version-label" for="summaryVersion">摘要版本</label><select id="summaryVersion" aria-label="选择要导出的发布版本"><option value="current">当前发布</option></select><button class="btn" id="releaseSummary">导出发布摘要</button>
-<button class="btn" id="backupRestore">恢复备份</button>
-</div>
+  <header class="card board-header">
+    <div class="hrow"><div class="board-heading"><h1 id="ttl"></h1><p id="boardReleaseLabel" class="board-release-label"></p></div><span class="grow"></span><button type="button" class="pill warn hidden" id="featPill" aria-label="打开项目设置并查看隐藏检查项">已隐藏 <b>0</b> 项</button><span class="mode" id="mode"><span class="dot"></span><span id="modeTxt">离线模式</span></span></div>
+    <div class="board-overview"><div class="board-progress"><div class="hprog"><div class="track" role="progressbar" aria-label="项目检查进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill" id="fill"></div></div><span class="pct" id="pct" aria-hidden="true">0%</span><span class="cnt" id="cnt" role="status" aria-live="polite"></span></div><div id="saveStatus" role="status" aria-live="polite"></div></div><div class="primary-actions"><button class="btn" id="continueCheck">继续检查</button><button class="btn primary" id="btnSave" disabled>保存进度</button></div></div>
+    <details class="release-readiness" id="readinessPanel"><summary id="readinessSummary">发布就绪检查</summary><p>必需项、证据和例外期限统一在条目详情维护。</p><ul id="readinessIssues"></ul></details>
+    <nav class="board-commands" aria-label="项目操作">
+      <details class="board-menu workflow-menu" id="configMenu"><summary>配置</summary><div class="board-menu-content"><button class="btn" id="btnFeat">项目设置</button><button class="btn" id="btnSubscriptions">订阅商品</button><button class="btn" id="btnPerm">权限配置</button><div id="configTools"></div></div></details>
+      <details class="board-menu" id="publishMenu"><summary>发布</summary><div class="board-menu-content release-actions"><button class="btn" id="releaseEdit">发布信息</button><button class="btn" id="releaseArchive">归档本次发布</button><button class="btn" id="newRelease">开始新一轮发布</button><label class="summary-version-label" for="summaryVersion">导出版本</label><select id="summaryVersion" aria-label="选择要导出的发布版本"><option value="current">当前发布</option></select><button class="btn" id="releaseSummary">导出发布摘要</button></div></details>
+      <details class="board-menu" id="historyMenu"><summary>历史与备份</summary><div class="board-menu-content"><div id="historyMenuActions"></div><button class="btn" id="backupRestore">恢复备份</button><div id="historyTools"></div></div></details>
+      <span class="morewrap"><button class="btn" id="btnMore" aria-haspopup="true" aria-expanded="false">数据与帮助</button><div class="moremenu" id="moreMenu"><button id="mExport">导出 Markdown 副本</button><button id="mGuide">使用说明</button><div class="msep"></div><button class="danger" id="mClear">清空完成状态</button></div></span>
+    </nav>
   </header>
-
-  <div id="list"></div>
-  <div class="empty hidden" id="empty">没有匹配的条目</div>
-
+  <section class="check-toolbar" aria-label="检查筛选"><div class="seg" id="seg"><button type="button" data-f="all" class="on" aria-pressed="true">全部</button><button type="button" data-f="todo" aria-pressed="false">待办</button><button type="button" data-f="done" aria-pressed="false">已完成</button><button type="button" data-f="skip" aria-pressed="false">已跳过</button></div><input type="search" id="q" placeholder="搜索检查项" aria-label="搜索检查项"><select id="sectionFilter" aria-label="按章节筛选"><option value="all">全部章节</option></select><select id="viewMode" aria-label="检查视图"><option value="all">完整清单</option><option value="focus">专注检查</option><option value="blockers">发布阻塞项</option></select></section>
+  <button class="seqline" id="seqline" title="定位当前检查项"></button><div class="secnote hidden" id="filtNote"></div>
+  <div class="board-content"><aside class="chapter-nav"><details open id="chapterOutline"><summary>章节导航</summary><nav id="chapterLinks" aria-label="检查章节"></nav></details></aside><main class="checklist-content"><div id="list"></div><div class="empty hidden" id="empty">没有匹配的条目</div></main></div>
 
 <footer>
     <div id="built"></div>
@@ -118,13 +78,11 @@ __BOARD_CSS__
     <div class="panel-body">
       <div class="panel-sec">
         <div class="featlist">
+          <label class="featrow"><input type="checkbox" id="featAdjust"><span class="featmain"><b>使用 Adjust 广告归因</b><em>添加正式 Token、授权与初始化、深度链接及归因验证检查。所有模板均可选。</em></span></label>
+          <label class="featrow"><input type="checkbox" id="featAnalysisApi"><span class="featmain"><b>使用 AnalysisApi 自有统计</b><em>添加生产地址、projectId、UUID、上报队列及失败降级检查。关闭时保留进度和备注。</em></span></label>
           <label class="featrow">
             <input type="checkbox" id="featPush">
             <span class="featmain"><b>App 有推送功能</b><em>开启后显示推送能力、APNs 密钥或证书配置检查项。Android 通知权限检查还需在「权限配置」选择通知；默认关闭，隐藏时保留进度和备注。</em></span>
-          </label>
-          <label class="featrow">
-            <input type="checkbox" id="featSubscription">
-            <span class="featmain"><b>App 有订阅商品</b><em>开启后显示订阅商品、环境、周期价格、购买验证及订阅页核对项；默认开启。关闭后保留检查进度和备注。</em></span>
           </label>
           <label class="featrow">
             <input type="checkbox" id="featFeedback">
@@ -252,13 +210,13 @@ __BOARD_CSS__
 </div>
 
 <dialog id="releaseEditDialog" aria-labelledby="releaseEditTitle"><form id="releaseEditForm"><h2 id="releaseEditTitle">发布信息</h2><div class="subscription-grid"><label>App 名称<input name="app" maxlength="200"></label><label>平台<select name="platform"><option value="">未指定</option><option value="iOS / Android">iOS / Android</option><option value="iOS">iOS</option><option value="Android">Android</option></select></label><label>版本号<input name="version" maxlength="100"></label><label>构建号<input name="build" maxlength="100"></label><label>检查日期<input name="date" type="date"></label><label>负责人<input name="owner" maxlength="200"></label></div><div class="subscription-grid"><label>iOS 应用标识<input name="appIdIOS" maxlength="200"></label><label>Android 应用标识<input name="appIdAndroid" maxlength="200"></label><label>环境<select name="environment"><option value="production">production</option><option value="staging">staging</option><option value="development">development</option></select></label><label>API 基础地址<input name="apiBaseUrl" type="url" maxlength="1000"></label><label>目标发布日期<input name="targetDate" type="date"></label><label>发布时区<input name="timeZone" maxlength="100" placeholder="Asia/Shanghai"></label><label>发布状态<select name="status"><option value="planning">计划中</option><option value="review">待发布</option><option value="released">已发布</option></select></label><label>完整发布检查<select name="strictValidation"><option value="off">仅检查条目</option><option value="on">同时检查发布信息及商品完整性</option></select></label></div><p id="releaseEditError" role="alert"></p><p class="save-explanation">草稿 · 保存平台后会更新适用清单，已有进度保留。</p><button class="btn" type="button" id="releaseEditCancel">取消</button><button class="btn primary" type="submit">保存发布信息</button></form></dialog>
-<dialog id="itemReviewDialog" aria-labelledby="itemReviewTitle"><form id="itemReviewForm"><h2 id="itemReviewTitle">备注 / 证据</h2><p id="itemReviewText"></p><label>跳过原因<textarea name="reason" maxlength="4000"></textarea></label><label>检查备注<textarea name="notes" maxlength="4000"></textarea></label><label>验证证据（路径或链接）<textarea name="evidence" maxlength="4000"></textarea></label><label><input name="required" type="checkbox" checked>发布必需项</label><label><input name="evidenceRequired" type="checkbox">完成时必须提供证据</label><label>证据路径有效至<input name="evidenceExpiresAt" type="date"></label><details class="exception-fields"><summary>跳过分类、负责人和复查记录</summary><label>跳过类型<select name="exceptionType"><option value="legacy">普通跳过（兼容原记录）</option><option value="not-applicable">不适用</option><option value="deferred">暂缓处理</option><option value="risk-accepted">风险接受</option></select></label><label>负责人<input name="exceptionOwner" maxlength="200"></label><label>复查期限<input name="reviewDue" type="date"></label><label>复查状态<select name="reviewStatus"><option value="pending">待复查</option><option value="reviewed">已复查</option></select></label><label>复查日期<input name="reviewedAt" type="date"></label><p>审批记录由你手动登记，用于追溯；风险接受需填写已批准状态、批准人和日期。</p><label>审批状态<select name="approvalStatus"><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已拒绝</option></select></label><label>批准人<input name="approvalBy" maxlength="200"></label><label>批准日期<input name="approvalDate" type="date"></label></details><p id="itemReviewError" role="alert"></p><p class="save-explanation">草稿 · 点击保存后生效</p><button type="button" class="btn" id="itemReviewCancel">取消</button><button type="submit" class="btn primary">保存备注与检查要求</button></form></dialog>
+<dialog id="itemReviewDialog" class="item-drawer" aria-labelledby="itemReviewTitle"><form id="itemReviewForm"><header class="form-heading"><div><span id="itemReviewMeta" class="detail-meta"></span><h2 id="itemReviewTitle">检查项详情</h2></div><button class="btn" type="button" id="itemReviewClose" aria-label="关闭条目详情">关闭</button></header><div class="form-body"><p id="itemReviewText" class="detail-title"></p><input type="hidden" name="attachmentIds"><section class="detail-section"><h3>检查记录</h3><label>检查备注<textarea name="notes" maxlength="4000" placeholder="记录验证过程和结果"></textarea></label></section><details class="detail-section" id="itemEvidenceSection"><summary>证据与附件 <span id="itemEvidenceCount"></span></summary><label>验证证据（路径或链接）<textarea name="evidence" maxlength="4000"></textarea></label><label>证据有效至<input name="evidenceExpiresAt" type="date"></label><div id="itemAttachments"></div><label id="itemAttachmentPicker">添加截图或文件<input id="itemAttachmentUpload" type="file" multiple></label><p class="form-hint">附件与本次详情一起保存。单文件最多 5 MiB。</p></details><section class="detail-section"><h3>例外与复查</h3><label>跳过原因<textarea name="reason" maxlength="4000"></textarea></label><details class="exception-fields"><summary>跳过分类、负责人和复查记录</summary><label>跳过类型<select name="exceptionType"><option value="legacy">普通跳过（兼容原记录）</option><option value="not-applicable">不适用</option><option value="deferred">暂缓处理</option><option value="risk-accepted">风险接受</option></select></label><label>负责人<input name="exceptionOwner" maxlength="200"></label><label>复查期限<input name="reviewDue" type="date"></label><label>复查状态<select name="reviewStatus"><option value="pending">待复查</option><option value="reviewed">已复查</option></select></label><label>复查日期<input name="reviewedAt" type="date"></label><p>审批记录由你手动登记，用于追溯；风险接受需填写已批准状态、批准人和日期。</p><label>审批状态<select name="approvalStatus"><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已拒绝</option></select></label><label>批准人<input name="approvalBy" maxlength="200"></label><label>批准日期<input name="approvalDate" type="date"></label></details></section><details class="detail-section"><summary>检查要求</summary><label class="inline-check"><input name="required" type="checkbox" checked>发布必需项</label><label class="inline-check"><input name="evidenceRequired" type="checkbox">完成时必须提供证据</label></details></div><footer class="form-footer"><p id="itemReviewError" role="alert"></p><button type="button" class="btn" id="itemReviewCancel">取消</button><button type="submit" class="btn primary">保存详情</button></footer></form></dialog>
 <dialog id="subscriptionDialog" aria-labelledby="subscriptionTitle">
 <form id="subscriptionForm">
 <div class="subscription-head"><div><h2 id="subscriptionTitle">订阅商品</h2><p>按商品记录周期、价格、试用和优惠；支持同一周期的多个档位。保存于当前项目，不会自动修改商店后台。</p></div><button class="btn" type="button" id="subscriptionClose" aria-label="关闭订阅商品">关闭</button></div>
-<div class="subscription-actions"><button class="btn" type="button" data-add-subscription="week">＋ 周订阅</button><button class="btn" type="button" data-add-subscription="month">＋ 月订阅</button><button class="btn" type="button" data-add-subscription="year">＋ 年订阅</button><button class="btn" type="button" data-add-subscription="custom">＋ 自定义周期</button></div>
-<div id="subscriptionProducts"></div><p id="subscriptionError" role="alert"></p>
-<div class="subscription-footer"><span id="subscriptionStatus" role="status"></span><button class="btn" type="button" id="subscriptionCancel">取消</button><button class="btn" type="button" id="subscriptionExport">导出商品 JSON</button><button class="btn primary" type="submit" id="subscriptionSave">保存订阅商品</button></div>
+<label class="subscription-enabled"><input type="checkbox" id="subscriptionEnabled"><span><b>此 App 有订阅商品</b><small>启用后配置下方商品；关闭会隐藏订阅检查，保留商品和已有记录。</small></span></label><div id="subscriptionConfiguration"><div class="subscription-actions"><button class="btn" type="button" data-add-subscription="week">＋ 周订阅</button><button class="btn" type="button" data-add-subscription="month">＋ 月订阅</button><button class="btn" type="button" data-add-subscription="year">＋ 年订阅</button><button class="btn" type="button" data-add-subscription="custom">＋ 自定义周期</button></div>
+<div id="subscriptionProducts"></div></div><p id="subscriptionError" role="alert"></p>
+<div class="subscription-footer"><span id="subscriptionStatus" role="status"></span><button class="btn" type="button" id="subscriptionCancel">取消</button><button class="btn" type="button" id="subscriptionExport">导出商品 JSON</button><button class="btn primary" type="submit" id="subscriptionSave">保存订阅设置与商品</button></div>
 </form></dialog>
 <dialog id="newReleaseDialog" style="max-width:460px;width:calc(100% - 32px);border:1px solid #dce2df;border-radius:14px;padding:24px">
 <form id="newReleaseForm"><h2>开始新一轮发布</h2><p>先归档当前发布，再清空检查进度。权限选择、项目功能设置和阅读确认保留。</p><label>新版本号<input name="version" required maxlength="80" style="display:block;width:100%;margin:8px 0 16px;padding:10px"></label><label>构建号<input name="build" maxlength="80" style="display:block;width:100%;margin:8px 0 16px;padding:10px"></label><p><label><input name="keepNotes" type="checkbox" checked> 保留检查备注和跳过原因</label></p><p><label><input name="keepEvidence" type="checkbox"> 保留证据路径和链接</label></p><p id="newReleaseError" role="alert"></p><button class="btn" type="button" id="cancelNewRelease">取消</button><button class="btn primary" type="submit">归档并开始</button></form></dialog>

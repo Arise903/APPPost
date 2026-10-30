@@ -1,9 +1,9 @@
-async function persistReview(next){
+async function persistReview(next,extra={}){
   try{
     const previousPlatform=reviewData.release?.platform;
-    const d = await api("/api/review", {revision:baseRevision, review:next});
+    const d = await api("/api/review", {revision:baseRevision, review:next,...extra});
     baseRevision = d.revision;
-    reviewData = d.review;
+    reviewData = d.review;DATA.assetIds=d.assetIds||DATA.assetIds;
     updateSummaryReleaseOptions();
     if(previousPlatform!==reviewData.release?.platform)build();else document.querySelectorAll('li.item').forEach(row=>updateItemSummary(row,reviewData.items?.[row.dataset.id]));refreshAll();saveState();
     toast("检查记录已保存");

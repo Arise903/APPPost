@@ -12,7 +12,7 @@ const search=node('input');search.type='search';search.placeholder='搜索修改
 const hint=node('p','保留最近 100 次修改记录、10 份完整快照；发布归档长期保留。更早的操作可能只有快照，没有逐项修改记录。','history-hint');
 const body=node('div',undefined,'history-list');body.id='historyList';const error=node('p',undefined,'history-error');error.setAttribute('role','alert');dialog.append(heading,meta,toolbar,hint,error,body);document.body.append(dialog);
 let projectId=null;
-function pending(){return (window.ReleaseExperience?.pending?.()||false)||(typeof subscriptionDialog!=='undefined'&&subscriptionDialog.open&&JSON.stringify(subscriptionRead())!==subscriptionBaseline);}
+function pending(){return (window.ReleaseExperience?.pending?.()||false)||(typeof subscriptionDialog!=='undefined'&&subscriptionHasChanges());}
 function preview(snapshot){
  const container=node('div',undefined,'history-preview');
  const project=snapshot.document?snapshot:null,parsed=project?S.payload({...project,version:1,generation:1,permissions:project.permissions||{selected:[],descs:{},descsEn:{}},review:project.review||{release:{},items:{},history:[]}}):null;
@@ -46,11 +46,11 @@ function render(){
  }
  if(!shown.length)body.append(node('p','暂无匹配的记录。完成一次保存后，这里会显示修改内容和时间。','history-empty'));
 }
-function open(id){try{projectId=id;filter.value='all';search.value='';render();dialog.showModal();}catch(e){alert(e.message);}}
+function open(id){try{projectId=id;filter.value='all';search.value='';render();window.BoardForms?.prepare(dialog);dialog.showModal();}catch(e){alert(e.message);}}
 filter.onchange=render;search.oninput=render;
 window.ReleaseHistory={open};
 if(window.RELEASE_PAGES){
- const history=node('button','历史记录','btn');history.id='btnHistory';history.type='button';history.onclick=()=>open(S.projectId());document.getElementById('btnSave').before(history);
+ const history=node('button','历史记录','btn');history.id='btnHistory';history.type='button';history.onclick=()=>open(S.projectId());(document.getElementById('historyMenuActions')||document.getElementById('btnSave').parentElement).append(history);
  const recovery=document.getElementById('backupRestore');recovery.textContent='备份与恢复';recovery.onclick=()=>{open(S.projectId());filter.value='snapshot';render();};
  const status=node('div',undefined,'history-last-modified');status.id='projectModifiedAt';document.getElementById('saveStatus').after(status);
  const update=()=>{try{status.textContent='最近修改：'+date(S.get(S.projectId()).updatedAt)+' · 历史记录可查看修改内容、版本和快照';}catch(_){}};update();window.addEventListener('projectchanged',update);window.addEventListener('storage',update);

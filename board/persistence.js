@@ -17,7 +17,7 @@ async function apiRequest(path, body){
     body: JSON.stringify(Object.assign({revision:baseRevision}, body))
   };
   const r = await boardFetch(path, opt);
-  if(!r.ok){ const err = await r.json().catch(() => ({})); throw new Error(err.error || (path + " -> HTTP " + r.status)); }
+  if(!r.ok){ const err = await r.json().catch(() => ({})); throw Object.assign(new Error(err.error || (path + " -> HTTP " + r.status)),{status:r.status}); }
   const data = await r.json();
   if(body !== undefined && data.revision){ baseRevision = data.revision; saveState(); }
   if(writing){lastSavedAt=Date.now();if(typeof clearFailedWrite==='function')clearFailedWrite(path);}

@@ -101,6 +101,25 @@ def _make_id(path_parts, text, counter) -> str:
     return "t_%08x" % digest
 
 
+def load_checklist_modules():
+    return json.loads((HERE / 'checklist_modules.json').read_text(encoding='utf-8'))
+
+
+def configure_document_features(text, features):
+    current = parse_md(text)['features']
+    current.update(features)
+    current['hasInitialization'] = current['hasAdjust'] or current['hasAnalysisApi']
+    for module in load_checklist_modules():
+        if current.get(module['feature']) and not any(('task:' + task_id) in text for task_id in [module['legacyTaskId'], *[item[0] for item in module['items']]]):
+            text = text.rstrip() + '\n\n## ' + module['title'] + ' <!-- section:module_' + module['id'] + ' -->\n'
+            text += '\n'.join('- [ ] ' + title + ' <!-- if:' + module['feature'] + ' --> <!-- task:' + task_id + ' -->' for task_id, title in module['items']) + '\n'
+    keys = ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush', 'hasAdjust', 'hasAnalysisApi')
+    if any(type(current.get(k)) is not bool for k in keys):
+        raise ValueError('项目特征无效')
+    line = '<!-- FEATURES ' + ' '.join(k + '=' + str(int(current[k])) for k in keys) + ' -->'
+    return RE_FEATURES.sub(line, text) if RE_FEATURES.search(text) else line + '\n' + text
+
+
 def parse_md(text: str) -> dict:
     """解析清单 markdown。
 
@@ -121,10 +140,13 @@ def parse_md(text: str) -> dict:
 
     # 项目特征（决定哪些条目显示）
     features = {"hasAccountSystem": True, "targetMinors": True, "hasFeedbackSystem": False, "hasSubscriptions": True, "hasPush": False}
+    features.update({module['feature']: any(('task:' + task_id) in text for task_id in [module['legacyTaskId'], *[item[0] for item in module['items']]]) for module in load_checklist_modules()})
     fm = RE_FEATURES.search(text)
     if fm:
         for k, v in RE_FEATURE_KV.findall(fm.group(1)):
             features[k] = (v == "1")
+
+    features['hasInitialization'] = features['hasAdjust'] or features['hasAnalysisApi']
 
     in_fence = False
     fence_lang = ""
@@ -639,31 +661,48 @@ def write_appendix(md_path: Path, selected: list, descs: dict, descs_en: dict = 
     return appendix
 
 
+def recover_subscription_settings(md_path):
+    from storage_utils import review_path
+    journal = md_path.with_name('.' + md_path.stem + '.subscription-txn.json')
+    if not journal.exists():
+        return
+    value = json.loads(journal.read_text(encoding='utf-8'))
+    atomic_write(md_path, value['document'])
+    review = review_path(md_path)
+    if value['review'] is None:
+        review.unlink(missing_ok=True)
+    else:
+        atomic_write(review, value['review'])
+    journal.unlink()
+
+
+def save_subscription_settings(md_path, enabled, products):
+    from storage_utils import review_path
+    if type(enabled) is not bool or not isinstance(products, list) or len(products) > 100 or any(not isinstance(p, dict) or any(not isinstance(v, str) or len(v) > 4000 for v in p.values()) for p in products):
+        raise ValueError('订阅设置无效')
+    recover_subscription_settings(md_path)
+    review = review_path(md_path)
+    journal = md_path.with_name('.' + md_path.stem + '.subscription-txn.json')
+    atomic_write(journal, json.dumps({'document': md_path.read_text(encoding='utf-8'), 'review': review.read_text(encoding='utf-8') if review.exists() else None}, ensure_ascii=False))
+    try:
+        features = parse_md(md_path.read_text(encoding='utf-8'))['features']
+        features['hasSubscriptions'] = enabled
+        next_review = load_review(md_path)
+        next_review['subscriptions'] = products
+        write_features(md_path, features)
+        save_review(md_path, next_review)
+        journal.unlink()
+    except Exception:
+        recover_subscription_settings(md_path)
+        raise
+
+
 def write_features(md_path: Path, features: dict) -> bool:
     """把项目特征写回 md 的 FEATURES 注释行。返回是否发生变更。"""
     text = md_path.read_text(encoding="utf-8")
-    parts = []
-    for k in ("hasAccountSystem", "targetMinors", "hasFeedbackSystem", "hasSubscriptions", "hasPush"):
-        parts.append(f"{k}={1 if features.get(k, k == 'hasSubscriptions') else 0}")
-    line = "<!-- FEATURES " + " ".join(parts) + " -->"
-
-    m = RE_FEATURES.search(text)
-    if m:
-        if m.group(0).strip() == line:
-            return False
-        new_text = text[: m.start()] + line + text[m.end():]
-    else:
-        # 插到一级标题之后
-        lines = text.split("\n")
-        ins = 1
-        for i, l in enumerate(lines):
-            if l.startswith("# "):
-                ins = i + 1
-                break
-        lines.insert(ins, "")
-        lines.insert(ins + 1, line)
-        new_text = "\n".join(lines)
-    backup_md(md_path)
+    new_text = configure_document_features(text, features)
+    if new_text == text:
+        return False
     atomic_write(md_path, new_text, encoding="utf-8")
     return True
 
@@ -1693,7 +1732,7 @@ def load_board_js():
         if path.parent not in (HERE, HERE / "board") or path.suffix != ".js":
             raise ValueError("Invalid board module: " + match.group(1))
         return path.read_text(encoding="utf-8")
-    return re.sub(r"^// @include ([A-Za-z_./-]+)$", include, source, flags=re.M)
+    return re.sub(r"^// @include ([A-Za-z_./-]+)$", include, source, flags=re.M).replace("__OPTIONAL_MODULES__", json.dumps(load_checklist_modules(), ensure_ascii=False).replace("</", "<\\/"))
 
 
 def build_html(md_path: Path, out_path: Path) -> Path:
@@ -1731,6 +1770,7 @@ class BoardServer(ThreadingHTTPServer):
 
 
 def _board_payload(md_path: Path) -> dict:
+    recover_subscription_settings(md_path)
     return document_payload(
         md_path.read_text(encoding="utf-8"), md_path.name, read_generation(),
         read_perm_state(md_path), load_review(md_path), revision(md_path),
@@ -2028,6 +2068,18 @@ def make_handler():
                         self._json({"error": str(e)}, 500)
                 return
 
+            if path == "/api/subscriptions":
+                with lock:
+                    try:
+                        md_path = self.server.md_path
+                        if payload.get('revision') != revision(md_path):
+                            self._json({'error': '文件已变化，请刷新后重试'}, 409)
+                            return
+                        save_subscription_settings(md_path, payload.get('enabled'), payload.get('products'))
+                        self._json(_board_payload(md_path))
+                    except Exception as error:
+                        self._json({'error': str(error)}, 400)
+                return
             if path == "/api/features":
                 # 保存项目特征（决定哪些条目显示）
                 with lock:

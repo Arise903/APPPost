@@ -23,6 +23,40 @@ class OnlineTests(unittest.TestCase):
         self.project = self.client.post('/api/projects', json={'name':'Test App'}, headers=self.headers).json['id']
         self.prefix = '/api/projects/'+self.project
 
+    def test_subscription_settings_save_atomically_and_preserve_disabled_values(self):
+        products = [{'id': 'month', 'name': '月订阅', 'trialEnabled': 'off', 'trialCount': '7', 'offerEnabled': 'off', 'offerPrice': '6'}]
+        original = self.payload()
+        saved = self.post('subscriptions', {'revision': original['revision'], 'enabled': False, 'products': products})
+        self.assertEqual(saved.status_code, 200)
+        self.assertFalse(saved.json['features']['hasSubscriptions'])
+        self.assertEqual(saved.json['review']['subscriptions'], products)
+        revision = saved.json['revision']
+        bad = self.post('subscriptions', {'revision': revision, 'enabled': True, 'products': [{'price': 12}]})
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(self.payload()['revision'], revision)
+        self.assertFalse(self.payload()['features']['hasSubscriptions'])
+        stale = self.post('subscriptions', {'revision': original['revision'], 'enabled': True, 'products': []})
+        self.assertEqual(stale.status_code, 409)
+        restored = self.post('subscriptions', {'revision': revision, 'enabled': True, 'products': products})
+        self.assertTrue(restored.json['features']['hasSubscriptions'])
+        self.assertEqual(restored.json['review']['subscriptions'], products)
+
+    def test_optional_sdk_modules_on_custom_document(self):
+        created = self.client.post('/api/projects', json={'name': 'Custom', 'document': '# App\n## Checks\n- [ ] One\n'}, headers=self.headers)
+        self.prefix = '/api/projects/' + created.json['id']
+        original = self.payload()
+        features = {**original['features'], 'hasAdjust': True, 'hasAnalysisApi': True}
+        enabled = self.post('features', {'revision': original['revision'], 'features': features})
+        self.assertEqual(enabled.status_code, 200)
+        self.assertEqual(len(enabled.json['items']), 13)
+        disabled = self.post('features', {'revision': enabled.json['revision'], 'features': {**features, 'hasAdjust': False}})
+        self.assertEqual(disabled.json['total'], 9)
+        back = self.post('features', {'revision': disabled.json['revision'], 'features': features})
+        self.assertEqual(len(back.json['items']), 13)
+        invalid = self.post('features', {'revision': back.json['revision'], 'features': {**features, 'hasAdjust': 'on'}})
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(self.payload()['revision'], back.json['revision'])
+
     def login(self, client):
         response = client.post('/api/auth/login',json={'email':self.email,'password':self.password})
         self.assertEqual(response.status_code,200)

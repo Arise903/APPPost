@@ -21,3 +21,5 @@ online/**/__pycache__/
 !release_policy.py
 
 !release_analysis.js
+
+!checklist_modules.json

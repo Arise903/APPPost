@@ -260,3 +260,27 @@ test('Calendar boundaries use the same project timezone in browser and server po
 test('Release timezone is validated and retained through project backup',async()=>{
  const {S}=setup();await assert.rejects(S.create({name:'Invalid timezone',review:{release:{timeZone:'Invalid/Timezone'},items:{},history:[]}}),/发布时区无效/);const id=await S.create({name:'Timezone',review:{release:{timeZone:'America/Los_Angeles'},items:{},history:[]}});const imported=await S.create({...S.export(id),name:'Timezone imported'});assert.equal(S.get(imported).review.release.timeZone,'America/Los_Angeles');
 });
+
+test('Optional Adjust and AnalysisApi modules work in every template without duplicate tasks or lost progress',async()=>{
+ const {S,context}=setup();
+ for(const template of S.listTemplates()){
+  const features={...template.features,hasAdjust:true,hasAnalysisApi:true};
+  const id=await S.create({name:template.name,document:template.document,features});
+  let d=S.payload(S.get(id));const moduleIds=d.items.filter(i=>i.cond==='hasAdjust'||i.cond==='hasAnalysisApi').map(i=>i.id);assert.equal(moduleIds.length,9);
+  const task=moduleIds[0];await S.mutate(id,1,'done',p=>{p.document=S.apply(p.document,{[task]:'done'});p.review.items[task]={notes:'保留'};});
+  await S.mutate(id,2,'off',p=>p.document=S.configureDocument(p.document,{...features,hasAdjust:false,hasAnalysisApi:false}));
+  d=S.payload(S.get(id));assert.equal(d.features.hasAdjust,false);assert.equal(d.total,template.document.match(/^- \[ /gm).length);
+  await S.mutate(id,3,'on',p=>p.document=S.configureDocument(p.document,features));d=S.payload(S.get(id));assert.equal(d.items.filter(i=>moduleIds.includes(i.id)).length,9);assert.equal(d.items.find(i=>i.id===task).state,'done');assert.equal(d.review.items[task].notes,'保留');
+  const python=execFileSync(process.env.PYTHON||'python3',['-c',"import checklist_tool as c,sys,json;print(c.configure_document_features(sys.argv[1],json.loads(sys.argv[2])),end='')",template.document,JSON.stringify(features)],{encoding:'utf8'});assert.equal(python,S.configureDocument(template.document,features));
+ }
+ const full=fs.readFileSync('online/default_checklist.md','utf8');const configured=S.configureDocument(full,{...S.parse(full).features,hasAdjust:true,hasAnalysisApi:true});assert.equal(S.parse(configured).items.length,S.parse(full).items.length);assert.equal(configured.includes('module_adjust_tokens'),false);
+});
+
+test('Initialization chapter uses OR for Adjust and AnalysisApi in original and generic templates',()=>{
+ const {S}=setup(),original=fs.readFileSync('online/default_checklist.md','utf8');
+ for(const source of [original,'# App\n## Tasks\n- [ ] One\n'])for(const [hasAdjust,hasAnalysisApi] of [[false,false],[true,false],[false,true],[true,true]]){
+  const text=S.configureDocument(source,{hasAdjust,hasAnalysisApi}),d=S.payload({name:'test',document:text,permissions:{selected:[],descs:{},descsEn:{}},review:{release:{},items:{},history:[]}}),items=d.items.filter(i=>i.cond==='hasInitialization');
+  assert.ok(items.length>0||!hasAdjust&&!hasAnalysisApi);assert.equal(d.features.hasInitialization,hasAdjust||hasAnalysisApi);
+  const visible=items.filter(i=>d.features[i.cond]!==false);assert.equal(visible.length>0,hasAdjust||hasAnalysisApi);
+ }
+});

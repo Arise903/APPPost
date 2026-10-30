@@ -1,5 +1,7 @@
 // @include release_analysis.js
 // @include release_readiness.js
+// @include board/modules.js
+// @include board/details.js
 // @include board/experience.js
 // Cloud instances scope every request, draft and guide to its project.
 function boardFetch(path, options){
@@ -14,18 +16,20 @@ function boardFetch(path, options){
 /* ------------------------------------------------------------------ *
  * 状态
  * ------------------------------------------------------------------ */
+let saveConflict=false;
 let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=EMBEDDED.updatedAt||null;
-function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
+function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush','hasAdjust','hasAnalysisApi'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
  const permissionPending=typeof permDirty!=="undefined"&&permDirty;
  const extraPending=boardPendingDetails();
  const pending=extraPending.length>0||(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
- let label=saveFailure?"保存失败 · "+saveFailure:localDraftFailure?localDraftFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleString():"尚无待保存修改";
+ let label=saveConflict?"其他标签页已更新 · 请查看冲突差异":saveFailure?"保存失败 · "+saveFailure:localDraftFailure?localDraftFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleString():"尚无待保存修改";
  if(pending&&extraPending.length)label+=' · '+extraPending.join('、');
- el.textContent=label;el.dataset.state=saveFailure||localDraftFailure?'error':savingOperations?'saving':pending?'pending':'saved';
+ el.textContent=label;el.dataset.state=saveConflict||saveFailure||localDraftFailure?'error':savingOperations?'saving':pending?'pending':'saved';
  const mobile=document.getElementById("mobileStatus");if(mobile)mobile.textContent=label;
  const save=document.getElementById("mobileSave");if(save)save.disabled=savingOperations>0||!online;
+ window.BoardRecovery?.refresh();
 }
 let baseRevision = EMBEDDED.revision;
 let serverBaseline = {};
@@ -178,13 +182,13 @@ function updateItemSummary(row, details){
   const text = [details?.reason, details?.notes, details?.evidence]
     .filter(value => typeof value === "string" && value.trim()).join(" · ");
   let summary = row.querySelector(".item-evidence-summary");
-  if(!text){ summary?.remove(); return; }
+  if(!text){ summary?.remove();row.classList.remove("has-records"); return; }
   if(!summary){
     summary = document.createElement("small");
     summary.className = "item-evidence-summary";
     row.appendChild(summary);
   }
-  summary.textContent = text;
+  row.classList.add("has-records");summary.textContent = text;summary.title=text;
 }
 
 function makeItem(b){
@@ -203,19 +207,19 @@ function makeItem(b){
   seq.title = b.seq != null ? ("第 " + b.seq + " 项，共 " + ORDER.length + " 项") : "";
   if(!b.gate) li.appendChild(seq);
 
-  const lab = document.createElement("label");
+  const lab = document.createElement("div");lab.className="item-main";
   const cb = document.createElement("input");
   cb.type = "checkbox";
-  cb.checked = st(b.id) === "done";
+  cb.checked = st(b.id) === "done";cb.setAttribute("aria-label","完成："+b.text);
   lab.appendChild(cb);
   const sp = document.createElement("span");
   sp.className = "txt";
   sp.innerHTML = inline(b.text);
-  lab.appendChild(sp);
+  const title=document.createElement("button");title.type="button";title.className="item-title";title.setAttribute("aria-label","查看详情："+b.text);title.append(sp);title.onclick=()=>openItemReview(b);lab.appendChild(title);
   li.appendChild(lab);
 
   const actions = document.createElement("div");
-  actions.className = "item-actions";
+  actions.className = "item-actions";const status=document.createElement("span");status.className="item-status";actions.append(status);
   li.appendChild(actions);
 
   // 锁定提示
@@ -234,7 +238,7 @@ function makeItem(b){
   const note = document.createElement("button");
   note.className = "btn";
   note.type = "button";
-  note.textContent = "备注 / 证据";
+  note.textContent = "详情";note.classList.add("item-detail");note.setAttribute("aria-label","详情 · 备注 / 证据");
   note.onclick = () => openItemReview(b);
   actions.appendChild(note);
   updateItemSummary(li, reviewData.items?.[b.id]);
@@ -421,6 +425,7 @@ function build(){
 
   // 按 DOM 顺序建立全局执行顺序
   ORDER = [...document.querySelectorAll("li.item")].map(li => li.dataset.id);
+  window.BoardWorkspace?.afterBuild();
 }
 
 /* --------------------------------------------------------------
@@ -437,6 +442,7 @@ function condOk(cond){
 }
 function applyFeatures(){
   if(!DATA) return;
+  ensureFeatureModules();
   PermissionVisibility.annotate(DATA.sections, PERMISSION_RULES);
   let n = 0;
   const walk = blocks => {
@@ -503,7 +509,7 @@ function hiddenItems(){
 }
 
 function featureHiddenItems(){
-  const keys = ["hasAccountSystem", "hasFeedbackSystem", "targetMinors", "hasSubscriptions", "hasPush"];
+  const keys = ["hasAccountSystem", "hasFeedbackSystem", "targetMinors", "hasSubscriptions", "hasPush", "hasAdjust", "hasAnalysisApi"];
   return hiddenItems().filter(it => keys.includes(it.cond) && !condOk(it.cond));
 }
 
@@ -582,6 +588,7 @@ function applyFilter(){
   if(query)activeLabels.push("搜索："+query);
   fn.textContent=activeLabels.length?activeLabels.join(" · ")+"（说明性内容始终保留）":"";
   fn.classList.toggle("hidden", activeLabels.length===0);
+  window.BoardWorkspace?.filterRows();
 }
 function refreshSectionFilter(){
   const select = document.getElementById("sectionFilter");
@@ -667,6 +674,7 @@ function jumpToCurrent(){
     return s !== "done" && s !== "skip" && l.dataset.locked === "0";
   });
   if(!target) return;
+  window.BoardWorkspace?.reveal(target);
   target.scrollIntoView({block:"center", behavior:"smooth"});
   target.animate(
     [{background:"#DCEAF9"},{background:"transparent"}],
@@ -748,7 +756,8 @@ async function loadFromServer(){
       // 从未确认过 → 清掉可能残留的本机记录
       try{ localStorage.removeItem(GUIDE_KEY); }catch(e){}
     }
-    setMode(true);
+    saveConflict=false;setMode(true);
+    window.BoardWorkspace?.loaded();
     build();
     render();
     return true;
@@ -1155,6 +1164,8 @@ loadFromServer().then(ok => {
 });
 
 // @include board/subscriptions.js
+
+// @include board/workspace.js
 
 // @include board/recovery.js
 

@@ -27,3 +27,5 @@ release-desk-source.zip
 artifacts/
 
 node_modules/
+
+*.subscription-txn.json

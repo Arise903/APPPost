@@ -17,7 +17,9 @@ function parse(text){
 function parseDocument(text){
  const lines=text.split('\n'), result={title:'Checklist',preamble:[],sections:[],items:[],features:{hasAccountSystem:true,targetMinors:true,hasFeedbackSystem:false,hasSubscriptions:true,hasPush:false}};
  let section=null,path=[],fence=null,pending=[];const counts={};const blocks=()=>section?section.blocks:result.preamble;
+ for(const module of PAGES_DATA.modules||[])result.features[module.feature]=[module.legacyTaskId,...module.items.map(item=>item[0])].some(id=>text.includes('task:'+id));
  const features=text.match(/<!--\s*FEATURES\s+([\s\S]*?)-->/);if(features)for(const kv of features[1].matchAll(/([A-Za-z0-9_]+)\s*=\s*([01])/g))result.features[kv[1]]=kv[2]==='1';
+ result.features.hasInitialization=result.features.hasAdjust||result.features.hasAnalysisApi;
  for(let i=0;i<lines.length;i++){
   const raw=lines[i],s=raw.trim();let m;
   if(/^\s*```/.test(raw)){if(fence){blocks().push(fence);fence=null;}else fence={type:'code',lang:s.slice(3).trim(),lines:[]};continue;}
@@ -52,14 +54,14 @@ function payload(project){const parsed=parse(project.document);global.Permission
  return {...parsed,mdName:project.name+'.md',mdText:project.document,generation:project.generation,revision:String(project.version),review:copy(project.review),assetIds:Object.keys(project.assets||{}),createdAt:project.createdAt,updatedAt:project.updatedAt,activity:copy(project.activity||[]),permSelected:copy(project.permissions.selected),permDescs:copy(project.permissions.descs),permDescsEn:copy(project.permissions.descsEn),gateId:gate?.id||null,gateDone:!gate||gate.state==='done',gateState:gate?.state||'done',total:items.length,done:items.filter(x=>x.state==='done').length,skipped:items.filter(x=>x.state==='skip').length,built:'Pages 个人版'};
 }
 function get(id){const project=validId(id)?repository.readProject(id):null;if(!project)throw Error('项目不存在或已删除，请返回工作台。');return project;}
-function state(project){const value=copy(project);delete value.snapshots;delete value.assets;return value;}
-function validateAssets(assets){
+function state(project){const {assets,snapshots,...value}=project;return copy(value);}
+function validateAssets(assets,trusted={}){
 if(!assets||Array.isArray(assets)||typeof assets!=='object'||Object.keys(assets).length>100)throw Error('附件数据格式无效，最多 100 个附件');let assetBytes=0;
- for(const [id,asset] of Object.entries(assets)){if(!validId(id)||!asset||typeof asset.data!=='string'||asset.data.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(asset.data)||!/^[a-f0-9]{64}$/.test(asset.sha256||'')||typeof asset.size!=='number'||asset.size<0||asset.size>5*1024*1024||Math.floor(asset.data.length*3/4)-(asset.data.endsWith('==')?2:asset.data.endsWith('=')?1:0)!==asset.size)throw Error('附件格式或大小无效');assetBytes+=asset.size;}
+ for(const [id,asset] of Object.entries(assets)){const old=trusted[id];if(old&&asset&&old.data===asset.data&&old.size===asset.size&&old.sha256===asset.sha256){assetBytes+=asset.size;continue;}if(!validId(id)||!asset||typeof asset.data!=='string'||asset.data.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(asset.data)||!/^[a-f0-9]{64}$/.test(asset.sha256||'')||typeof asset.size!=='number'||asset.size<0||asset.size>5*1024*1024||Math.floor(asset.data.length*3/4)-(asset.data.endsWith('==')?2:asset.data.endsWith('=')?1:0)!==asset.size)throw Error('附件格式或大小无效');assetBytes+=asset.size;}
  if(assetBytes>20*1024*1024)throw Error('每个项目附件总量最多 20 MiB');
 }
 function mergeAssets(...groups){const merged=groups.reduce((result,group)=>({...result,...(group||{})}),{});try{validateAssets(merged);}catch(error){throw Error('合并附件失败：'+error.message+'。同步未写入，请先导出备份并清理无引用附件。');}return merged;}
-function validate(input){
+function validate(input,options={}){
  if(!input||typeof input!=='object'||typeof input.document!=='string'||input.document.length>800000||!parse(input.document).items.length)throw Error('清单无效，至少需要一个 Markdown 检查项，且小于 800 KB。');
  if(input.activity!==undefined&&(!Array.isArray(input.activity)||input.activity.length>100||input.activity.some(a=>!a||typeof a.id!=='string'||!Number.isFinite(a.date)||typeof a.label!=='string'||a.label.length>500||!Array.isArray(a.changes)||a.changes.length>31||a.changes.some(c=>typeof c!=='string'||c.length>4000))))throw Error('修改历史格式无效');
  const parsed=parse(input.document);if(new Set(parsed.items.map(x=>x.id)).size!==parsed.items.length)throw Error('检查项 ID 重复，请修正文件后再导入');
@@ -72,11 +74,11 @@ function validate(input){
  if(review.preflight!==undefined&&review.preflight!==null){const report=review.preflight;if(typeof report!=='object'||!Array.isArray(report.findings)||!Array.isArray(report.files)||typeof report.basis!=='string'||!Number.isSafeInteger(report.errors)||report.errors<0||report.errors!==report.findings.filter(f=>f.severity==='error').length)throw Error('配置预检报告格式无效');}
  if(review.subscriptions!==undefined&&(!Array.isArray(review.subscriptions)||review.subscriptions.length>100||review.subscriptions.some(p=>!p||typeof p!=='object'||Array.isArray(p)||Object.values(p).some(v=>typeof v!=='string'||v.length>4000))))throw Error('订阅商品配置无效，最多 100 个商品，字段须为文本');
  for(const item of Object.values(review.items)){if(!item||typeof item!=='object'||Object.values(item).some(v=>typeof v!=='string'))throw Error('备注字段必须为文本');for(const key of ['reviewDue','approvalDate','reviewedAt','evidenceExpiresAt'])if(item[key]&&!/^\d{4}-\d{2}-\d{2}$/.test(item[key]))throw Error('日期应为 YYYY-MM-DD');}
- const assets=input.assets||{};validateAssets(assets);
+ const assets=input.assets||{};validateAssets(assets,options.trustedAssets);
  if(review.evidenceFiles!==undefined&&(!review.evidenceFiles||Array.isArray(review.evidenceFiles)||typeof review.evidenceFiles!=='object'||Object.entries(review.evidenceFiles).some(([id,f])=>!validId(id)||!f||!validId(f.assetId)||typeof f.name!=='string'||f.name.length>200||!Array.isArray(f.taskIds)||f.taskIds.some(id=>!validId(id)))))throw Error('证据附件关联格式无效');
- return {permissions:copy(permissions),review:copy(review),assets:copy(assets)};
+ return {permissions:copy(permissions),review:copy(review),assets:options.copyAssets===false?assets:copy(assets)};
 }
-function configureDocument(document,features){if(!features)return document;const allowed=['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush'];if(allowed.some(k=>typeof features[k]!=='boolean'))throw Error('项目特征无效');const line='<!-- FEATURES '+allowed.map(k=>k+'='+(features[k]?1:0)).join(' ')+' -->';return /<!--\s*FEATURES\s+[\s\S]*?-->/.test(document)?document.replace(/<!--\s*FEATURES\s+[\s\S]*?-->/,line):line+'\n'+document;}
+function configureDocument(document,features){if(!features)return document;const allowed=['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush','hasAdjust','hasAnalysisApi'];features={...parse(document).features,...features};features.hasInitialization=features.hasAdjust||features.hasAnalysisApi;if(allowed.some(k=>typeof features[k]!=='boolean'))throw Error('项目特征无效');for(const module of PAGES_DATA.modules||[])if(features[module.feature]&&![module.legacyTaskId,...module.items.map(item=>item[0])].some(id=>document.includes('task:'+id)))document=document.trimEnd()+'\n\n## '+module.title+' <!-- section:module_'+module.id+' -->\n'+module.items.map(([id,text])=>'- [ ] '+text+' <!-- if:'+module.feature+' --> <!-- task:'+id+' -->').join('\n')+'\n';const line='<!-- FEATURES '+allowed.map(k=>k+'='+(features[k]?1:0)).join(' ')+' -->';return /<!--\s*FEATURES\s+[\s\S]*?-->/.test(document)?document.replace(/<!--\s*FEATURES\s+[\s\S]*?-->/,line):line+'\n'+document;}
 function snapshot(project){const d=payload(project);return {release:copy(project.review.release),subscriptions:copy(project.review.subscriptions||[]),features:copy(d.features),permissions:copy(project.permissions),selectedPermissions:copy(project.permissions.selected),evidenceFiles:copy(project.review.evidenceFiles||{}),assetIds:Object.keys(project.assets||{}),preflight:copy(project.review.preflight||null),items:d.items.map(i=>({...d.review.items[i.id],...i,applicable:!i.gate&&d.features[i.cond]!==false&&global.PermissionVisibility.visible(i.permissionRule,project.permissions.selected,PAGES_DATA.profiles)&&global.PermissionVisibility.platformVisible(i,project.review.release.platform)}))};}
 function readiness(project,now){return global.ReleaseReadiness.assess(snapshot(project),now);}
 function templateDiff(project){const old=parse(project.document),latest=parse(PAGES_DATA.document),previous=new Map(old.items.map(i=>[i.id,i]));return {added:latest.items.filter(i=>!previous.has(i.id)),changed:latest.items.filter(i=>previous.has(i.id)&&i.text!==(project.templateBaseline?.[i.id]||previous.get(i.id).text)),removed:old.items.filter(i=>!latest.items.some(n=>n.id===i.id))};}
@@ -86,7 +88,7 @@ function describeChanges(before,after,label){
  const status={todo:'待检查',done:'已完成',skip:'已跳过'};
  for(const item of parse(after.document).items){const old=oldItems.get(item.id);if(old&&old.state!==item.state)changes.push(item.text+'：'+status[old.state]+' → '+status[item.state]);}
  const oldFeatures=parse(before.document).features,nextFeatures=parse(after.document).features;
- const names={hasAccountSystem:'账号系统',hasFeedbackSystem:'反馈系统',hasSubscriptions:'订阅功能',hasPush:'推送功能',targetMinors:'面向未成年用户'};
+ const names={hasAccountSystem:'账号系统',hasFeedbackSystem:'反馈系统',hasSubscriptions:'订阅功能',hasPush:'推送功能',hasAdjust:'Adjust 归因',hasAnalysisApi:'AnalysisApi 自有统计',targetMinors:'面向未成年用户'};
  for(const key of Object.keys(names))if(oldFeatures[key]!==nextFeatures[key])changes.push(names[key]+'：'+(nextFeatures[key]?'开启':'关闭'));
  if(!same(before.permissions,after.permissions))changes.push('修改权限选择或用途说明');
  if(!same(before.review.subscriptions,after.review.subscriptions))changes.push('修改订阅商品配置（'+(after.review.subscriptions||[]).length+' 个商品）');
@@ -97,11 +99,12 @@ function describeChanges(before,after,label){
  if(!changes.length)changes.push(label==='restore'?'恢复历史快照':'更新项目内容');
  return (changes.length>30?[...changes.slice(0,30),'另有 '+(changes.length-30)+' 项变更']:changes).map(text=>text.slice(0,4000));
 }
-async function mutate(id,version,label,action){return transaction(data=>{
+async function mutate(id,version,label,action){return repository.projectTransaction(id,data=>{
  const p=data.projects[id];if(!p)throw Error('项目不存在');if(String(version)!==String(p.version))throw Object.assign(Error('另一个页面已更新项目，请先导出草稿，再刷新核对。'),{status:409});
- const before=state(p),activity=copy(p.activity||[]),snapshots=copy(p.snapshots||[]);p.document=stabilize(p.document);p.dataVersion=2;action(p);validate(p);
+ const priorAssets=Object.fromEntries(Object.entries(p.assets||{}).map(([id,asset])=>[id,{...asset}]));
+ const before=state(p),activity=copy(p.activity||[]),snapshots=copy(p.snapshots||[]);p.document=stabilize(p.document);p.dataVersion=2;action(p);validate(p,{trustedAssets:priorAssets,copyAssets:false});
  if(JSON.stringify(before)===JSON.stringify(state(p)))return payload(p);
- const date=Date.now(),labels={write:'保存检查进度',review:'保存配置 / 备注',features:'修改项目设置','perm-write':'修改权限配置',ack:'确认阅读说明',unack:'取消阅读确认',clear:'清空检查进度','new-release':'开始新一轮发布',restore:'恢复历史快照'};
+ const date=Date.now(),labels={write:'保存检查进度',review:'保存配置 / 备注',subscriptions:'保存订阅设置与商品',features:'修改项目设置','perm-write':'修改权限配置',ack:'确认阅读说明',unack:'取消阅读确认',clear:'清空检查进度','new-release':'开始新一轮发布',restore:'恢复历史快照'};
  p.activity=[{id:crypto.randomUUID(),date,label:labels[label]||label,changes:describeChanges(before,p,label)},...activity].slice(0,100);
  const snapshot=copy(before);delete snapshot.activity;
  p.snapshots=[{id:crypto.randomUUID(),date,label:labels[label]||label,state:snapshot},...snapshots].slice(0,10);p.version++;p.updatedAt=date;return payload(p);
@@ -149,7 +152,7 @@ function initialize(){
    project.snapshots=project.snapshots.slice(0,10);
    project.document=stabilize(project.document);project.dataVersion=2;project.templateVersion=project.templateVersion||'legacy';project.templateBaseline=project.templateBaseline||Object.fromEntries(parse(project.document).items.map(x=>[x.id,x.text]));migrated++;
   }
-  data.storageVersion=2;
+  data.storageVersion=Math.max(data.storageVersion||1,2);
   return {migrated};
  })).catch(error=>{initialization=null;throw error;});return initialization;
 }
@@ -244,10 +247,12 @@ async function handle(path,options={}){
  if(op==='perm-config')return {...config(data),appendix:appendix(data)};
  if(op==='perm-en-preview'||op==='perm-write-en'){const doc=english(data);return {doc,path:'Privacy-and-Permissions-EN.md',lines:doc.split('\n').length};}
  if(op==='backups')return {backups:p.snapshots.map(x=>x.id),entries:p.snapshots.map(x=>({id:x.id,label:x.label,created_at:x.date/1000}))};
+ if(op==='review'&&data.assets)await verifyAssets(data.assets);
  const updated=await mutate(id,data.revision,op,project=>{
   if(op==='write'){const ids=new Set(parse(project.document).items.map(x=>x.id));if(!data.states||Object.keys(data.states).some(x=>!ids.has(x)))throw Error('检查项已变化');project.document=apply(project.document,data.states);}
-  else if(op==='review'){validate({...project,review:data.review});project.review=copy(data.review);}
-  else if(op==='features'){const features={hasFeedbackSystem:false,hasSubscriptions:true,hasPush:false,...data.features};if(!features||['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush'].some(k=>typeof features[k]!=='boolean'))throw Error('项目特征无效');const line='<!-- FEATURES '+Object.entries(features).filter(([k])=>['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush'].includes(k)).map(([k,v])=>k+'='+(v?1:0)).join(' ')+' -->';project.document=/<!--\s*FEATURES\s+[\s\S]*?-->/.test(project.document)?project.document.replace(/<!--\s*FEATURES\s+[\s\S]*?-->/,line):line+'\n'+project.document;}
+  else if(op==='review'){if(data.assets)project.assets=mergeAssets(project.assets,data.assets);project.review=copy(data.review);}
+  else if(op==='subscriptions'){if(typeof data.enabled!=='boolean'||!Array.isArray(data.products))throw Error('订阅设置无效');project.document=configureDocument(project.document,{...parse(project.document).features,hasSubscriptions:data.enabled});project.review.subscriptions=copy(data.products);}
+  else if(op==='features'){project.document=configureDocument(project.document,{hasFeedbackSystem:false,hasSubscriptions:true,hasPush:false,...data.features});}
   else if(op==='ack'||op==='unack'){const gate=payload(project).gateId;if(gate)project.document=apply(project.document,{[gate]:op==='ack'?'done':'skip'});}
   else if(op==='clear'){const d=payload(project);project.document=apply(project.document,Object.fromEntries(d.items.filter(x=>!x.gate).map(x=>[x.id,'todo'])));project.generation++;}
   else if(op==='perm-write'){const permissions={selected:data.selected||[],descs:data.descs||{},descsEn:data.descsEn||{}};validate({...project,permissions});project.permissions=copy(permissions);project.document=replaceAppendix(project.document,appendix(permissions));}

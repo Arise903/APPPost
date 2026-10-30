@@ -2,8 +2,8 @@
  * 项目设置：账号系统 / 未成年用户
  * 切换后立即重算可见条目并重新连续编号；保存时写回 md 的 FEATURES 行。
  * -------------------------------------------------------------- */
+const featAdjust=document.getElementById("featAdjust"),featAnalysisApi=document.getElementById("featAnalysisApi");
 const featPush = document.getElementById("featPush");
-const featSubscription = document.getElementById("featSubscription");
 const featFeedback = document.getElementById("featFeedback");
 const featAcc = document.getElementById("featAcc");
 const featMinor = document.getElementById("featMinor");
@@ -11,6 +11,7 @@ const featMinor = document.getElementById("featMinor");
 function currentFeatures(){
   return {
     hasAccountSystem: !!(DATA && DATA.features && DATA.features.hasAccountSystem),
+    hasAdjust: DATA?.features?.hasAdjust===true, hasAnalysisApi: DATA?.features?.hasAnalysisApi===true,
     hasPush: DATA?.features?.hasPush === true,
     hasSubscriptions: DATA?.features?.hasSubscriptions !== false,
     hasFeedbackSystem: !!(DATA && DATA.features && DATA.features.hasFeedbackSystem),
@@ -19,8 +20,8 @@ function currentFeatures(){
 }
 function refreshFeatUI(){
   const f = currentFeatures();
+  featAdjust.checked=f.hasAdjust;featAnalysisApi.checked=f.hasAnalysisApi;
   featPush.checked = f.hasPush;
-  featSubscription.checked = f.hasSubscriptions;
   featFeedback.checked = f.hasFeedbackSystem;
   featAcc.checked = f.hasAccountSystem;
   featMinor.checked = f.targetMinors;
@@ -36,7 +37,7 @@ function refreshFeatUI(){
   const pv = document.getElementById("featPreview");
   if(pv){
     const visible = (DATA.sections || []).flatMap(sec => sec.blocks || []).filter(it => it.type === "item" && !it.gate && it.visible !== false);
-    const label = {hasAccountSystem:"无用户账号系统",hasFeedbackSystem:"无用户反馈系统",hasSubscriptions:"无订阅商品",hasPush:"无推送功能",targetMinors:"不面向未成年用户"};
+    const label = {hasAdjust:"未使用 Adjust",hasAnalysisApi:"未使用 AnalysisApi",hasAccountSystem:"无用户账号系统",hasFeedbackSystem:"无用户反馈系统",hasSubscriptions:"无订阅商品",hasPush:"无推送功能",targetMinors:"不面向未成年用户"};
     const clean = value => escapeHtml(String(value).replace(/<[^>]+>/g, "").replace(/\*\*/g, "").replace(/`/g, ""));
     const grouped = {};
     hidden.forEach(it => { (grouped[it.cond] = grouped[it.cond] || []).push(it.text); });
@@ -60,7 +61,7 @@ function openFeatPanel(){
 function closeFeatPanel(){
   if(featureSnapshot){ DATA.features=featureSnapshot; featureSnapshot=null; render(); refreshFeatUI(); updateSaveStatus(); }
   document.getElementById("featPanel").classList.remove("on");
-  if(featFocusReturn&&featFocusReturn.isConnected)featFocusReturn.focus();
+  if(featFocusReturn&&featFocusReturn.isConnected){if(window.BoardForms)BoardForms.returnFocus(featFocusReturn);else featFocusReturn.focus();}
   featFocusReturn=null;
 }
 document.getElementById("btnFeat").addEventListener("click", openFeatPanel);
@@ -73,7 +74,7 @@ function onFeatToggle(){
   saveFailure="";
   if(!DATA) return;
   DATA.features = {
-    hasPush: featPush.checked, hasSubscriptions: featSubscription.checked, hasFeedbackSystem: featFeedback.checked,
+    hasAdjust:featAdjust.checked,hasAnalysisApi:featAnalysisApi.checked,hasPush: featPush.checked, hasSubscriptions: DATA?.features?.hasSubscriptions !== false, hasFeedbackSystem: featFeedback.checked,
     hasAccountSystem: featAcc.checked,
     targetMinors: featMinor.checked
   };
@@ -82,15 +83,15 @@ function onFeatToggle(){
   refreshFeatUI();
   updateSaveStatus();
 }
+featAdjust.addEventListener("change",onFeatToggle);featAnalysisApi.addEventListener("change",onFeatToggle);
 featPush.addEventListener("change", onFeatToggle);
-featSubscription.addEventListener("change", onFeatToggle);
 featFeedback.addEventListener("change", onFeatToggle);
 featAcc.addEventListener("change", onFeatToggle);
 featMinor.addEventListener("change", onFeatToggle);
 
 // 保存到 md
 document.getElementById("featSave").addEventListener("click", async () => {
-  const f = {hasAccountSystem: featAcc.checked, targetMinors: featMinor.checked, hasPush: featPush.checked, hasSubscriptions: featSubscription.checked, hasFeedbackSystem: featFeedback.checked};
+  const f = {hasAdjust:featAdjust.checked,hasAnalysisApi:featAnalysisApi.checked,hasAccountSystem: featAcc.checked, targetMinors: featMinor.checked, hasPush: featPush.checked, hasSubscriptions: DATA?.features?.hasSubscriptions !== false, hasFeedbackSystem: featFeedback.checked};
   if(!online){
     toast("离线模式无法写入文件，请启动本地服务");
     return;

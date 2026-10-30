@@ -379,14 +379,25 @@ def create_app(overrides=None):
                 gate = checklist.find_gate_item(parsed)
                 if gate:
                     project['document'] = checklist.apply_states(project['document'], parsed, {gate['id']: 'done' if operation == 'ack' else 'skip'})
+            elif operation == 'subscriptions':
+                if type(data.get('enabled')) is not bool or not isinstance(data.get('products'), list):
+                    abort(400, '订阅设置无效')
+                review = json.loads(project['review'])
+                review['subscriptions'] = data['products']
+                validate_review(review)
+                features = checklist.parse_md(project['document'])['features']
+                features['hasSubscriptions'] = data['enabled']
+                project['document'] = checklist.configure_document_features(project['document'], features)
+                project['review'] = encode(review)
             elif operation == 'features':
                 features = data.get('features')
                 if isinstance(features, dict):
                     features = {'hasFeedbackSystem': False, 'hasSubscriptions': True, 'hasPush': False, **features}
                 if not isinstance(features, dict) or any(type(features.get(k)) is not bool for k in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush')):
                     abort(400, '项目特征无效')
-                line = '<!-- FEATURES ' + ' '.join(k + '=' + str(int(features[k])) for k in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush')) + ' -->'
-                project['document'] = checklist.RE_FEATURES.sub(line, project['document']) if checklist.RE_FEATURES.search(project['document']) else line + '\n' + project['document']
+                if any(k in features and type(features[k]) is not bool for k in ('hasAdjust', 'hasAnalysisApi')):
+                    abort(400, '项目特征无效')
+                project['document'] = checklist.configure_document_features(project['document'], features)
             elif operation == 'review':
                 validate_review(data.get('review'))
                 project['review'] = encode(data['review'])
