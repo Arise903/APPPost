@@ -68,4 +68,6 @@ jobs:
           name: visual-comparison
           path: artifacts/visual
       - name: Build production image
-        run: docker build -t release-desk:test .
+        run: |
+          docker build -t release-desk:test .
+          docker run --rm release-desk:test python -c "import checklist_tool as c; from pathlib import Path; assert len(c.load_checklist_modules()) == 3; assert c.parse_md(Path('online/default_checklist.md').read_text())['features']['hasAdjust']; assert '__OPTIONAL_MODULES__' not in c.load_board_js()"
