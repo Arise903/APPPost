@@ -14,6 +14,7 @@ def annotate(sections):
                 group=next((g for g in rules['groups'] if re.search(g['heading'],block['title'])),None)
                 feature=next((g['feature'] for g in rules.get('featureGroups',[]) if re.search(g['heading'],block['title'])),None)
             if block['type']!='item':continue
+            if block['id'] in rules.get('platformItems',{}):block['platform']=rules['platformItems'][block['id']]
             condition=rules.get('featureConditions',{}).get(block['id']) or feature or next((r['feature'] for r in rules.get('featureText',[]) if r['contains'] in block['text']),None)
             if condition:block['cond']=condition
             requirement=rules.get('itemRules',{}).get(block['id']) or (next((r['requires'] for r in group['rules'] if r['contains'] in block['text']),group['default']) if group else None)
@@ -31,3 +32,8 @@ def visible(rule,selected,profiles):
     if rule=='android':return any((p.get('android') or {}).get('manifest') for p in picked)
     if rule=='androidRuntime':return any((p.get('android') or {}).get('manifest') and (p.get('android') or {}).get('runtime') for p in picked)
     return False
+
+
+def platform_visible(item, platform):
+    normalized = str(platform or '').strip().lower()
+    return not item.get('platform') or normalized not in ('ios', 'android') or item['platform'] == normalized

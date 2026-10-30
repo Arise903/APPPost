@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=1709c4272d94"></script><script src="store.js?v=1709c4272d94"></script><script>PagesStore.install();</script><script defer src="experience.js?v=1709c4272d94"></script><link rel="stylesheet" href="history.css?v=1709c4272d94"><script defer src="history.js?v=1709c4272d94"></script>
+<script src="data.js?v=726d73883e33"></script><script src="release_analysis.js?v=726d73883e33"></script><script src="storage.js?v=726d73883e33"></script><script src="store.js?v=726d73883e33"></script><script>PagesStore.install();</script><script defer src="experience.js?v=726d73883e33"></script><link rel="stylesheet" href="history.css?v=726d73883e33"><script defer src="history.js?v=726d73883e33"></script><link rel="stylesheet" href="workflows.css?v=726d73883e33"><script defer src="workflows.js?v=726d73883e33"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -547,6 +547,14 @@ li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size
 .workflow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.workflow>div{background:var(--surface-2,#f5f7f6);border:1px solid var(--border,#ddd);border-radius:10px;padding:12px}.workflow b{display:block;font-size:13px}.workflow span{display:block;color:var(--text-3,#777);font-size:11px;line-height:1.7;margin-top:5px}.release-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border,#ddd);padding-top:14px;margin-top:14px}@media(max-width:700px){.workflow{gap:6px}.workflow>div{padding:9px}.workflow span{font-size:10px}.release-actions>.btn{flex:1 1 auto}}
 @media(max-width:700px){#sectionFilter{box-sizing:border-box;width:100%;min-width:0}.txt code,.note code,.para code,section.card code{overflow-wrap:anywhere;word-break:break-word}}
 
+.release-readiness{margin:16px 0;padding:14px 16px;border:1px solid var(--line,#dce3de);border-radius:12px;background:#fafbf8}.release-readiness summary{cursor:pointer;font-weight:600;line-height:1.8}.release-readiness[data-ready="true"]{border-color:#82b897}.release-readiness p{font-size:12px;color:#64726a}.release-readiness ul{max-height:240px;overflow:auto;padding:0;list-style:none}.release-readiness li{margin:6px 0}.release-readiness li button{text-align:left;white-space:normal;height:auto;line-height:1.6}#itemReviewDialog{width:min(600px,calc(100vw - 32px));max-height:90dvh;overflow:auto;border:1px solid #ccd6ce;border-radius:16px;padding:24px}#itemReviewDialog::backdrop{background:#10251a70}#itemReviewForm>label{display:block;margin:12px 0}#itemReviewForm textarea{display:block;width:100%;box-sizing:border-box;min-height:64px;padding:10px;font:inherit;border:1px solid #ccd6ce;border-radius:8px}.permission-maintenance{font-size:11px;color:#627168;margin-top:10px}.permission-maintenance a{word-break:break-word}.permission-maintenance summary{cursor:pointer}
+
+#releaseEditDialog{width:min(600px,calc(100vw - 32px));max-height:90dvh;overflow:auto;border:1px solid #ccd6ce;border-radius:16px;padding:24px}#releaseEditDialog::backdrop{background:#10251a70}#releaseEditForm input,#releaseEditForm select{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccd6ce;border-radius:8px;font:inherit}#releaseEditForm label{display:grid;gap:8px;margin:8px 0}
+
+.permission-toggle{display:block;width:100%;padding:0;border:0;background:transparent;text-align:left;font:inherit;color:inherit;cursor:pointer}.permission-toggle:focus-visible{outline:2px solid #176d52;outline-offset:4px}.item:focus-visible,.btn:focus-visible,summary:focus-visible{outline:2px solid #176d52;outline-offset:3px}
+
+.item-evidence-summary{overflow-wrap:anywhere}
+
 </style>
 </head>
 <body><div style="padding:14px 24px;background:#17243a;color:white"><a href="index.html" style="color:white">← 返回个人工作台</a>　·　<span id="pagesProjectName"></span>　·　数据仅保存在当前浏览器，请定期导出备份</div>
@@ -571,7 +579,7 @@ li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size
       <span class="cnt" id="cnt" role="status" aria-live="polite"></span>
     </div>
 
-    <button class="seqline" id="seqline" title="点击跳到当前应处理的条目"></button>
+    <details class="release-readiness" id="readinessPanel"><summary id="readinessSummary">发布就绪检查</summary><p>适用项默认必需；在「备注 / 证据」可调整必需性与证据要求。填写原因的跳过项可通过检查。</p><ul id="readinessIssues"></ul></details><button class="seqline" id="seqline" title="点击跳到当前应处理的条目"></button>
 
     <nav class="workflow" aria-label="发布流程"><div><b>1 配置</b><span>按实际功能设置项目、商品和权限</span></div><div><b>2 检查</b><span>逐项处理，保存检查进度</span></div><div><b>3 发布</b><span>填写版本、归档，再开始下一轮</span></div></nav>
     <div class="toolbar">
@@ -598,7 +606,7 @@ li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size
         </div>
       </span>
     </div>
-    <div id="saveStatus" role="status" aria-live="polite"></div><div class="save-explanation">检查进度：点击保存；备注、发布信息和权限配置：分别即时保存。项目设置点击保存后生效。</div>
+    <div id="saveStatus" role="status" aria-live="polite"></div><div class="save-explanation">检查进度、备注、项目设置和商品：点击各自保存按钮；权限自动保存；发布信息填写完成后保存。下方显示当前未保存内容。</div>
     <div class="secnote hidden" id="filtNote"></div>
   <div class="release-actions" aria-label="发布与归档">
 <button class="btn" id="releaseEdit">发布信息</button>
@@ -792,6 +800,8 @@ li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size
   </div>
 </div>
 
+<dialog id="releaseEditDialog" aria-labelledby="releaseEditTitle"><form id="releaseEditForm"><h2 id="releaseEditTitle">发布信息</h2><div class="subscription-grid"><label>App 名称<input name="app" maxlength="200"></label><label>平台<select name="platform"><option value="">未指定</option><option value="iOS / Android">iOS / Android</option><option value="iOS">iOS</option><option value="Android">Android</option></select></label><label>版本号<input name="version" maxlength="100"></label><label>构建号<input name="build" maxlength="100"></label><label>检查日期<input name="date" type="date"></label><label>负责人<input name="owner" maxlength="200"></label></div><div class="subscription-grid"><label>iOS 应用标识<input name="appIdIOS" maxlength="200"></label><label>Android 应用标识<input name="appIdAndroid" maxlength="200"></label><label>环境<select name="environment"><option value="production">production</option><option value="staging">staging</option><option value="development">development</option></select></label><label>API 基础地址<input name="apiBaseUrl" type="url" maxlength="1000"></label><label>目标发布日期<input name="targetDate" type="date"></label><label>发布时区<input name="timeZone" maxlength="100" placeholder="Asia/Shanghai"></label><label>发布状态<select name="status"><option value="planning">计划中</option><option value="review">待发布</option><option value="released">已发布</option></select></label><label>完整发布检查<select name="strictValidation"><option value="off">仅检查条目</option><option value="on">同时检查发布信息及商品完整性</option></select></label></div><p id="releaseEditError" role="alert"></p><p class="save-explanation">草稿 · 保存平台后会更新适用清单，已有进度保留。</p><button class="btn" type="button" id="releaseEditCancel">取消</button><button class="btn primary" type="submit">保存发布信息</button></form></dialog>
+<dialog id="itemReviewDialog" aria-labelledby="itemReviewTitle"><form id="itemReviewForm"><h2 id="itemReviewTitle">备注 / 证据</h2><p id="itemReviewText"></p><label>跳过原因<textarea name="reason" maxlength="4000"></textarea></label><label>检查备注<textarea name="notes" maxlength="4000"></textarea></label><label>验证证据（路径或链接）<textarea name="evidence" maxlength="4000"></textarea></label><label><input name="required" type="checkbox" checked>发布必需项</label><label><input name="evidenceRequired" type="checkbox">完成时必须提供证据</label><label>证据路径有效至<input name="evidenceExpiresAt" type="date"></label><details class="exception-fields"><summary>跳过分类、负责人和复查记录</summary><label>跳过类型<select name="exceptionType"><option value="legacy">普通跳过（兼容原记录）</option><option value="not-applicable">不适用</option><option value="deferred">暂缓处理</option><option value="risk-accepted">风险接受</option></select></label><label>负责人<input name="exceptionOwner" maxlength="200"></label><label>复查期限<input name="reviewDue" type="date"></label><label>复查状态<select name="reviewStatus"><option value="pending">待复查</option><option value="reviewed">已复查</option></select></label><label>复查日期<input name="reviewedAt" type="date"></label><p>审批记录由你手动登记，用于追溯；风险接受需填写已批准状态、批准人和日期。</p><label>审批状态<select name="approvalStatus"><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已拒绝</option></select></label><label>批准人<input name="approvalBy" maxlength="200"></label><label>批准日期<input name="approvalDate" type="date"></label></details><p id="itemReviewError" role="alert"></p><p class="save-explanation">草稿 · 点击保存后生效</p><button type="button" class="btn" id="itemReviewCancel">取消</button><button type="submit" class="btn primary">保存备注与检查要求</button></form></dialog>
 <dialog id="subscriptionDialog" aria-labelledby="subscriptionTitle">
 <form id="subscriptionForm">
 <div class="subscription-head"><div><h2 id="subscriptionTitle">订阅商品</h2><p>按商品记录周期、价格、试用和优惠；支持同一周期的多个档位。保存于当前项目，不会自动修改商店后台。</p></div><button class="btn" type="button" id="subscriptionClose" aria-label="关闭订阅商品">关闭</button></div>
@@ -802,7 +812,7 @@ li.item>small{flex:0 0 100%;overflow-wrap:anywhere;color:var(--text-3);font-size
 <dialog id="newReleaseDialog" style="max-width:460px;width:calc(100% - 32px);border:1px solid #dce2df;border-radius:14px;padding:24px">
 <form id="newReleaseForm"><h2>开始新一轮发布</h2><p>先归档当前发布，再清空检查进度。权限选择、项目功能设置和阅读确认保留。</p><label>新版本号<input name="version" required maxlength="80" style="display:block;width:100%;margin:8px 0 16px;padding:10px"></label><label>构建号<input name="build" maxlength="80" style="display:block;width:100%;margin:8px 0 16px;padding:10px"></label><p><label><input name="keepNotes" type="checkbox" checked> 保留检查备注和跳过原因</label></p><p><label><input name="keepEvidence" type="checkbox"> 保留证据路径和链接</label></p><p id="newReleaseError" role="alert"></p><button class="btn" type="button" id="cancelNewRelease">取消</button><button class="btn primary" type="submit">归档并开始</button></form></dialog>
 <div class="mobile-actions"><span id="mobileStatus" role="status"></span><button id="mobileCurrent" class="btn">当前检查项</button><button id="mobileSave" class="btn primary">保存进度</button><button id="mobileExport" class="btn">导出摘要</button></div>
-<script>
+<script type="text/plain" id="pagesBoardSource">
 const PERMISSION_RULES = {
   "groups": [
     {
@@ -1019,6 +1029,59 @@ const PERMISSION_RULES = {
     "t_36e3f51a": "hasPush",
     "t_c7c9aea7": "hasPush",
     "t_4cc648e9": "hasPush"
+  },
+  "platformItems": {
+    "t_64e0e769": "ios",
+    "t_d669db33": "ios",
+    "t_755eb036": "ios",
+    "t_fa2c1ab7": "ios",
+    "t_c1ff806f": "ios",
+    "t_e2cf0e51": "ios",
+    "t_245416b5": "ios",
+    "t_90714170": "ios",
+    "t_93d65e8e": "ios",
+    "t_73116bf6": "ios",
+    "t_5bb3a143": "ios",
+    "t_7180c3b6": "ios",
+    "t_36e3f51a": "ios",
+    "t_fc569848": "ios",
+    "t_2215d265": "ios",
+    "t_7990e422": "ios",
+    "t_8c46c981": "ios",
+    "t_c7c9aea7": "ios",
+    "t_af5f214a": "ios",
+    "t_c67b7080": "ios",
+    "t_ebf43bde": "android",
+    "t_092b7ad4": "android",
+    "t_0d1742fa": "android",
+    "t_c8334401": "android",
+    "t_d73816ab": "android",
+    "t_93edf33e": "android",
+    "t_aad69bfe": "ios",
+    "t_faf300d9": "ios",
+    "t_71952b07": "ios",
+    "t_da6459c0": "ios",
+    "t_d773b98d": "android",
+    "t_6930c175": "ios",
+    "t_40980b39": "android",
+    "t_de476d18": "ios",
+    "t_b7ff98b9": "ios",
+    "t_0911f6f9": "ios",
+    "t_165bf3dd": "ios",
+    "t_0333b600": "ios",
+    "t_baaadf56": "ios",
+    "t_8793689d": "ios",
+    "t_6bc90f79": "android",
+    "t_cb588da7": "android",
+    "t_1b7eb939": "android",
+    "t_4df29bbe": "android",
+    "t_fe196a61": "android",
+    "t_4cc648e9": "android",
+    "t_75f86cfd": "android",
+    "t_126de941": "android",
+    "t_70a9ee0a": "android",
+    "t_9ec219b3": "ios",
+    "t_a05b02cc": "ios"
   }
 }
 ;
@@ -1034,6 +1097,7 @@ const PERMISSION_RULES = {
       feature=(rules.featureGroups||[]).find(g=>new RegExp(g.heading).test(block.title))?.feature||null;
      }
      if(block.type!=='item')continue;
+     if(rules.platformItems?.[block.id])block.platform=rules.platformItems[block.id];
      const knownFeature=rules.featureConditions?.[block.id]||feature||(rules.featureText||[]).find(r=>block.text.includes(r.contains))?.feature;
      if(knownFeature)block.cond=knownFeature;
      const requirement=rules.itemRules?.[block.id]||(group?(group.rules.find(r=>block.text.includes(r.contains))?.requires||group.default):null);
@@ -1041,6 +1105,7 @@ const PERMISSION_RULES = {
     }
    }
   },
+  platformVisible(item,platform){const normalized=String(platform||'').trim().toLowerCase();return !item.platform||!['ios','android'].includes(normalized)||item.platform===normalized;},
   visible(rule,selected,profiles){
    if(!rule)return true;const ids=new Set(selected||[]);if(Array.isArray(rule))return rule.some(id=>ids.has(id));
    const picked=(profiles.permissions||[]).filter(p=>ids.has(p.id));
@@ -1060,6 +1125,170 @@ const EMBEDDED_PROFILES = PAGES_DATA.profiles;
 
 
 document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;
+/* Pure configuration checks and release comparison. Raw input files are never persisted. */
+(function(root){
+'use strict';
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+function basis(snapshot){const r=snapshot.release||{};return JSON.stringify({platform:r.platform||'',appIdIOS:r.appIdIOS||'',appIdAndroid:r.appIdAndroid||'',version:r.version||'',build:r.build||'',environment:r.environment||'production',apiBaseUrl:r.apiBaseUrl||'',permissions:[...(snapshot.selectedPermissions||snapshot.permissions?.selected||[])].sort()});}
+function safeURL(value){try{if(!value)return '';const url=new URL(String(value));if(!['http:','https:'].includes(url.protocol))return '[无效URL]';url.username='';url.password='';url.search='';url.hash='';return url.href;}catch(_){return value?'[无效URL]':'';}}
+function parseFile(name,text){
+ if(typeof text!=='string'||text.length>2000000)throw Error('配置文件应为小于 2 MB 的文本');
+ const lower=name.toLowerCase();let facts={},platform='common',kind='';
+ if(lower.endsWith('.json')){
+  const value=JSON.parse(text),v=value.expo||value;kind='json';
+  const choose=(...keys)=>keys.map(k=>v[k]).find(x=>typeof x==='string'||typeof x==='number');
+  facts={applicationId:String(choose('applicationId','bundleIdentifier','package')||v.ios?.bundleIdentifier||v.android?.package||''),version:String(choose('versionName','version')||''),build:String(choose('versionCode','buildNumber','build')||''),environment:String(choose('environment','env','APP_ENV')||''),apiBaseUrl:safeURL(choose('apiBaseUrl','API_BASE_URL','baseUrl')||''),permissions:Array.isArray(v.permissions)?v.permissions.filter(p=>typeof p==='string'):v.android?.permissions||[]};
+  const explicit=String(v.platform||'').toLowerCase();platform=explicit==='ios'||v.ios&&!v.android?'ios':explicit==='android'||v.android&&!v.ios?'android':'common';
+ }else if(lower.endsWith('.env')||lower.startsWith('.env')||lower.endsWith('.properties')){
+  kind='environment';const allowed={APP_ENV:'environment',ENVIRONMENT:'environment',NODE_ENV:'environment',API_BASE_URL:'apiBaseUrl',BASE_URL:'apiBaseUrl',APPLICATION_ID:'applicationId',VERSION_NAME:'version',VERSION_CODE:'build'};
+  for(const line of text.split(/\r?\n/)){const m=line.match(/^\s*(?:export\s+)?([A-Z_]+)\s*=\s*(.*?)\s*$/);if(m&&allowed[m[1]]){let value=m[2].replace(/\s+#.*$/,'').replace(/^(['"])(.*)\1$/,'$2');facts[allowed[m[1]]]=m[1].includes('URL')?safeURL(value):value.slice(0,1000);}}
+ }else{
+  if(!root.DOMParser)throw Error('XML 预检需要浏览器 XML 解析器');
+  const doc=new root.DOMParser().parseFromString(text,'application/xml');if(doc.querySelector('parsererror'))throw Error('XML 格式无效或二进制 plist，请导出为文本 XML');
+  if(doc.documentElement.tagName==='plist'){
+   kind='plist';platform='ios';const values={};for(const key of [...(doc.documentElement.children[0]?.children||[])].filter(el=>el.tagName==='key')){const next=key.nextElementSibling;if(next&&next.tagName==='string')values[key.textContent]=next.textContent;}
+   facts={applicationId:values.CFBundleIdentifier||'',version:values.CFBundleShortVersionString||'',build:values.CFBundleVersion||'',usageDescriptions:Object.fromEntries(Object.entries(values).filter(([k])=>/^NS.*UsageDescription$/.test(k)))};
+  }else if(doc.documentElement.tagName==='manifest'){
+   kind='manifest';platform='android';const manifest=doc.documentElement,attr=(el,key)=>el.getAttributeNS('http://schemas.android.com/apk/res/android',key)||el.getAttribute('android:'+key)||'';
+   facts={applicationId:manifest.getAttribute('package')||'',version:attr(manifest,'versionName'),build:attr(manifest,'versionCode'),permissions:[...doc.querySelectorAll('uses-permission,uses-permission-sdk-23')].map(el=>attr(el,'name'))};
+  }else throw Error('支持 Info.plist、AndroidManifest.xml、JSON 及环境配置文件');
+ }
+ for(const key of ['applicationId','version','build','environment','apiBaseUrl'])if(facts[key]!==undefined&&typeof facts[key]!=='string')throw Error('配置字段应为文本或数字');
+ if(facts.permissions&&(!Array.isArray(facts.permissions)||facts.permissions.some(p=>typeof p!=='string')))throw Error('permissions 必须是字符串数组');
+ return {name:String(name).slice(0,200),platform,kind,facts};
+}
+function preflight(files,snapshot,profiles,date=new Date().toISOString()){
+ if(!files.length)throw Error('请至少选择一个配置文件');if(files.length>20)throw Error('每次最多预检 20 个配置文件');
+ const findings=[],release=snapshot.release||{},add=(severity,file,field,expected,actual,message)=>findings.push({severity,file,field,expected:String(expected??''),actual:String(actual??''),message});
+ const selected=new Set(snapshot.selectedPermissions||snapshot.permissions?.selected||[]),chosen=(profiles.permissions||[]).filter(p=>selected.has(p.id)),platform=String(release.platform||'').toLowerCase();
+ for(const file of files){
+  const f=file.facts;
+  if(['ios','android'].includes(platform)&&file.platform!=='common'&&file.platform!==platform)add('warning',file.name,'platform',platform,file.platform,'文件属于另一平台');
+  const expectedId=file.platform==='ios'?release.appIdIOS:file.platform==='android'?release.appIdAndroid:release.appIdIOS===release.appIdAndroid?release.appIdIOS:'';
+  for(const [key,expected] of [['applicationId',expectedId],['version',release.version],['build',release.build],['environment',release.environment||'production'],['apiBaseUrl',safeURL(release.apiBaseUrl||'')]]){
+   if(!(key in f))continue;const actual=f[key];
+   if(/\$\(|\$\{|\[.*\]|YOUR_|TODO/i.test(actual))add('error',file.name,key,expected,actual,'配置包含未解析占位符');
+   else if(!actual&&['applicationId','version','build'].includes(key))add('warning',file.name,key,expected,actual,'未提供该字段，请核对最终构建产物');
+   else if(expected&&String(actual)!==String(expected))add('error',file.name,key,expected,actual,'与发布配置不一致');
+  }
+  if(f.apiBaseUrl&&/localhost|127\.0\.0\.1|sandbox|staging|(?:^|[./_-])dev(?:[./_-]|$)/i.test(f.apiBaseUrl)&&(!release.environment||release.environment==='production'))add('error',file.name,'apiBaseUrl','正式环境地址',f.apiBaseUrl,'正式发布仍使用测试地址');
+  if(file.kind==='manifest'){
+   const expected=chosen.map(p=>p.android?.manifest).filter(Boolean);for(const permission of expected)if(!f.permissions.includes(permission))add('error',file.name,'permissions',permission,'未声明','所选权限缺少 Manifest 声明');
+   const known=new Set(expected);for(const permission of f.permissions)if(!known.has(permission))add('warning',file.name,'permissions','工作台选中的权限',permission,'配置中存在工作台未选择的声明，请核对是否必要');
+  }
+  if(file.kind==='plist'){
+   const expected=chosen.flatMap(p=>p.ios?.infoplist_keys?.map(k=>k.key)||(p.ios?.infoplist_key?[p.ios.infoplist_key]:[]));
+   for(const key of expected)if(!String(f.usageDescriptions[key]||'').trim())add('error',file.name,key,'非空用途说明',f.usageDescriptions[key]||'','所选权限缺少用途说明');
+   for(const [key,value] of Object.entries(f.usageDescriptions))if(!String(value).trim()||/TODO|YOUR_|\[.*\]/i.test(value))add('error',file.name,key,'已填写并核验的用途说明',value,'用途说明为空或含占位符');
+  }
+ }
+ for(let a=0;a<files.length;a++)for(let b=a+1;b<files.length;b++)if(files[a].platform===files[b].platform)for(const field of ['applicationId','version','build','environment','apiBaseUrl']){const x=files[a].facts[field],y=files[b].facts[field];if(x&&y&&x!==y)add('error',files[b].name,field,x,y,'与同平台文件 '+files[a].name+' 不一致');}
+ return {id:root.crypto?.randomUUID?.()||String(Date.now()),date,basis:basis(snapshot),files,findings,errors:findings.filter(f=>f.severity==='error').length,warnings:findings.filter(f=>f.severity==='warning').length};
+}
+function compare(before,after){
+ const changes=[];const add=(area,id,kind,oldValue,newValue)=>changes.push({area,id,kind,before:oldValue??null,after:newValue??null});
+ const objects=(area,left,right)=>{for(const id of new Set([...Object.keys(left||{}),...Object.keys(right||{})]))if(!same(left?.[id],right?.[id]))add(area,id,!(id in (left||{}))?'added':!(id in (right||{}))?'removed':'changed',left?.[id],right?.[id]);};
+ objects('发布信息',before.release,after.release);objects('功能',before.features,after.features);
+ const permissions=s=>Object.fromEntries((s.selectedPermissions||s.permissions?.selected||[]).map(id=>[id,{selected:true,description:s.permissions?.descs?.[id]||'',descriptionEn:s.permissions?.descsEn?.[id]||''}]));objects('权限',permissions(before),permissions(after));
+ const items=s=>Object.fromEntries((s.items||[]).map(i=>[i.id,Object.fromEntries(['text','state','applicable','required','evidenceRequired','evidence','attachmentIds','evidenceExpiresAt','reason','notes','exceptionType','exceptionOwner','reviewDue','approvalStatus','approvalBy','reviewStatus'].filter(k=>i[k]!==undefined).map(k=>[k,i[k]]))]));objects('检查项',items(before),items(after));
+ const products=s=>Object.fromEntries((s.subscriptions||[]).map((p,index)=>[p.id||p.iosProductId||p.androidProductId||String(index),p]));objects('订阅商品',products(before),products(after));objects('证据附件',before.evidenceFiles,after.evidenceFiles);objects('配置预检',before.preflight?{result:before.preflight}: {},after.preflight?{result:after.preflight}:{});
+ return {format:'release-desk-diff/v1',date:new Date().toISOString(),changes};
+}
+root.ReleaseAnalysis={parseFile,preflight,compare,basis,safeURL};
+})(typeof window==='undefined'?globalThis:window);
+
+/* Versioned readiness rules; the Python server uses the same policy. */
+(function(root){
+'use strict';
+const DEFAULT_TIME_ZONE='Asia/Shanghai';
+function calendarDate(now=new Date(),timeZone=DEFAULT_TIME_ZONE){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:timeZone||DEFAULT_TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(now));
+ const values=Object.fromEntries(parts.map(part=>[part.type,part.value]));return values.year+'-'+values.month+'-'+values.day;
+}
+function assess(snapshot,now=new Date()){
+ const timeZone=snapshot.release?.timeZone||DEFAULT_TIME_ZONE,today=calendarDate(now,timeZone),items=(snapshot.items||[]).filter(i=>!i.gate&&i.applicable!==false),issues=[];
+ let done=0,skipped=0,pending=0;
+ const add=(id,text,reason)=>issues.push({id,text,reason});
+ for(const item of items){
+  if(item.state==='done')done++;else if(item.state==='skip')skipped++;else pending++;
+  if(item.required==='off')continue;
+  let reason='';
+  if(!['done','skip'].includes(item.state))reason='必需项待检查';
+  else if(item.state==='skip'){
+   if(!String(item.reason||'').trim())reason='跳过缺少原因';
+   else if(item.exceptionType&&item.exceptionType!=='legacy'){
+    if(!['not-applicable','deferred','risk-accepted'].includes(item.exceptionType))reason='跳过类型无效';
+    else if(item.exceptionType==='deferred')reason='暂缓项尚未解决';
+    else if(!String(item.exceptionOwner||'').trim()||!/^\d{4}-\d{2}-\d{2}$/.test(item.reviewDue||''))reason='例外缺少负责人或复查期限';
+    else if(item.reviewDue<today)reason='例外已到期，需重新复查';
+    else if(item.exceptionType==='risk-accepted'&&(item.approvalStatus!=='approved'||!String(item.approvalBy||'').trim()||!/^\d{4}-\d{2}-\d{2}$/.test(item.approvalDate||'')||item.approvalDate>today))reason='风险接受缺少有效审批记录';
+   }
+  }else if(item.state==='done'){
+   let ids=[];try{ids=JSON.parse(item.attachmentIds||'[]');if(!Array.isArray(ids))ids=[];}catch(_){}
+   const files=ids.map(id=>snapshot.evidenceFiles?.[id]),hasAsset=f=>!!f&&(snapshot.assetIds||[]).includes(f.assetId),validFiles=files.filter(f=>hasAsset(f)&&(!f.expiresAt||f.expiresAt>=today));
+   const hasText=!!String(item.evidence||'').trim(),textValid=hasText&&(!item.evidenceExpiresAt||item.evidenceExpiresAt>=today);
+   if(ids.some((id,index)=>!hasAsset(files[index])))reason='关联附件缺失';
+   else if((hasText&&!textValid||files.some(f=>f?.expiresAt&&f.expiresAt<today))&&!textValid&&!validFiles.length)reason='验证证据已过期';
+   else if(item.evidenceRequired==='on'&&!textValid&&!validFiles.length)reason='缺少必需证据';
+  }
+  if(reason)add(item.id,item.text,reason);
+ }
+ const release=snapshot.release||{};
+ if(release.strictValidation==='on'){
+  for(const [key,label] of [['app','App 名称'],['platform','平台'],['version','版本号'],['build','构建号'],['owner','负责人']])if(!String(release[key]||'').trim())add('__release',label,'发布信息不完整');
+  if(snapshot.features?.hasSubscriptions){const products=(snapshot.subscriptions||[]).filter(p=>p.status!=='off');if(!products.length)add('__subscriptions','订阅商品','尚未配置可发布商品');const seen=new Set();for(const p of products){const platform=p.platform||'both';let error=!p.name||p.price===''||p.price===undefined||!Number.isFinite(Number(p.price))||Number(p.price)<0||!/^[A-Z]{3}$/.test(p.currency||'')||!Number.isSafeInteger(Number(p.periodCount))||Number(p.periodCount)<1||!p.benefits||p.status==='draft';if((platform==='ios'||platform==='both')&&!p.iosProductId)error=true;if((platform==='android'||platform==='both')&&(!p.androidProductId||!p.basePlanId))error=true;for(const key of ['iosProductId','androidProductId'])if(p[key]){const id=key+':'+p[key]+(key==='androidProductId'?':'+(p.basePlanId||''):'');if(seen.has(id))error=true;seen.add(id);}if(error)add('__subscriptions',p.name||'未命名商品','商品配置不完整或重复');}}
+ }
+ if(snapshot.preflight){const report=snapshot.preflight;if(root.ReleaseAnalysis&&report.basis!==root.ReleaseAnalysis.basis(snapshot))add('__preflight','配置预检','发布配置已变化，预检结果需重新生成');else if(report.errors>0)add('__preflight','配置预检',report.errors+' 项配置预检错误未解决');}
+ return {policyVersion:3,timeZone,assessedOn:today,total:items.length,done,skipped,pending,blockers:issues.length,missingEvidence:issues.filter(i=>i.reason==='缺少必需证据').length,ready:items.length>0&&!issues.length,issues};
+}
+root.ReleaseReadiness={assess,calendarDate,DEFAULT_TIME_ZONE};
+})(typeof window==='undefined'?globalThis:window);
+
+/* Shared board policies and explicit form drafts. */
+function boardPendingDetails(){
+ const pending=[];
+ if(typeof dirty!=='undefined'&&dirty)pending.push('检查进度');
+ if(typeof permDirty!=='undefined'&&permDirty)pending.push('权限配置');
+ if(typeof featureSnapshot!=='undefined'&&featureHasChanges())pending.push('项目设置');
+ const subscriptions=document.getElementById('subscriptionDialog');
+ if(subscriptions?.open&&typeof subscriptionBaseline!=='undefined'&&JSON.stringify(subscriptionRead())!==subscriptionBaseline)pending.push('订阅商品');
+ if(releaseEditorDirty())pending.push('发布信息');
+ if(itemReviewDirty())pending.push('备注与检查要求');
+ return pending;
+}
+function itemReviewDirty(){const dialog=document.getElementById('itemReviewDialog');return !!dialog?.open&&dialog.dataset.baseline!==JSON.stringify(itemReviewValues());}
+function itemReviewValues(){const f=document.getElementById('itemReviewForm');return {...Object.fromEntries(['evidenceExpiresAt','exceptionType','exceptionOwner','reviewDue','reviewStatus','reviewedAt','approvalStatus','approvalBy','approvalDate'].map(k=>[k,f.elements[k].value])),reason:f.elements.reason.value,notes:f.elements.notes.value,evidence:f.elements.evidence.value,required:f.elements.required.checked?'on':'off',evidenceRequired:f.elements.evidenceRequired.checked?'on':'off'};}
+function openItemReview(item){
+ if(!online){toast('请先连接存储服务');return;}
+ const dialog=document.getElementById('itemReviewDialog'),form=document.getElementById('itemReviewForm'),old=reviewData.items?.[item.id]||{};
+ dialog.dataset.id=item.id;document.getElementById('itemReviewText').textContent=item.text;
+ for(const key of ['reason','notes','evidence','evidenceExpiresAt','exceptionOwner','reviewDue','reviewedAt','approvalBy','approvalDate'])form.elements[key].value=old[key]||'';for(const [key,fallback] of [['exceptionType','legacy'],['reviewStatus','pending'],['approvalStatus','pending']])form.elements[key].value=old[key]||fallback;
+ form.elements.required.checked=old.required!=='off';form.elements.evidenceRequired.checked=old.evidenceRequired==='on';
+ dialog.dataset.baseline=JSON.stringify(itemReviewValues());document.getElementById('itemReviewError').textContent='';dialog.showModal();
+}
+function closeItemReview(){if(document.getElementById('itemReviewDialog').dataset.saving==='true')return;if(itemReviewDirty()&&!confirm('放弃尚未保存的备注与检查要求？'))return;document.getElementById('itemReviewDialog').close();updateSaveStatus();}
+function refreshReadiness(){
+ const summary=document.getElementById('readinessSummary');if(!summary||!DATA)return;
+ const result=ReleaseReadiness.assess(releaseSnapshot());
+ summary.textContent=(result.ready?'发布就绪':'发布未就绪')+' · 完成 '+result.done+' / 跳过 '+result.skipped+' / 待检 '+result.pending+' · 阻塞 '+result.blockers+' · 缺少证据 '+result.missingEvidence;
+ summary.parentElement.dataset.ready=String(result.ready);
+ const list=document.getElementById('readinessIssues'),signature=JSON.stringify(result);if(list.dataset.signature===signature)return;list.dataset.signature=signature;list.replaceChildren();
+ for(const issue of result.issues){const li=document.createElement('li'),button=document.createElement('button');button.type='button';button.className='btn';button.textContent=issue.reason+' · '+issue.text;button.onclick=()=>{if(issue.id==='__release'){openReleaseEditor();return;}if(issue.id==='__subscriptions'){document.getElementById('btnSubscriptions').click();return;}if(issue.id==='__preflight'){window.ReleaseWorkflows?.preflight();return;}sectionFilter='all';filter='all';query='';document.getElementById('q').value='';document.getElementById('sectionFilter').value='all';document.querySelectorAll('#seg button').forEach(b=>{b.classList.toggle('on',b.dataset.f==='all');b.setAttribute('aria-pressed',String(b.dataset.f==='all'));});applyFilter();const row=[...document.querySelectorAll('li.item')].find(el=>el.dataset.id===issue.id);row?.scrollIntoView({block:'center',behavior:'smooth'});row?.querySelector('.txt')?.animate([{background:'#ffe9b0'},{background:'transparent'}],{duration:1600});};li.append(button);list.append(li);}
+}
+function installBoardExperience(){
+ const dialog=document.getElementById('itemReviewDialog'),form=document.getElementById('itemReviewForm');
+ document.getElementById('itemReviewCancel').onclick=closeItemReview;
+ dialog.addEventListener('cancel',event=>{event.preventDefault();closeItemReview();});form.addEventListener('input',updateSaveStatus);
+ form.onsubmit=async event=>{event.preventDefault();const controls=[...form.elements];controls.forEach(el=>el.disabled=true);dialog.dataset.saving='true';try{const next=JSON.parse(JSON.stringify(reviewData));next.items=next.items||{};next.items[dialog.dataset.id]={...next.items[dialog.dataset.id],...itemReviewValues()};if(await persistReview(next)){dialog.close();updateSaveStatus();}else showFormSaveFailure(document.getElementById('itemReviewError'),form,'保存失败，草稿已保留。');}finally{dialog.dataset.saving='false';controls.forEach(el=>el.disabled=false);}};
+ document.addEventListener('click',event=>{const a=event.target.closest('a[href]');if(a&&a.target!=='_blank'&&boardPendingDetails().length&&!confirm('还有未保存的'+boardPendingDetails().join('、')+'，离开当前页面？'))event.preventDefault();});
+ installReleaseEditor();refreshReadiness();
+}
+
+function releaseEditorValues(){const form=document.getElementById('releaseEditForm');return Object.fromEntries(['app','platform','version','build','date','owner','appIdIOS','appIdAndroid','environment','apiBaseUrl','targetDate','status','strictValidation','timeZone'].map(k=>[k,form.elements[k].value.trim()]));}
+function releaseEditorDirty(){const dialog=document.getElementById('releaseEditDialog');return !!dialog?.open&&dialog.dataset.baseline!==JSON.stringify(releaseEditorValues());}
+function openReleaseEditor(){if(!online){toast('请先连接存储服务');return;}const form=document.getElementById('releaseEditForm'),release=reviewData.release||{};for(const key of ['app','platform','version','build','date','owner','appIdIOS','appIdAndroid','environment','apiBaseUrl','targetDate','status','strictValidation','timeZone']){const input=form.elements[key],value=release[key]||(key==='date'?ReleaseReadiness.calendarDate(undefined,release.timeZone):key==='timeZone'?ReleaseReadiness.DEFAULT_TIME_ZONE:key==='environment'?'production':key==='status'?'planning':key==='strictValidation'?'off':'');if(input.tagName==='SELECT'&&value&&![...input.options].some(o=>o.value===value))input.add(new Option(value,value));input.value=value;}const dialog=document.getElementById('releaseEditDialog');dialog.dataset.baseline=JSON.stringify(releaseEditorValues());document.getElementById('releaseEditError').textContent='';dialog.showModal();}
+function installReleaseEditor(){const dialog=document.getElementById('releaseEditDialog'),form=document.getElementById('releaseEditForm');function close(){if(dialog.dataset.saving==='true')return;if(releaseEditorDirty()&&!confirm('放弃尚未保存的发布信息？'))return;dialog.close();updateSaveStatus();}document.getElementById('releaseEditCancel').onclick=close;dialog.addEventListener('cancel',event=>{event.preventDefault();close();});form.addEventListener('input',updateSaveStatus);form.onsubmit=async event=>{event.preventDefault();const next=JSON.parse(JSON.stringify(reviewData));next.release={...next.release,...releaseEditorValues()};const controls=[...form.elements];controls.forEach(el=>el.disabled=true);dialog.dataset.saving='true';try{if(await persistReview(next)){dialog.close();updateSaveStatus();}else showFormSaveFailure(document.getElementById('releaseEditError'),form,'保存失败，发布信息草稿已保留。');}finally{dialog.dataset.saving='false';controls.forEach(el=>el.disabled=false);}};}
+
 // Cloud instances scope every request, draft and guide to its project.
 function boardFetch(path, options){
   const cloud = window.RELEASE_CLOUD;
@@ -1078,8 +1307,10 @@ function featureHasChanges(){return typeof featureSnapshot!=="undefined" && feat
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
  const permissionPending=typeof permDirty!=="undefined"&&permDirty;
- const pending=(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
+ const extraPending=boardPendingDetails();
+ const pending=extraPending.length>0||(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
  let label=saveFailure?"保存失败 · "+saveFailure:localDraftFailure?localDraftFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleString():"尚无待保存修改";
+ if(pending&&extraPending.length)label+=' · '+extraPending.join('、');
  el.textContent=label;el.dataset.state=saveFailure||localDraftFailure?'error':savingOperations?'saving':pending?'pending':'saved';
  const mobile=document.getElementById("mobileStatus");if(mobile)mobile.textContent=label;
  const save=document.getElementById("mobileSave");if(save)save.disabled=savingOperations>0||!online;
@@ -1275,24 +1506,12 @@ function makeItem(b){
   note.className = "btn";
   note.type = "button";
   note.textContent = "备注 / 证据";
-  note.onclick = async () => {
-    if(!online){ toast("请连接服务后编辑检查记录"); return; }
-    const old = (reviewData.items || {})[b.id] || {};
-    const reason = prompt("跳过原因（不适用 / 暂缓 / 待他人处理，可自行填写）", old.reason || "");
-    if(reason === null) return;
-    const notes = prompt("检查备注", old.notes || "");
-    if(notes === null) return;
-    const evidence = prompt("验证证据：文件路径、截图路径或链接", old.evidence || "");
-    if(evidence === null) return;
-    const next = JSON.parse(JSON.stringify(reviewData));
-    next.items = next.items || {};
-    next.items[b.id] = {reason, notes, evidence};
-    await persistReview(next);
-  };
+  note.onclick = () => openItemReview(b);
   li.appendChild(note);
   const details = (reviewData.items || {})[b.id];
   if(details){
     const small = document.createElement("small");
+    small.className="item-evidence-summary";
     small.textContent = [details.reason, details.notes, details.evidence].filter(Boolean).join(" · ");
     li.appendChild(small);
   }
@@ -1501,7 +1720,7 @@ function applyFeatures(){
     (blocks || []).forEach(b => {
       if(b.type !== "item") return;
       if(b.gate){ b.visible = true; b.seq = ""; return; }
-      b.visible = condOk(b.cond) && PermissionVisibility.visible(b.permissionRule, DATA.permSelected || [], EMBEDDED_PROFILES);
+      b.visible = PermissionVisibility.platformVisible(b,reviewData.release?.platform) && condOk(b.cond) && PermissionVisibility.visible(b.permissionRule, DATA.permSelected || [], EMBEDDED_PROFILES);
       if(b.visible){ n++; b.seq = n; } else { b.seq = ""; }
     });
   };
@@ -1733,6 +1952,7 @@ function jumpToCurrent(){
 }
 function refreshAll(){
   updateSaveStatus();
+  refreshReadiness();
   // 先按顺序计算锁定，再统一应用
   const firstOpen = computeLocks();
   document.querySelectorAll("li.item").forEach(li => {
@@ -1787,11 +2007,13 @@ async function apiRequest(path, body){
   if(!r.ok){ const err = await r.json().catch(() => ({})); throw new Error(err.error || (path + " -> HTTP " + r.status)); }
   const data = await r.json();
   if(body !== undefined && data.revision){ baseRevision = data.revision; saveState(); }
-  if(writing) lastSavedAt = Date.now();
+  if(writing){lastSavedAt=Date.now();if(typeof clearFailedWrite==='function')clearFailedWrite(path);}
   return data;
-  }catch(error){ if(writing) saveFailure=error.message; throw error; }
+  }catch(error){ if(writing){saveFailure=error.message;if(typeof rememberFailedWrite==='function')rememberFailedWrite(path,body,error);} throw error; }
   finally{ if(writing) savingOperations--; setTimeout(updateSaveStatus,0); }
 }
+
+
 async function loadFromServer(){
   try{
     const d = await api("/api/list");
@@ -1853,6 +2075,8 @@ function mergeItems(d){
     done: d.done != null ? d.done : 0,
     skipped: d.skipped != null ? d.skipped : 0,
     mdName: d.mdName || (em && em.mdName) || "清单文件",
+    permDescs:d.permDescs||em?.permDescs||{},permDescsEn:d.permDescsEn||em?.permDescsEn||{},
+    assetIds:d.assetIds||em?.assetIds||[],
     permSelected: Array.isArray(d.permSelected) ? d.permSelected : ((em && em.permSelected) || []),
     features: d.features || (em && em.features) || {hasAccountSystem:true, targetMinors:true}
   };
@@ -2095,7 +2319,7 @@ document.getElementById("mClear").addEventListener("click", async () => {
 
 /* ---- 离开前提醒未保存 ---- */
 window.addEventListener("beforeunload", e => {
-  if((dirty || featureHasChanges() || permDirty || savingOperations>0) && online){ e.preventDefault(); e.returnValue = ""; }
+  if((dirty || featureHasChanges() || permDirty || savingOperations>0 || boardPendingDetails().length) && online){ e.preventDefault(); e.returnValue = ""; }
 });
 
 /* ------------------------------------------------------------------ *
@@ -2154,6 +2378,7 @@ function renderScenarios(){
 }
 
 function renderPerms(){
+  const focusedPermission=document.activeElement?.dataset.permissionId;
   const box = document.getElementById("permGroups");
   box.innerHTML = "";
   const groups = PROFILES.groups || [];
@@ -2195,7 +2420,9 @@ function renderPerms(){
           ? io.map(c => "<code>" + escapeHtml(c) + "</code>").join("<br>")
           : "无需声明权限") + "</div>" +
         (hint ? '<div class="phint">' + escapeHtml(hint) + "</div>" : "");
-      el.addEventListener("click", () => {
+      const toggle=document.createElement('button');toggle.type='button';toggle.className='permission-toggle';toggle.dataset.permissionId=p.id;toggle.setAttribute('aria-pressed',String(used.has(p.id)));while(el.firstChild)toggle.append(el.firstChild);el.append(toggle);
+      const maintenance=document.createElement('details');maintenance.className='permission-maintenance';const title=document.createElement('summary');title.textContent='来源与适用版本';maintenance.append(title);const info=document.createElement('p'),meta=p.maintenance||{};info.textContent='适用版本：'+(meta.applicableVersions||'待核验')+' · 核验日期：'+(meta.lastVerified||'尚未核验');maintenance.append(info);for(const source of [...(meta.sources||[]),...(EMBEDDED_PROFILES.maintenance?.references||[])]){const url=typeof source==='string'?source:source.url;if(!/^https?:\/\//.test(url||''))continue;const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener';link.textContent=source.title||url;maintenance.append(link,document.createElement('br'));}maintenance.addEventListener('click',event=>event.stopPropagation());el.append(maintenance);
+      toggle.addEventListener("click", () => {
         const i = permSelected.indexOf(p.id);
         if(i >= 0) permSelected.splice(i, 1);
         else permSelected.push(p.id);
@@ -2208,7 +2435,7 @@ function renderPerms(){
     wrap.appendChild(grid);
     box.appendChild(wrap);
   }
-  renderDescs();
+  renderDescs();if(focusedPermission)[...document.querySelectorAll('.permission-toggle')].find(el=>el.dataset.permissionId===focusedPermission)?.focus({preventScroll:true});
 }
 
 function renderDescs(){
@@ -2540,6 +2767,8 @@ document.getElementById("permSave").addEventListener("click", async () => {
   }
 });
 
+
+
 /* ------------------------------------------------------------------ *
  * 更多菜单 / 快捷操作
  * ------------------------------------------------------------------ */
@@ -2685,6 +2914,8 @@ document.getElementById("featSave").addEventListener("click", async () => {
   }
 });
 
+
+
 /* ---- 使用说明入口 ---- */
 function openGuide(){
   // 服务端模式走 /guide（内容总是最新的），离线模式走同目录 html
@@ -2730,32 +2961,25 @@ function baselineFromData(d){
 
 async function persistReview(next){
   try{
+    const previousPlatform=reviewData.release?.platform;
     const d = await api("/api/review", {revision:baseRevision, review:next});
     baseRevision = d.revision;
     reviewData = d.review;
     updateSummaryReleaseOptions();
-    build(); refreshAll(); saveState();
+    if(previousPlatform!==reviewData.release?.platform)build();else document.querySelectorAll('li.item').forEach(row=>{let summary=row.querySelector('.item-evidence-summary');const item=reviewData.items?.[row.dataset.id];if(!item){summary?.remove();return;}if(!summary){summary=document.createElement('small');summary.className='item-evidence-summary';row.append(summary);}summary.textContent=[item.reason,item.notes,item.evidence].filter(Boolean).join(' · ');});refreshAll();saveState();
     toast("检查记录已保存");
     return true;
   }catch(e){ toast("保存失败：" + e.message); return false; }
 }
-document.getElementById("releaseEdit").onclick = async () => {
-  if(!online){ toast("请先连接本机存储"); return; }
-  const next = JSON.parse(JSON.stringify(reviewData));
-  next.release = next.release || {};
-  for(const [key,label] of [["app","App 名称"],["platform","平台"],["version","版本号"],["build","构建号"],["date","检查日期"],["owner","负责人"]]){
-    const value = prompt(label, next.release[key] || (key === "date" ? new Date().toLocaleDateString("sv-SE") : ""));
-    if(value === null) return;
-    next.release[key] = value;
-  }
-  await persistReview(next);
-};
+document.getElementById('releaseEdit').onclick=openReleaseEditor;
 function releaseSnapshot(){
-  return {subscriptions:JSON.parse(JSON.stringify(reviewData.subscriptions||[])), release:reviewData.release || {}, date:new Date().toISOString(), features:{...DATA.features}, selectedPermissions:[...(DATA.permSelected||[])], items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false, ...(reviewData.items || {})[b.id]}))};
+  const snapshot={evidenceFiles:JSON.parse(JSON.stringify(reviewData.evidenceFiles||{})),assetIds:DATA.assetIds||[],preflight:reviewData.preflight||null,permissions:{selected:DATA.permSelected||[],descs:DATA.permDescs||{},descsEn:DATA.permDescsEn||{}},subscriptions:JSON.parse(JSON.stringify(reviewData.subscriptions||[])), release:reviewData.release || {}, date:new Date().toISOString(), features:{...DATA.features}, selectedPermissions:[...(DATA.permSelected||[])], items:[...(DATA.preamble||[]),...DATA.sections.flatMap(s => s.blocks)].filter(b => b.type === "item" && !b.gate).map(b => ({...reviewData.items?.[b.id],id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false}))};
+  snapshot.readiness=ReleaseReadiness.assess(snapshot);return snapshot;
 }
 document.getElementById("releaseArchive").onclick = async () => {
-  if(!online || dirty || featureHasChanges() || permDirty || savingOperations>0){ toast("请先保存检查进度、项目设置和权限配置，再归档"); return; }
-  if(!confirm("归档当前发布信息和检查结果？")) return;
+  if(!online || dirty || featureHasChanges() || permDirty || savingOperations>0 || boardPendingDetails().length){ toast("请先保存检查进度、项目设置和权限配置，再归档"); return; }
+  const readiness=ReleaseReadiness.assess(releaseSnapshot());
+  if(!confirm((readiness.ready?'发布就绪：无阻塞项。':'尚有 '+readiness.blockers+' 个发布阻塞项（缺少证据 '+readiness.missingEvidence+' 项）。归档会标记为未就绪。')+'\n归档当前发布信息和检查结果？')) return;
   const next = JSON.parse(JSON.stringify(reviewData));
   next.history = next.history || [];
   next.history.push(releaseSnapshot());
@@ -2789,6 +3013,7 @@ document.getElementById("releaseSummary").onclick = () => {
   const pendingExport=selection==="current"&&(dirty||featureHasChanges()||permDirty||savingOperations>0);
   const lines = ["# 发布检查摘要", "", "导出版本："+(snapshot.release?.version||snapshot.version||"未填写版本"), ...Object.entries(snapshot.release||{}).filter(([key])=>key!=="version").map(([k,v])=>k+"："+v), "", "生成时间："+new Date().toLocaleString(), pendingExport?"注意：包含尚未全部保存的当前页面内容。":"", "", "## 各版本进度对比", "", "完成率按适用检查项计算；不适用项不计入分母。", "", "| 版本 | 日期 | 已完成 | 已跳过 | 待处理 | 完成率 |", "| --- | --- | ---: | ---: | ---: | ---: |"];
   versions.forEach(({snapshot:version,label})=>{const m=releaseMetrics(version);lines.push("| "+String(label).replace(/[|\n]/g," ")+" | "+(version.date?new Date(version.date).toLocaleDateString():"—")+" | "+m.done+" / "+m.total+" | "+m.skipped+" | "+m.pending+" | "+m.percent+"% |");});
+  const readiness=snapshot.readiness||ReleaseReadiness.assess(snapshot);lines.push('', '## 发布就绪检查', '', '策略版本：'+readiness.policyVersion, '发布状态：'+(readiness.ready?'已就绪':'未就绪'), '阻塞项：'+readiness.blockers+'；缺少必需证据：'+readiness.missingEvidence,...readiness.issues.map(i=>'- '+i.reason+'：'+i.text));
   lines.push("", "## 订阅商品配置", "", "```json", JSON.stringify(snapshot.subscriptions||[],null,2), "```", "", "## 所选版本检查项");
   for(const item of (Array.isArray(snapshot.items)?snapshot.items:[])){
     lines.push("- [" + ({done:"x",skip:"-",todo:" "}[item.state]) + "] " + item.text + (item.applicable===false ? "（不适用）" : ""));
@@ -2817,6 +3042,8 @@ document.getElementById("backupRestore").onclick = async () => {
   }catch(e){ toast("恢复失败：" + e.message); }
 };
 
+
+
 document.getElementById("mobileSave").onclick=()=>document.getElementById("btnSave").click();
 document.getElementById("mobileCurrent").onclick=jumpToCurrent;
 document.getElementById("mobileExport").onclick=()=>document.getElementById("releaseSummary").click();
@@ -2827,14 +3054,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElement
 const newReleaseButton=document.getElementById('newRelease');
 newReleaseButton.hidden=!(window.RELEASE_PAGES||window.RELEASE_CLOUD);
 newReleaseButton.onclick=()=>{
- if(dirty||permDirty||featureHasChanges()||savingOperations){toast('请先保存所有改动，再开始新一轮发布');return;}
+ if(dirty||permDirty||featureHasChanges()||savingOperations||boardPendingDetails().length){toast('请先保存所有改动，再开始新一轮发布');return;}
  document.getElementById('newReleaseForm').reset();document.getElementById('newReleaseError').textContent='';document.getElementById('newReleaseDialog').showModal();
 };
 document.getElementById('cancelNewRelease').onclick=()=>document.getElementById('newReleaseDialog').close();
 document.getElementById('newReleaseForm').onsubmit=async event=>{
  event.preventDefault();const form=event.target,button=form.querySelector('[type=submit]');button.disabled=true;
  try{
-  const release={...reviewData.release,version:form.elements.version.value.trim(),build:form.elements.build.value.trim(),date:new Date().toLocaleDateString('sv-SE')};
+  const release={...reviewData.release,version:form.elements.version.value.trim(),build:form.elements.build.value.trim(),date:ReleaseReadiness.calendarDate(undefined,reviewData.release?.timeZone)};
   const d=await api('/api/new-release',{release,keepNotes:form.elements.keepNotes.checked,keepEvidence:form.elements.keepEvidence.checked});
   gen=d.generation;reviewData=d.review;updateSummaryReleaseOptions();state=seedFromData(d);serverBaseline=baselineFromData(d);DATA=mergeItems(d);dirty=false;saveState();render();refreshFeatUI();document.getElementById('newReleaseDialog').close();toast('上一轮已归档，新一轮发布已开始');
  }catch(error){document.getElementById('newReleaseError').textContent=error.message;}finally{button.disabled=false;updateSaveStatus();}
@@ -2918,8 +3145,8 @@ function subscriptionRender(){
   const remove=document.createElement('button');remove.type='button';remove.className='btn';remove.textContent='删除此商品';remove.style.marginTop='16px';remove.onclick=()=>{if(!confirm('删除此订阅商品？保存后生效。'))return;subscriptionDraft=subscriptionRead();subscriptionDraft.splice(index,1);subscriptionRender();subscriptionUpdateStatus();};card.append(remove);subscriptionProducts.append(card);
  });
 }
-function subscriptionUpdateStatus(){document.getElementById('subscriptionStatus').textContent=JSON.stringify(subscriptionRead())===subscriptionBaseline?'已保存 · '+subscriptionDraft.length+' 个商品':'有未保存的商品配置';document.getElementById('subscriptionError').textContent='';}
-function subscriptionClose(){if(subscriptionSaving)return;if(JSON.stringify(subscriptionRead())!==subscriptionBaseline&&!confirm('放弃尚未保存的订阅商品修改？'))return;subscriptionDialog.close();subscriptionFocus?.focus();}
+function subscriptionUpdateStatus(){setTimeout(updateSaveStatus,0);document.getElementById('subscriptionStatus').textContent=JSON.stringify(subscriptionRead())===subscriptionBaseline?'已保存 · '+subscriptionDraft.length+' 个商品':'有未保存的商品配置';document.getElementById('subscriptionError').textContent='';}
+function subscriptionClose(){if(subscriptionSaving)return;if(JSON.stringify(subscriptionRead())!==subscriptionBaseline&&!confirm('放弃尚未保存的订阅商品修改？'))return;subscriptionDialog.close();updateSaveStatus();subscriptionFocus?.focus();}
 document.getElementById('btnSubscriptions').onclick=()=>{subscriptionFocus=document.activeElement;subscriptionDraft=JSON.parse(JSON.stringify(reviewData.subscriptions||[]));subscriptionRender();subscriptionBaseline=JSON.stringify(subscriptionRead());subscriptionUpdateStatus();subscriptionDialog.showModal();};
 document.getElementById('subscriptionClose').onclick=subscriptionClose;document.getElementById('subscriptionCancel').onclick=subscriptionClose;
 subscriptionDialog.addEventListener('cancel',event=>{event.preventDefault();subscriptionClose();});
@@ -2956,6 +3183,61 @@ document.getElementById('subscriptionExport').onclick=()=>{try{const products=su
 
 window.addEventListener('beforeunload',event=>{if(subscriptionDialog.open&&JSON.stringify(subscriptionRead())!==subscriptionBaseline){event.preventDefault();event.returnValue='';}});
 
+
+/* Retry, inspect conflicts and recover explicitly saved form drafts. */
+const FORM_DRAFT_KEY=LS_KEY+':forms';
+let failedWrite=null;
+function captureFormDraft(){
+ const result={format:'release-desk-form-draft/v1',date:new Date().toISOString(),revision:baseRevision,generation:gen,checks:{...state}};
+ if(itemReviewDirty())result.item={id:document.getElementById('itemReviewDialog').dataset.id,values:itemReviewValues()};
+ if(releaseEditorDirty())result.release=releaseEditorValues();
+ if(subscriptionDialog.open&&JSON.stringify(subscriptionRead())!==subscriptionBaseline)result.subscriptions=subscriptionRead();
+ if(featureHasChanges())result.features=currentFeatures();
+ if(permDirty)result.permissions={selected:permSelected,descs:permDescs,descsEn:permDescsEn};
+ return result;
+}
+function persistFormDraft(){try{const draft=captureFormDraft();if(draft.item||draft.release||draft.subscriptions||draft.features||draft.permissions)localStorage.setItem(FORM_DRAFT_KEY,JSON.stringify(draft));else localStorage.removeItem(FORM_DRAFT_KEY);}catch(_){/* Export remains available when local storage is unavailable. */}}
+function exportCurrentDraft(){const url=URL.createObjectURL(new Blob([JSON.stringify(captureFormDraft(),null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='release-form-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function showFormSaveFailure(container,form,message){container.textContent=message;const retry=document.createElement('button');retry.type='button';retry.className='btn';retry.textContent='重试保存';retry.onclick=()=>form.requestSubmit();container.append(retry);}
+function clearFailedWrite(path){if(failedWrite?.path===path){failedWrite=null;const button=document.getElementById('retryFailedSave');if(button)button.hidden=true;}}
+function rememberFailedWrite(path,body,error){failedWrite={path,body,message:error.message};persistFormDraft();const retry=document.getElementById('retryFailedSave');if(retry)retry.hidden=false;}
+async function retryFailedWrite(){
+ if(!failedWrite){toast('暂无失败的保存');return;}
+ if(failedWrite.path==='/api/review'){for(const id of ['itemReviewDialog','releaseEditDialog','subscriptionDialog']){const dialog=document.getElementById(id);if(dialog.open){dialog.querySelector('form').requestSubmit();return;}}}
+ if(failedWrite.path==='/api/write'){document.getElementById('btnSave').click();return;}
+ if(failedWrite.path==='/api/features'){document.getElementById('featSave').click();return;}
+ if(failedWrite.path==='/api/perm-write'){document.getElementById('permSave').click();return;}
+ toast('请在原操作面板中重试；草稿可以导出保留。');
+}
+async function conflictPreview(){
+ const dialog=document.createElement('dialog');dialog.className='workflow-dialog';dialog.setAttribute('aria-label','冲突差异');const title=document.createElement('h2');title.textContent='当前草稿与最新保存记录的差异';const pre=document.createElement('pre');pre.className='conflict-preview';dialog.append(title,pre);
+ const close=document.createElement('button');close.className='btn';close.textContent='关闭';close.onclick=()=>dialog.close();dialog.append(close);dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+ try{let latest;if(window.RELEASE_PAGES){await PagesStore.refreshStorage();latest=PagesStore.snapshot(PagesStore.get(PagesStore.projectId()));}else{const response=await boardFetch('/api/list');if(!response.ok)throw Error('无法读取最新项目');const d=await response.json();latest={release:d.review.release,subscriptions:d.review.subscriptions||[],features:d.features,selectedPermissions:d.permSelected,permissions:{selected:d.permSelected,descs:d.permDescs,descsEn:d.permDescsEn},items:d.items.map(i=>({...d.review.items[i.id],...i,applicable:!i.gate&&d.features[i.cond]!==false&&PermissionVisibility.visible(i.permissionRule,d.permSelected,EMBEDDED_PROFILES)&&PermissionVisibility.platformVisible(i,d.review.release?.platform)}))};}const local=releaseSnapshot();if(releaseEditorDirty())local.release=releaseEditorValues();if(itemReviewDirty()){const id=document.getElementById('itemReviewDialog').dataset.id;local.items=local.items.map(i=>i.id===id?{...i,...itemReviewValues()}:i);}const diff=ReleaseAnalysis.compare(local,latest);pre.textContent=diff.changes.length?diff.changes.map(c=>c.area+' · '+c.id+'\n本页草稿：'+JSON.stringify(c.before)+'\n最新保存：'+JSON.stringify(c.after)).join('\n\n'):'当前记录一致。';}catch(error){pre.textContent=error.message;}
+}
+async function restoreFormDraft(value){
+ let draft=value;if(!draft){const raw=localStorage.getItem(FORM_DRAFT_KEY);if(!raw){toast('没有可恢复的表单草稿');return;}draft=JSON.parse(raw);}
+ if(draft.format!=='release-desk-form-draft/v1')throw Error('请选择表单草稿 JSON');
+ if((draft.generation!==gen||String(draft.revision)!==String(baseRevision))&&!confirm('此草稿来自另一批次或旧版本，恢复前请结合冲突差异核对，避免覆盖更新内容。继续？'))return;
+ if(draft.item){const item=[...(DATA.preamble||[]),...DATA.sections.flatMap(s=>s.blocks)].find(i=>i.id===draft.item.id);if(!item)throw Error('草稿对应的检查项已删除，请保留导出文件');openItemReview(item);for(const [key,value] of Object.entries(draft.item.values)){const input=document.getElementById('itemReviewForm').elements[key];if(input){if(input.type==='checkbox')input.checked=value==='on';else input.value=value;}}}
+ else if(draft.release){openReleaseEditor();for(const [key,value] of Object.entries(draft.release)){const input=document.getElementById('releaseEditForm').elements[key];if(input)input.value=value;}}
+ else if(draft.subscriptions){document.getElementById('btnSubscriptions').click();subscriptionDraft=draft.subscriptions;subscriptionRender();subscriptionUpdateStatus();}
+ else if(draft.features){openFeatPanel();for(const [key,id] of [['hasAccountSystem','featAcc'],['targetMinors','featMinor'],['hasSubscriptions','featSubscription'],['hasPush','featPush'],['hasFeedbackSystem','featFeedback']])document.getElementById(id).checked=!!draft.features[key];onFeatToggle();}
+ else if(draft.permissions){await openPermPanel();permSelected=draft.permissions.selected;permDescs=draft.permissions.descs;permDescsEn=draft.permissions.descsEn;permDirty=true;renderPerms();refreshPermGen();}
+ else toast('文件中只有检查进度；检查进度草稿会在看板正常恢复。');
+ updateSaveStatus();
+}
+function installSaveRecovery(){
+ const row=document.createElement('div');row.className='save-recovery';for(const [id,label,action] of [['retryFailedSave','重试失败保存',retryFailedWrite],['exportFormDraft','导出当前草稿',exportCurrentDraft],['restoreFormDraft','恢复表单草稿',()=>restoreFormDraft()],['viewConflict','查看冲突差异',conflictPreview]]){const button=document.createElement('button');button.type='button';button.className='btn';button.id=id;button.textContent=label;button.onclick=()=>Promise.resolve().then(action).catch(error=>toast(error.message));if(id==='retryFailedSave')button.hidden=true;row.append(button);}
+ const label=document.createElement('label');label.className='btn';label.textContent='导入表单草稿';const input=document.createElement('input');input.type='file';input.accept='.json';input.hidden=true;input.onchange=async()=>{const file=input.files[0];if(!file)return;try{if(file.size>1500000)throw Error('草稿文件请小于 1.5 MB');await restoreFormDraft(JSON.parse(await file.text()));}catch(error){toast(error.message);}finally{input.value='';}};label.append(input);row.append(label);document.getElementById('saveStatus').after(row);
+ let timer;document.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(persistFormDraft,250);});window.addEventListener('beforeunload',persistFormDraft);
+ for(const id of ['itemReviewDialog','releaseEditDialog','subscriptionDialog'])document.getElementById(id).addEventListener('close',persistFormDraft);
+ if(localStorage.getItem(FORM_DRAFT_KEY))toast('发现未保存的表单草稿，可点击「恢复表单草稿」继续。');
+}
+installSaveRecovery();
+
+
+installBoardExperience();
+
 </script>
-</body>
+<script defer src="bootstrap.js?v=726d73883e33"></script></body>
 </html>

@@ -1,5 +1,5 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const {webcrypto}=require('node:crypto');const {execFileSync}=require('node:child_process');
-function setup(){const memory=new Map();let blocked=false,queue=Promise.resolve();const localStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>{if(blocked)throw Error('quota');memory.set(k,v);}};const context=vm.createContext({window:{},localStorage,navigator:{locks:{request:(_name,action)=>{const next=queue.then(action);queue=next.catch(()=>{});return next;}}},crypto:webcrypto,TextEncoder,Response,URL,URLSearchParams,location:{search:''},setTimeout,Blob});vm.runInContext(fs.readFileSync('docs/data.js','utf8'),context);vm.runInContext(fs.readFileSync('permission_visibility.js','utf8'),context);vm.runInContext(fs.readFileSync('pages/store.js','utf8'),context);return {S:context.window.PagesStore,block:()=>blocked=true,context};}
+function setup(){const memory=new Map();let blocked=false,queue=Promise.resolve();const localStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>{if(blocked)throw Error('quota');memory.set(k,v);}};const context=vm.createContext({window:{},localStorage,navigator:{locks:{request:(_name,action)=>{const next=queue.then(action);queue=next.catch(()=>{});return next;}}},crypto:webcrypto,atob,btoa,TextEncoder,Response,URL,URLSearchParams,location:{search:''},setTimeout,Blob});vm.runInContext(fs.readFileSync('docs/data.js','utf8'),context);vm.runInContext(fs.readFileSync('permission_visibility.js','utf8'),context);vm.runInContext(fs.readFileSync('release_analysis.js','utf8'),context);vm.runInContext(fs.readFileSync('pages/templates.js','utf8'),context);vm.runInContext(fs.readFileSync('release_readiness.js','utf8'),context);vm.runInContext(fs.readFileSync('pages/storage.js','utf8'),context);vm.runInContext(fs.readFileSync('pages/store.js','utf8'),context);return {S:context.window.PagesStore,block:()=>blocked=true,context};}
 test('Markdown parser keeps Python IDs, spans, and conditions',()=>{const {S}=setup();const expected=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,checklist_tool as c;from pathlib import Path;print(json.dumps(c.parse_md(Path('online/default_checklist.md').read_text()),ensure_ascii=False))"],{encoding:'utf8'}));const actual=S.parse(fs.readFileSync('online/default_checklist.md','utf8'));assert.deepEqual(JSON.parse(JSON.stringify(actual.items)),expected.items);});
 test('Save, revision conflict and complete snapshot restore',async()=>{const {S}=setup();const id=await S.create({name:'Test'});const before=S.get(id);const item=S.payload(before).items.find(x=>!x.gate);await S.mutate(id,1,'write',p=>p.document=S.apply(p.document,{[item.id]:'done'}));await assert.rejects(S.mutate(id,1,'stale',p=>p.name='Wrong'),/另一个页面/);assert.equal(S.get(id).name,'Test');assert.equal(S.payload(S.get(id)).items.find(x=>x.id===item.id).state,'done');const snapshot=S.get(id).snapshots[0];await S.mutate(id,2,'restore',p=>{const version=p.version;Object.assign(p,snapshot.state);p.version=version;});assert.equal(S.payload(S.get(id)).items.find(x=>x.id===item.id).state,'todo');assert.equal(S.get(id).version,3);});
 test('Quota errors leave saved projects untouched',async()=>{const {S,block}=setup();await S.create({name:'Saved'});block();await assert.rejects(S.create({name:'Not saved'}),/未保存/);assert.equal(S.list().length,1);});
@@ -161,4 +161,102 @@ test('Restoring a snapshot retains later activity and preserves the pre-restore 
 });
 test('Activity merge deduplicates and limits retained records',()=>{
  const {S}=setup();const entries=Array.from({length:110},(_,i)=>({id:'event-'+i,date:i,label:'edit',changes:['changed']}));const merged=S.mergeActivity(entries,entries);assert.equal(merged.length,100);assert.equal(merged[0].id,'event-109');assert.equal(new Set(merged.map(e=>e.id)).size,100);
+});
+
+
+test('Release policy counts blockers, skipped reasons, optional items and required evidence',()=>{
+ const {context}=setup(),assess=context.window.ReleaseReadiness.assess;
+ const items=[{id:'a',text:'Required',state:'todo'},{id:'b',text:'Skipped',state:'skip',reason:'  '},{id:'c',text:'Evidence',state:'done',evidenceRequired:'on'},{id:'d',text:'Optional',state:'todo',required:'off'},{id:'e',text:'Hidden',state:'todo',applicable:false}];
+ const result=assess({items});assert.equal(result.total,4);assert.equal(result.pending,2);assert.equal(result.blockers,3);assert.equal(result.missingEvidence,1);assert.equal(result.ready,false);
+ items[0].state='done';items[1].reason='Not applicable';items[2].evidence='audit.png';assert.equal(assess({items}).ready,true);assert.equal(assess({items:[]}).ready,false);
+ const python=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c','import json,sys;from release_policy import assess;print(json.dumps(assess(json.loads(sys.argv[1]))))',JSON.stringify({items})],{encoding:'utf8'}));assert.deepEqual(JSON.parse(JSON.stringify(assess({items}))),python);
+});
+test('Creation configuration filters platforms and capabilities without changing task identities',async()=>{
+ const {S}=setup();const features={hasAccountSystem:false,targetMinors:false,hasSubscriptions:false,hasPush:false,hasFeedbackSystem:false};
+ const id=await S.create({name:'Android setup',features,review:{release:{platform:'Android'},items:{},history:[]},permissions:{selected:['camera'],descs:{},descsEn:{}}});
+ const p=S.get(id),data=S.payload(p);assert.equal(data.features.hasAccountSystem,false);assert.equal(data.features.hasSubscriptions,false);assert.ok(data.total<data.items.filter(i=>!i.gate).length);assert.equal(p.templateVersion,vm.runInContext('PAGES_DATA.templateVersion',setup().context));
+ const ios=data.items.find(i=>i.platform==='ios');assert.ok(ios);await S.mutate(id,p.version,'review',p=>{p.review.items[ios.id]={required:'off',evidenceRequired:'on',evidence:'proof'};});const updated=S.get(id);assert.equal(S.readiness(updated).issues.some(i=>i.id===ios.id),false);
+ const expected=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,sys,checklist_tool as c;p=json.loads(sys.argv[1]);print(c.document_payload(p['document'],p['name'],1,(p['permissions']['selected'],{},{}),p['review'],'1')['total'])",JSON.stringify(updated)],{encoding:'utf8'}));assert.equal(S.payload(updated).total,expected);
+});
+test('New release persists readiness and retains policy flags regardless of note retention',async()=>{
+ const {S,context}=setup();const id=await S.create({name:'Policy',document:'# App\n## Tasks\n- [x] Proof <!-- task:proof -->\n'});await S.mutate(id,1,'review',p=>p.review.items.proof={required:'on',evidenceRequired:'on',evidence:'screenshot.png'});
+ context.location.search='?id='+id;context.window.fetch=async()=>{};S.install();const response=await context.window.fetch('/api/new-release',{method:'POST',body:JSON.stringify({revision:'2',release:{version:'2'},keepNotes:false,keepEvidence:false})});assert.equal(response.status,200);
+ const p=S.get(id);assert.equal(p.review.history[0].readiness.ready,true);assert.equal(p.review.items.proof.evidenceRequired,'on');assert.equal(p.review.items.proof.required,'on');assert.equal(p.review.items.proof.evidence,undefined);assert.equal(S.readiness(p).ready,false);
+});
+test('Template preview reports additions and changes without mutating the project',async()=>{
+ const {S}=setup();const id=await S.create({name:'Old',document:'# Old\n## Tasks\n- [x] Custom <!-- task:custom -->\n'});const before=JSON.stringify(S.get(id));const diff=S.templateDiff(S.get(id));assert.ok(diff.added.length>0);assert.equal(diff.removed[0].id,'custom');assert.equal(JSON.stringify(S.get(id)),before);assert.ok(S.storageUsage().bytes>0);
+});
+
+
+test('Exception, evidence-expiry and strict release policies match the server',()=>{
+ const {context}=setup(),assess=context.window.ReleaseReadiness.assess,now='2026-10-30T12:00:00Z';
+ const scenarios=[
+  {items:[{id:'a',text:'Deferred',state:'skip',reason:'later',exceptionType:'deferred',exceptionOwner:'Alice',reviewDue:'2027-01-01'}]},
+  {items:[{id:'a',text:'Risk',state:'skip',reason:'accepted',exceptionType:'risk-accepted',exceptionOwner:'Alice',reviewDue:'2027-01-01',approvalStatus:'approved',approvalBy:'Reviewer',approvalDate:'2026-10-01'}]},
+  {items:[{id:'a',text:'Expired',state:'done',evidenceRequired:'on',evidence:'proof.png',evidenceExpiresAt:'2026-10-01'}]},
+  {items:[{id:'a',text:'File',state:'done',evidenceRequired:'on',attachmentIds:'["f"]'}],evidenceFiles:{f:{assetId:'asset',expiresAt:'2027-01-01'}},assetIds:['asset']},
+  {items:[{id:'a',text:'Missing',state:'done',evidenceRequired:'on',attachmentIds:'["f"]'}],evidenceFiles:{f:{assetId:'missing'}},assetIds:[]},
+  {items:[{id:'a',text:'Release',state:'done'}],release:{strictValidation:'on'},features:{hasSubscriptions:true},subscriptions:[]}
+ ];
+ for(const snapshot of scenarios){const expected=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,sys;from release_policy import assess;print(json.dumps(assess(json.loads(sys.argv[1]),sys.argv[2]),ensure_ascii=False))",JSON.stringify(snapshot),now],{encoding:'utf8'}));assert.deepEqual(JSON.parse(JSON.stringify(assess(snapshot,now))),expected);}
+ assert.equal(assess(scenarios[1],now).ready,true);assert.equal(assess(scenarios[3],now).ready,true);assert.equal(assess(scenarios[2],now).ready,false);
+});
+test('Preflight reports identifier/version/environment mismatches and never saves unknown env keys',()=>{
+ const {context}=setup(),A=context.window.ReleaseAnalysis;
+ const env=A.parseFile('.env','APP_ENV=production\nAPI_BASE_URL=https://user:password@api.example.com/v1?token=secret\nAPI_SECRET=do-not-save');assert.equal(env.facts.apiBaseUrl,'https://api.example.com/v1');assert.doesNotMatch(JSON.stringify(env),/password|secret|do-not-save/);
+ const files=[A.parseFile('app.json',JSON.stringify({platform:'android',applicationId:'wrong',version:'2',build:'3',environment:'production',apiBaseUrl:'https://staging.example.com'}))];
+ const report=A.preflight(files,{release:{platform:'Android',appIdAndroid:'com.example.demo',version:'1',build:'2',environment:'production'}},{permissions:[]});assert.ok(report.errors>=4);assert.ok(report.findings.some(f=>f.field==='applicationId'));
+});
+test('Release comparison captures permission descriptions, product changes, item reasons and evidence',()=>{
+ const {context}=setup(),compare=context.window.ReleaseAnalysis.compare;
+ const before={release:{version:'1'},permissions:{selected:['camera'],descs:{camera:'Scan'}},items:[{id:'a',text:'Task',state:'skip',reason:'old'}],subscriptions:[{id:'p',price:'1'}],evidenceFiles:{f:{assetId:'old'}}};
+ const after={release:{version:'2'},permissions:{selected:['camera','photos'],descs:{camera:'Photo'}},items:[{id:'a',text:'Task',state:'done',evidence:'proof'}],subscriptions:[{id:'p',price:'2'}],evidenceFiles:{f:{assetId:'new'}}};
+ const diff=compare(before,after);for(const area of ['发布信息','权限','检查项','订阅商品','证据附件'])assert.ok(diff.changes.some(c=>c.area===area));
+});
+test('Attachment backups verify integrity, avoid snapshot binary duplication, and retain assets on restore',async()=>{
+ const {S}=setup(),bytes=Buffer.from('evidence'),sha256=require('node:crypto').createHash('sha256').update(bytes).digest('hex'),assetId='asset_'+sha256;
+ const assets={[assetId]:{id:assetId,data:bytes.toString('base64'),size:bytes.length,sha256}};
+ const id=await S.create({name:'Evidence',assets,review:{release:{},items:{proof:{evidenceRequired:'on',attachmentIds:'["file"]'}},history:[],evidenceFiles:{file:{id:'file',assetId,name:'proof.txt',taskIds:['proof']}}},document:'# Evidence\n## Tasks\n- [x] Proof <!-- task:proof -->\n'});assert.equal(S.readiness(S.get(id)).ready,true);
+ await S.mutate(id,1,'unlink',p=>{p.review.evidenceFiles={};p.review.items.proof.attachmentIds='[]';});assert.equal(S.readiness(S.get(id)).ready,false);const snap=S.get(id).snapshots[0];assert.equal(snap.state.assets,undefined);
+ await S.mutate(id,2,'restore',p=>{const version=p.version;Object.assign(p,snap.state);p.version=version;});assert.equal(S.readiness(S.get(id)).ready,true);assert.ok(S.export(id).assets[assetId]);
+ const imported=await S.create({...S.export(id),name:'Imported'});assert.equal(S.readiness(S.get(imported)).ready,true);
+ const bad=JSON.parse(JSON.stringify(assets));bad[assetId].data=Buffer.from('tampered').toString('base64');bad[assetId].size=8;await assert.rejects(S.create({name:'Bad',assets:bad}),/附件校验失败/);
+});
+test('Custom template library and form drafts roundtrip in full workspace backup',async()=>{
+ const {S,context}=setup();await S.initialize();await S.saveTemplate({id:'custom',name:'Custom',document:'# App\n## Tasks\n- [ ] Task <!-- task:proof -->\n',requirements:{proof:{required:'on',evidenceRequired:'on'}}});
+ const id=await S.create({name:'Forms'});context.localStorage.setItem('app-release-checklist-state-v2:pages:'+id+':forms',JSON.stringify({format:'release-desk-form-draft/v1',generation:1,revision:'1',release:{version:'draft'}}));const backup=S.exportAll();assert.ok(backup.templates.custom);assert.equal(backup.drafts[id].forms.release.version,'draft');
+ const result=await S.importAll(backup);assert.equal(S.listTemplates().filter(t=>!t.builtin).length,2);assert.equal(JSON.parse(context.localStorage.getItem('app-release-checklist-state-v2:pages:'+result.ids[0]+':forms')).release.version,'draft');
+});
+
+
+test('Migrated markers never become empty writable compatibility workspaces',async()=>{
+ for(const forcedLegacy of [false,true]){const {S,context}=setup(),raw=JSON.stringify({schema:1,storageVersion:3,projects:{},migratedAt:123});context.localStorage.setItem(S.KEY,raw);if(forcedLegacy)context.localStorage.setItem(S.KEY+':storage-mode','legacy');await assert.rejects(S.initialize(),/迁移标记/);assert.throws(()=>S.list(),/迁移标记/);await assert.rejects(S.create({name:'Must not create'}),/迁移标记/);assert.equal(context.localStorage.getItem(S.KEY),raw);}
+ const {S,context}=setup();const id=await S.create({name:'Before switch'}),marker=JSON.stringify({schema:1,storageVersion:3,projects:{}});context.localStorage.setItem(S.KEY,marker);let invoked=false;await assert.rejects(S.mutate(id,1,'stale legacy',()=>{invoked=true;}),/迁移标记/);assert.equal(invoked,false);assert.equal(context.localStorage.getItem(S.KEY),marker);
+});
+test('Over-limit attachment merges abort pull atomically and block upload before writing',async()=>{
+ const {S,context}=setup(),bytes=Buffer.alloc(4*1024*1024,1),sha256=require('node:crypto').createHash('sha256').update(bytes).digest('hex'),asset={data:bytes.toString('base64'),size:bytes.length,sha256},assets=prefix=>Object.fromEntries([0,1,2].map(n=>[prefix+n,asset]));
+ const id=await S.create({name:'Local twelve MiB',assets:assets('local')});const local=S.exportAll(),remote=JSON.parse(JSON.stringify(local));remote.projects[0].assets=assets('remote');remote.projects[0].review.release.version='remote';remote.projects.unshift({...remote.projects[0],id:'remote-only',name:'Must roll back',assets:{}});remote.templates={incoming:{id:'incoming',name:'Must roll back',document:'# Template\n## Tasks\n- [ ] One\n'}};const before=context.localStorage.getItem(S.KEY);
+ await assert.rejects(S.mergeRemoteAll(remote),/合并附件失败.*20 MiB/);assert.equal(context.localStorage.getItem(S.KEY),before);assert.equal(S.list().length,1);assert.equal(S.get(id).version,1);assert.equal(S.read().templates,undefined);
+ // Exercise the upload merger from the actual sync module, without running browser boot.
+ context.PagesStore=S;context.document={readyState:'loading',addEventListener:()=>{}};const sync=fs.readFileSync('pages/github-sync.js','utf8').replace('function esc(value){','window.testUploadMerge=mergedForUpload;\nfunction esc(value){');vm.runInContext(sync,context);assert.throws(()=>context.window.testUploadMerge(local,remote),/合并附件失败.*20 MiB/);assert.equal(context.localStorage.getItem(S.KEY),before);
+ const boundary=S.mergeAssets(assets('local'),{remote0:asset,remote1:asset});assert.equal(Object.values(boundary).reduce((n,a)=>n+a.size,0),20*1024*1024);assert.equal(Object.keys(S.mergeAssets(assets('local'),assets('local'))).length,3);
+ await S.mutate(id,1,'still editable',p=>p.review.release.version='2');assert.equal(S.get(id).version,2);
+});
+test('Calendar boundaries use the same project timezone in browser and server policies',()=>{
+ const {context}=setup(),R=context.window.ReleaseReadiness;
+ const item={id:'review',text:'Review',state:'skip',reason:'Not applicable',exceptionType:'not-applicable',exceptionOwner:'Owner',reviewDue:'2026-10-30'};
+ const scenarios=[
+  [{items:[item]},'2026-10-30T15:59:59Z','2026-10-30',true],
+  [{items:[item]},'2026-10-30T16:00:00Z','2026-10-31',false],
+  [{items:[item],release:{timeZone:'America/Los_Angeles'}},'2026-10-30T16:30:00Z','2026-10-30',true],
+  [{items:[{id:'proof',text:'Proof',state:'done',evidenceRequired:'on',evidence:'proof.png',evidenceExpiresAt:'2026-10-30'}]},'2026-10-30T16:30:00Z','2026-10-31',false],
+  [{items:[{...item,exceptionType:'risk-accepted',reviewDue:'2027-01-01',approvalStatus:'approved',approvalBy:'Reviewer',approvalDate:'2026-10-31'}]},'2026-10-30T16:30:00Z','2026-10-31',true],
+  [{items:[{...item,reviewDue:'2026-11-01'}],release:{timeZone:'America/Los_Angeles'}},'2026-11-02T07:59:59Z','2026-11-01',true],
+  [{items:[{...item,reviewDue:'2026-11-01'}],release:{timeZone:'America/Los_Angeles'}},'2026-11-02T08:00:00Z','2026-11-02',false]
+ ];
+ for(const [snapshot,now,day,ready] of scenarios){const actual=R.assess(snapshot,now);assert.equal(actual.assessedOn,day);assert.equal(actual.ready,ready);const python=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,sys;from release_policy import assess;print(json.dumps(assess(json.loads(sys.argv[1]),sys.argv[2]),ensure_ascii=False))",JSON.stringify(snapshot),now],{encoding:'utf8'}));assert.deepEqual(JSON.parse(JSON.stringify(actual)),python);}
+ assert.throws(()=>R.calendarDate('2026-10-30T16:30:00Z','Invalid/Timezone'));assert.equal(R.calendarDate('2026-10-30T16:30:00+00:00'),'2026-10-31');
+});
+test('Release timezone is validated and retained through project backup',async()=>{
+ const {S}=setup();await assert.rejects(S.create({name:'Invalid timezone',review:{release:{timeZone:'Invalid/Timezone'},items:{},history:[]}}),/发布时区无效/);const id=await S.create({name:'Timezone',review:{release:{timeZone:'America/Los_Angeles'},items:{},history:[]}});const imported=await S.create({...S.export(id),name:'Timezone imported'});assert.equal(S.get(imported).review.release.timeZone,'America/Los_Angeles');
 });

@@ -40,7 +40,10 @@ jobs:
           TEST_DATABASE_URL: postgresql://release_test:test-only-password@localhost:5432/release_test
         run: python -m unittest -v test_online
       - run: python test_http_integration.py
-      - run: node --check board.js
+      - name: Check assembled shared board modules
+        run: |
+          python -c "from pathlib import Path; import checklist_tool as c; Path('/tmp/release-board.js').write_text(c.load_board_js())"
+          node --check /tmp/release-board.js
       - run: node --check online/static/app.js
       - run: node --check pages/experience.js
       - name: Build and verify Pages personal edition
@@ -53,5 +56,6 @@ jobs:
           npm install --no-save --package-lock=false playwright@1.62.1
           npx playwright install --with-deps chromium
           node scripts/test_pages_render.cjs
+          node scripts/test_workflows.cjs
       - name: Build production image
         run: docker build -t release-desk:test .

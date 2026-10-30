@@ -10,6 +10,7 @@
       feature=(rules.featureGroups||[]).find(g=>new RegExp(g.heading).test(block.title))?.feature||null;
      }
      if(block.type!=='item')continue;
+     if(rules.platformItems?.[block.id])block.platform=rules.platformItems[block.id];
      const knownFeature=rules.featureConditions?.[block.id]||feature||(rules.featureText||[]).find(r=>block.text.includes(r.contains))?.feature;
      if(knownFeature)block.cond=knownFeature;
      const requirement=rules.itemRules?.[block.id]||(group?(group.rules.find(r=>block.text.includes(r.contains))?.requires||group.default):null);
@@ -17,6 +18,7 @@
     }
    }
   },
+  platformVisible(item,platform){const normalized=String(platform||'').trim().toLowerCase();return !item.platform||!['ios','android'].includes(normalized)||item.platform===normalized;},
   visible(rule,selected,profiles){
    if(!rule)return true;const ids=new Set(selected||[]);if(Array.isArray(rule))return rule.some(id=>ids.has(id));
    const picked=(profiles.permissions||[]).filter(p=>ids.has(p.id));

@@ -18,6 +18,7 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import checklist_tool as checklist
+from release_policy import assess as assess_release, calendar_date
 from .db import Database, project_state, snapshot
 
 ROOT = Path(__file__).resolve().parent
@@ -264,6 +265,8 @@ def create_app(overrides=None):
             abort(400, '清单中至少需要一个 Markdown 检查项')
         document = checklist.stabilize_document(document)
         permissions = data.get('permissions', {'selected': [], 'descs': {}, 'descsEn': {}})
+        if data.get('assets'):
+            abort(400, '此项目包含浏览器证据附件，请在 Pages 个人版导入完整 JSON，在线版不会丢弃附件后继续导入')
         review = data.get('review', {'release': {}, 'items': {}, 'history': []})
         validate_permissions(permissions)
         validate_review(review)
@@ -284,7 +287,7 @@ def create_app(overrides=None):
         page = checklist.TEMPLATE.read_text(encoding='utf-8')
         cloud = {'projectId': project_id, 'userId': g.user['id'], 'csrf': g.session['csrf'], 'role': project['role']}
         script = 'window.RELEASE_CLOUD=' + encode(cloud).replace('</', '<\\/') + ';'
-        js = (checklist.HERE / 'board.js').read_text(encoding='utf-8')
+        js = checklist.load_board_js()
         js = js.replace('将恢复 Markdown 清单，当前文件会先备份。权限面板和发布记录保留当前值。未保存勾选将丢弃，是否继续？', '将恢复完整项目快照，包含清单、权限配置和发布记录；当前项目会先备份。未保存勾选将丢弃，是否继续？')
         js = js.replace('已连接 · 可写回文件', '云端已连接 · 修改可同步').replace('本地服务', '在线服务').replace('仅本机保存', '草稿仅保存在当前浏览器')
         if project['role'] == 'viewer':
@@ -402,13 +405,17 @@ def create_app(overrides=None):
                     abort(400, '请填写新版本号和保留选项')
                 review = json.loads(project['review'])
                 before = project_payload(project)
-                review.setdefault('history', []).append({'subscriptions': review.get('subscriptions', []), 'release': review.get('release', {}), 'date': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'features': before['features'], 'permissions': json.loads(project['permissions']), 'items': [{**item, 'applicable': before['features'].get(item.get('cond'), True) and checklist.permission_visibility.visible(item.get('permissionRule'), json.loads(project['permissions'])['selected'], checklist.load_profiles()), **review.get('items', {}).get(item['id'], {})} for item in before['items'] if not item['gate']]})
+                review.setdefault('history', []).append({'preflight': review.get('preflight'), 'evidenceFiles': review.get('evidenceFiles', {}), 'subscriptions': review.get('subscriptions', []), 'release': review.get('release', {}), 'date': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'features': before['features'], 'permissions': json.loads(project['permissions']), 'items': [{**review.get('items', {}).get(item['id'], {}), **item, 'applicable': before['features'].get(item.get('cond'), True) and checklist.permission_visibility.visible(item.get('permissionRule'), json.loads(project['permissions'])['selected'], checklist.load_profiles()) and checklist.permission_visibility.platform_visible(item, review.get('release', {}).get('platform'))} for item in before['items'] if not item['gate']]})
+                review['history'][-1]['readiness'] = assess_release(review['history'][-1])
                 parsed = checklist.parse_md(project['document'])
                 gate = checklist.find_gate_item(parsed)
                 project['document'] = checklist.apply_states(project['document'], parsed, {item['id']: 'todo' for item in parsed['items'] if not gate or item['id'] != gate['id']})
                 retained = {}
                 for key, item in review.get('items', {}).items():
-                    saved = {k: v for k, v in item.items() if (k in ('notes', 'reason') and data['keepNotes']) or (k == 'evidence' and data['keepEvidence'])}
+                    saved = {k: v for k, v in item.items() if k in ('required', 'evidenceRequired') or (k in ('notes', 'reason', 'exceptionType', 'exceptionOwner', 'reviewDue') and data['keepNotes']) or (k == 'evidence' and data['keepEvidence'])}
+                    if data['keepNotes'] and item.get('exceptionType') not in (None, 'legacy'):
+                        saved['approvalStatus'] = 'pending'
+                        saved['reviewStatus'] = 'pending'
                     if saved: retained[key] = saved
                 review['items'] = retained
                 review['release'] = release
@@ -516,6 +523,13 @@ def create_app(overrides=None):
 def validate_review(value):
     if not isinstance(value, dict) or not isinstance(value.get('release', {}), dict) or not isinstance(value.get('items', {}), dict) or not isinstance(value.get('history', []), list):
         abort(400, '发布记录无效')
+    try:
+        calendar_date(time_zone=value.get('release', {}).get('timeZone'))
+    except ValueError as error:
+        abort(400, str(error))
+    preflight = value.get('preflight')
+    if preflight is not None and (not isinstance(preflight, dict) or not isinstance(preflight.get('findings'), list) or type(preflight.get('errors')) is not int or preflight['errors'] < 0):
+        abort(400, '配置预检报告格式无效')
     subscriptions = value.get('subscriptions', [])
     if not isinstance(subscriptions, list) or len(subscriptions) > 100 or any(not isinstance(p, dict) or any(not isinstance(v, str) or len(v) > 4000 for v in p.values()) for p in subscriptions):
         abort(400, '订阅商品配置无效')

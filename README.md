@@ -61,3 +61,7 @@ python3 checklist_tool.py build
 ```
 
 HTTP 集成测试只绑定本机随机端口并使用临时目录，需要环境允许本机监听。浏览器验证还应覆盖勾选保存、版本冲突、备注保存、归档、摘要下载和刷新恢复。
+
+Pages 个人工作流的最新入口、发布就绪检查、创建配置和存储评估见 [PAGES.md](PAGES.md#整体体验与发布就绪检查)。共用看板模块位于 `board/`，由 `checklist_tool.load_board_js()` 统一组装；修改任一模块后重新运行 `python3 scripts/build_pages.py`。
+
+个人版现已加入 IndexedDB 自动迁移与回退、可随备份保存的证据附件、配置自动预检、通用模板库、发布批次对比、例外复查和发布总览。入口与文件大小限制见 [完整发布工作流](PAGES.md#完整发布工作流)。

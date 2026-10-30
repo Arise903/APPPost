@@ -1,3 +1,6 @@
+// @include release_analysis.js
+// @include release_readiness.js
+// @include board/experience.js
 // Cloud instances scope every request, draft and guide to its project.
 function boardFetch(path, options){
   const cloud = window.RELEASE_CLOUD;
@@ -16,8 +19,10 @@ function featureHasChanges(){return typeof featureSnapshot!=="undefined" && feat
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
  const permissionPending=typeof permDirty!=="undefined"&&permDirty;
- const pending=(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
+ const extraPending=boardPendingDetails();
+ const pending=extraPending.length>0||(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
  let label=saveFailure?"保存失败 · "+saveFailure:localDraftFailure?localDraftFailure:(savingOperations>0||(typeof queuedWrites!=='undefined'&&queuedWrites>0))?"保存中…":pending?"有未保存修改":lastSavedAt?"已保存 · "+new Date(lastSavedAt).toLocaleString():"尚无待保存修改";
+ if(pending&&extraPending.length)label+=' · '+extraPending.join('、');
  el.textContent=label;el.dataset.state=saveFailure||localDraftFailure?'error':savingOperations?'saving':pending?'pending':'saved';
  const mobile=document.getElementById("mobileStatus");if(mobile)mobile.textContent=label;
  const save=document.getElementById("mobileSave");if(save)save.disabled=savingOperations>0||!online;
@@ -213,24 +218,12 @@ function makeItem(b){
   note.className = "btn";
   note.type = "button";
   note.textContent = "备注 / 证据";
-  note.onclick = async () => {
-    if(!online){ toast("请连接服务后编辑检查记录"); return; }
-    const old = (reviewData.items || {})[b.id] || {};
-    const reason = prompt("跳过原因（不适用 / 暂缓 / 待他人处理，可自行填写）", old.reason || "");
-    if(reason === null) return;
-    const notes = prompt("检查备注", old.notes || "");
-    if(notes === null) return;
-    const evidence = prompt("验证证据：文件路径、截图路径或链接", old.evidence || "");
-    if(evidence === null) return;
-    const next = JSON.parse(JSON.stringify(reviewData));
-    next.items = next.items || {};
-    next.items[b.id] = {reason, notes, evidence};
-    await persistReview(next);
-  };
+  note.onclick = () => openItemReview(b);
   li.appendChild(note);
   const details = (reviewData.items || {})[b.id];
   if(details){
     const small = document.createElement("small");
+    small.className="item-evidence-summary";
     small.textContent = [details.reason, details.notes, details.evidence].filter(Boolean).join(" · ");
     li.appendChild(small);
   }
@@ -439,7 +432,7 @@ function applyFeatures(){
     (blocks || []).forEach(b => {
       if(b.type !== "item") return;
       if(b.gate){ b.visible = true; b.seq = ""; return; }
-      b.visible = condOk(b.cond) && PermissionVisibility.visible(b.permissionRule, DATA.permSelected || [], EMBEDDED_PROFILES);
+      b.visible = PermissionVisibility.platformVisible(b,reviewData.release?.platform) && condOk(b.cond) && PermissionVisibility.visible(b.permissionRule, DATA.permSelected || [], EMBEDDED_PROFILES);
       if(b.visible){ n++; b.seq = n; } else { b.seq = ""; }
     });
   };
@@ -671,6 +664,7 @@ function jumpToCurrent(){
 }
 function refreshAll(){
   updateSaveStatus();
+  refreshReadiness();
   // 先按顺序计算锁定，再统一应用
   const firstOpen = computeLocks();
   document.querySelectorAll("li.item").forEach(li => {
@@ -703,33 +697,8 @@ function setMode(live){
 /* ------------------------------------------------------------------ *
  * 与本地服务通信
  * ------------------------------------------------------------------ */
-let saveQueue=Promise.resolve(), queuedWrites=0;
-function api(path,body){
- const writing=body!==undefined&&!['/api/backups','/api/perm-config','/api/perm-en-preview','/api/perm-write-en'].includes(path);
- if(!writing)return apiRequest(path,body);
- queuedWrites++;updateSaveStatus();
- const observedRevision=baseRevision;
- const result=saveQueue.catch(()=>{}).then(()=>apiRequest(path,{...body,revision:body.revision===undefined||body.revision===observedRevision?baseRevision:body.revision}));
- saveQueue=result.finally(()=>{queuedWrites--;setTimeout(updateSaveStatus,0);});saveQueue.catch(()=>{});return result;
-}
-async function apiRequest(path, body){
-  const writing = body !== undefined && !["/api/profiles", "/api/backups", "/api/perm-config", "/api/perm-en-preview", "/api/perm-write-en"].includes(path);
-  if(writing){ savingOperations++; saveFailure=""; updateSaveStatus(); }
-  try{
-  const opt = body === undefined ? {} : {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(Object.assign({revision:baseRevision}, body))
-  };
-  const r = await boardFetch(path, opt);
-  if(!r.ok){ const err = await r.json().catch(() => ({})); throw new Error(err.error || (path + " -> HTTP " + r.status)); }
-  const data = await r.json();
-  if(body !== undefined && data.revision){ baseRevision = data.revision; saveState(); }
-  if(writing) lastSavedAt = Date.now();
-  return data;
-  }catch(error){ if(writing) saveFailure=error.message; throw error; }
-  finally{ if(writing) savingOperations--; setTimeout(updateSaveStatus,0); }
-}
+// @include board/persistence.js
+
 async function loadFromServer(){
   try{
     const d = await api("/api/list");
@@ -791,6 +760,8 @@ function mergeItems(d){
     done: d.done != null ? d.done : 0,
     skipped: d.skipped != null ? d.skipped : 0,
     mdName: d.mdName || (em && em.mdName) || "清单文件",
+    permDescs:d.permDescs||em?.permDescs||{},permDescsEn:d.permDescsEn||em?.permDescsEn||{},
+    assetIds:d.assetIds||em?.assetIds||[],
     permSelected: Array.isArray(d.permSelected) ? d.permSelected : ((em && em.permSelected) || []),
     features: d.features || (em && em.features) || {hasAccountSystem:true, targetMinors:true}
   };
@@ -1033,450 +1004,10 @@ document.getElementById("mClear").addEventListener("click", async () => {
 
 /* ---- 离开前提醒未保存 ---- */
 window.addEventListener("beforeunload", e => {
-  if((dirty || featureHasChanges() || permDirty || savingOperations>0) && online){ e.preventDefault(); e.returnValue = ""; }
+  if((dirty || featureHasChanges() || permDirty || savingOperations>0 || boardPendingDetails().length) && online){ e.preventDefault(); e.returnValue = ""; }
 });
 
-/* ------------------------------------------------------------------ *
- * 权限与隐私配置面板
- * ------------------------------------------------------------------ */
-let PROFILES = null;         // 权限元数据
-let permFocusReturn = null;
-let permSelected = [];       // 选中的权限 id
-let permDescs = {};          // {permId: 中文用途描述}
-let permDescsEn = {};        // {permId: 英文用途描述}
-let permLang = "zh";         // 当前描述编辑语言
-let permDirty = false;       // 面板内是否有未写入的改动
-let gateDone = false;         // 是否已确认阅读使用说明（门禁）
-
-function permById(id){
-  return (PROFILES && PROFILES.permissions || []).find(p => p.id === id);
-}
-function iosKeysOf(p){
-  const ios = (p && p.ios) || {};
-  if(ios.infoplist_keys) return ios.infoplist_keys;
-  if(ios.infoplist_key) return [{key: ios.infoplist_key, desc: ios.desc || "", desc_en: ios.desc_en || ""}];
-  return [];
-}
-function escapeHtml(s){
-  return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-}
-
-async function loadProfiles(){
-  if(PROFILES) return PROFILES;
-  try{
-    const r = await boardFetch("/api/profiles");
-    PROFILES = await r.json();
-  }catch(e){
-    PROFILES = window.EMBEDDED_PROFILES || {scenarios:[],permissions:[],groups:[],appstore_data_types:[]};  }
-  return PROFILES;
-}
-
-function renderScenarios(){
-  const box = document.getElementById("scenarios");
-  box.innerHTML = "";
-  (PROFILES.scenarios || []).forEach(s => {
-    const b = document.createElement("button");
-    b.className = "scen";
-    b.type = "button";
-    b.innerHTML = "<b>" + escapeHtml(s.name) + "</b><span>" + escapeHtml(s.desc || "") + "</span>";
-    b.addEventListener("click", () => {
-      permSelected = (s.permissions || []).slice();
-      permDescs = {};
-      permDescsEn = {};
-      permDirty = true;
-      renderPerms();
-      refreshPermGen();
-    });
-    box.appendChild(b);
-  });
-}
-
-function renderPerms(){
-  const box = document.getElementById("permGroups");
-  box.innerHTML = "";
-  const groups = PROFILES.groups || [];
-  const perms = PROFILES.permissions || [];
-  const used = new Set(permSelected);
-
-  const byGroup = new Map();
-  groups.forEach(g => byGroup.set(g.id, []));
-  perms.forEach(p => {
-    if(!byGroup.has(p.group)) byGroup.set(p.group, []);
-    byGroup.get(p.group).push(p);
-  });
-
-  for(const [gid, list] of byGroup.entries()){
-    if(!list.length) continue;
-    const gname = (groups.find(g => g.id === gid) || {}).name || gid;
-    const wrap = document.createElement("div");
-    wrap.style.marginBottom = "14px";
-    const h = document.createElement("div");
-    h.style.cssText = "font-size:11.5px;color:var(--text-3);margin:0 0 7px";
-    h.textContent = gname;
-    wrap.appendChild(h);
-
-    const grid = document.createElement("div");
-    grid.className = "permgrid";
-    list.forEach(p => {
-      const el = document.createElement("div");
-      el.className = "perm" + (used.has(p.id) ? " on" : "");
-      const iosKeys = iosKeysOf(p);
-      const a = p.android || {};
-      const io = [];
-      iosKeys.forEach(k => io.push(k.key));
-      if(a.manifest) io.push(a.manifest);
-      const nm = permLang === "en" ? (p.name_en || p.id) : p.name;
-      const hint = permLang === "en" ? (p.panel_hint_en || "") : (p.panel_hint || "");
-      el.innerHTML =
-        '<div class="nm"><span class="tick"></span>' + escapeHtml(nm) + "</div>" +
-        '<div class="io">' + (io.length
-          ? io.map(c => "<code>" + escapeHtml(c) + "</code>").join("<br>")
-          : "无需声明权限") + "</div>" +
-        (hint ? '<div class="phint">' + escapeHtml(hint) + "</div>" : "");
-      el.addEventListener("click", () => {
-        const i = permSelected.indexOf(p.id);
-        if(i >= 0) permSelected.splice(i, 1);
-        else permSelected.push(p.id);
-        permDirty = true;
-        renderPerms();
-        refreshPermGen();
-      });
-      grid.appendChild(el);
-    });
-    wrap.appendChild(grid);
-    box.appendChild(wrap);
-  }
-  renderDescs();
-}
-
-function renderDescs(){
-  const sec = document.getElementById("descSec");
-  const list = document.getElementById("descList");
-  list.innerHTML = "";
-  if(!permSelected.length){ sec.style.display = "none"; return; }
-  sec.style.display = "";
-  const en = permLang === "en";
-  permSelected.forEach(pid => {
-    const p = permById(pid);
-    if(!p) return;
-    const keys = iosKeysOf(p);
-    const label = keys.length
-      ? keys.map(k => k.key).join(" / ")
-      : ((p.android && p.android.manifest) || "无需声明");
-    const row = document.createElement("div");
-    row.className = "descrow";
-    // 默认文案：当前语言下 用户已改过 > 内置默认 > 另一语言 用户已改过 > 另一语言内置默认
-    let def;
-    if(en){
-      const kEn = keys.length ? (keys.find(k=>k.desc_en) || keys[0]) : null;
-      def = permDescsEn[pid] != null ? permDescsEn[pid]
-            : ((kEn && kEn.desc_en) || ((p.android||{}).desc_en) || permDescs[pid] || "");
-    }else{
-      def = permDescs[pid] != null ? permDescs[pid]
-            : ((keys[0] && keys[0].desc) || (p.android && p.android.desc) || permDescsEn[pid] || "");
-    }
-    row.innerHTML =
-      '<span class="lbl">' + escapeHtml(en ? (p.name_en || p.id) : p.name) + '</span>' +
-      '<input type="text" value="' + escapeHtml(def) + '" placeholder="' +
-        (en ? "Describe the purpose in English" : "填写用途描述") + '">' +
-      '<span style="font-size:11px;color:var(--text-3);flex:0 0 auto">' + escapeHtml(label) + "</span>";
-    const input = row.querySelector("input");
-    input.addEventListener("input", () => {
-      if(en) permDescsEn[pid] = input.value;
-      else permDescs[pid] = input.value;
-      permDirty = true;
-      refreshPermGen();
-    });
-    list.appendChild(row);
-  });
-  document.getElementById("langHint").textContent = en
-    ? "English strings are used in the generated privacy policy and the English document. "
-      + "Leave a field empty to fall back to the built-in wording."
-    : "中文文案用于生成的中文隐私政策与 Info.plist；英文版请切到 English 标签填写。";
-}
-
-function refreshPermissionVisibilityNote(){
- const el=document.getElementById('permissionFilterNote');if(!el||!DATA)return;
- PermissionVisibility.annotate(DATA.sections,PERMISSION_RULES);
- const rows=DATA.sections.flatMap(s=>s.blocks).filter(b=>b.type==='item'&&b.permissionRule&&condOk(b.cond));
- const visible=rows.filter(b=>PermissionVisibility.visible(b.permissionRule,permSelected,EMBEDDED_PROFILES)).length;
- el.textContent='权限筛选：'+visible+' 项核对适用，'+(rows.length-visible)+' 项因未选对应权限隐藏。权限改动自动保存。';
-}
-async function refreshPermGen(){
-  const body = {selected: permSelected, descs: permDescs, descsEn: permDescsEn, lang: permLang};
-  let cfg = null;
-  try{
-    const r = await boardFetch("/api/perm-config", {
-      method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)
-    });
-    cfg = await r.json();
-  }catch(e){
-    cfg = genLocally();
-  }
-  if(!cfg) return;
-  refreshPermissionVisibilityNote();
-  document.getElementById("gen-ios").textContent =
-    "<dict>\n" + (cfg.iosPlist || "    <!-- 无需添加权限声明 -->") + "\n</dict>";
-  document.getElementById("gen-android").textContent =
-    cfg.androidManifest || "<!-- 无需添加权限声明 -->";
-  document.getElementById("gen-policy").textContent =
-    cfg.privacyPolicy || "_当前选中的权限无需在隐私政策中单独说明。_";
-
-  const as = document.getElementById("gen-appstore");
-  as.innerHTML = "";
-  if(cfg.appstore && cfg.appstore.length){
-    cfg.appstore.forEach(l => {
-      const li = document.createElement("li");
-      li.textContent = "☐ " + l;
-      as.appendChild(li);
-    });
-  }else{
-    const li = document.createElement("li");
-    li.textContent = "未选择任何数据类型（若 App 仅使用 localStorage，可选择「不收集数据」）";
-    as.appendChild(li);
-  }
-
-  const ck = document.getElementById("gen-checks");
-  ck.innerHTML = "";
-  if(cfg.checks && cfg.checks.length){
-    cfg.checks.forEach(c => {
-      const li = document.createElement("li");
-      li.textContent = c;
-      ck.appendChild(li);
-    });
- }else{
-    const li = document.createElement("li");
-    li.textContent = "无";
-    ck.appendChild(li);
-  }
-
-  const warn = document.getElementById("permWarn");
-  if(cfg.missing && cfg.missing.length){
-    warn.classList.remove("hidden");
-    warn.innerHTML = "⚠️ " + cfg.missing.map(escapeHtml).join("；");
-  }else{
-    warn.classList.add("hidden");
-  }
-
-  document.getElementById("permHint").textContent =
-    permSelected.length ? ("已选 " + permSelected.length + " 项权限") : "尚未选择权限";
-
-  refreshEnPreview();
-
-  schedulePermSave();
-}
-
-/* 刷新英文文档预览 */
-async function refreshEnPreview(){
-  const box = document.getElementById("enPreview");
-  if(!box) return;
-  try{
-    const r = await boardFetch("/api/perm-en-preview", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({selected: permSelected, descsEn: permDescsEn})
-    });
-    const d = await r.json();
-    if(d.error){ box.textContent = "英文文档生成失败：" + d.error; return; }
-    const doc = d.doc || "";
-    const lines = doc.split("\n");
-    const ph = (doc.match(/\[[A-Z][A-Z0-9 /\-\.]*\]/g) || []).filter((v,i,a)=>a.indexOf(v)===i);
-
-    // 展示头部 + Part 3 权限文案段（用户最关心自己改的部分）
-    const head = lines.slice(0, 14).join("\n");
-    let p3 = "";
-    const i3 = lines.findIndex(l => l.indexOf("## Part 3") === 0);
-    if(i3 >= 0) p3 = lines.slice(i3, i3 + Math.min(40, lines.length - i3)).join("\n");
-
-    box.textContent =
-      "共 " + lines.length + " 行 · " + permSelected.length + " 项权限 · " + ph.length + " 个待填占位符\n\n" +
-      "──── 文档开头 ────\n" + head + "\n\n" +
-      "──── Part 3 权限文案（你改的内容在这里）────\n" + (p3 || "（无）") + "\n\n" +
-      "完整内容请点「导出英文文档」";
-  }catch(e){
-    box.textContent = "英文文档预览不可用（离线模式）";
-  }
-}
-
-/* 离线兜底：本地生成（与服务端逻辑保持一致的核心部分） */
-function genLocally(){
-  const ios = [], android = [], appstore = [], policy = [], checks = [], missing = [];
-  const en = permLang === "en";
-  permSelected.forEach(pid => {
-    const p = permById(pid);
-    if(!p) return;
-    iosKeysOf(p).forEach(k => {
-      const d = en
-        ? (permDescsEn[pid] != null ? permDescsEn[pid] : (k.desc_en || permDescs[pid] || ""))
-        : (permDescs[pid] != null ? permDescs[pid] : (k.desc || permDescsEn[pid] || ""));
-      if(!d.trim()) missing.push(p.name + "：缺少用途描述");
-      ios.push("<key>" + escapeHtml(k.key) + "</key>\n<string>" + escapeHtml(d) + "</string>");
-    });
-    const a = p.android || {};
-    if(a.manifest){
-      android.push('<uses-permission android:name="' + a.manifest + '" />');
-      checks.push("〔" + p.name + "〕Android " + (a.runtime ? "运行时权限，需动态申请" : "普通权限"));
-    }
-    ((p.ios || {}).appstore_labels || []).forEach(l => {
-      const cn = ((PROFILES.appstore_data_types || []).find(t => t.en === l) || {}).name || l;
-      const entry = cn + "（" + l + "）";
-      if(!appstore.includes(entry)) appstore.push(entry);
-    });
-    const pname = en ? (p.name_en || p.id) : p.name;
-    const ptext = en ? (p.policy_text_en || p.policy_text) : p.policy_text;
-    if(ptext) policy.push("- **" + pname + "**：" + ptext);
-    const notes = en ? (p.review_notes_en || p.review_notes) : p.review_notes;
-    (notes || []).forEach(n => checks.push("〔" + pname + "〕" + n));
-  });
-  return {iosPlist: ios.join("\n"), androidManifest: android.join("\n"),
-          appstore, privacyPolicy: policy.join("\n"), checks, missing};
-}
-
-async function openPermPanel(){
-  permFocusReturn=document.activeElement;
-  await loadProfiles();
-  document.getElementById("permHint").textContent = "权限资料待逐项核验；请核对目标平台版本与官方文档。";
-  // 预填：优先服务端记录的面板状态（选中项 + 中英文自定义描述）
-  if(!permSelected.length){
-    try{
-      const r = await boardFetch("/api/list");
-      const d = await r.json();
-      if(d.permSelected && d.permSelected.length) permSelected = d.permSelected.slice();
-      if(d.permDescs && Object.keys(d.permDescs).length) permDescs = Object.assign({}, d.permDescs);
-      if(d.permDescsEn && Object.keys(d.permDescsEn).length) permDescsEn = Object.assign({}, d.permDescsEn);
-    }catch(e){
-      // 离线：退回构建时嵌入的快照
-      if(EMBEDDED && EMBEDDED.permSelected && EMBEDDED.permSelected.length){
-        permSelected = EMBEDDED.permSelected.slice();
-        if(EMBEDDED.permDescs) permDescs = Object.assign({}, EMBEDDED.permDescs);
-        if(EMBEDDED.permDescsEn) permDescsEn = Object.assign({}, EMBEDDED.permDescsEn);
-      }
-    }
-  }
-  renderScenarios();
-  renderPerms();
-  refreshPermGen();
-  document.getElementById("permPanel").classList.add("on");
-  document.getElementById("permClose").focus();
-}
-function closePermPanel(){
-  document.getElementById("permPanel").classList.remove("on");
-  if(permFocusReturn&&permFocusReturn.isConnected)permFocusReturn.focus();
-  permFocusReturn=null;
-}
-
-document.getElementById("btnPerm").addEventListener("click", openPermPanel);
-document.getElementById("permClose").addEventListener("click", closePermPanel);
-document.getElementById("permCancel").addEventListener("click", closePermPanel);
-
-/* 用途描述语言切换 */
-document.getElementById("langTabs").addEventListener("click", e => {
-  const btn = e.target.closest(".langtab");
-  if(!btn) return;
-  permLang = btn.dataset.lang;
-  document.querySelectorAll("#langTabs .langtab").forEach(b => b.classList.toggle("on", b === btn));
-  renderPerms();     // 权限卡片上的提示语也跟着切换
-  refreshPermGen();
-});
-
-/* 导出英文文档 */
-document.getElementById("permEn").addEventListener("click", async () => {
-  if(!online){ toast("离线模式无法写入文件，请启动本地服务"); return; }
-  try{
-    const d = await api("/api/perm-write-en", {selected: permSelected, descsEn: permDescsEn});
-    if(window.RELEASE_CLOUD){ const link = document.createElement("a"); const url = URL.createObjectURL(new Blob([d.doc], {type:"text/markdown;charset=utf-8"})); link.href=url; link.download=d.path; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
-    toast("已生成 " + d.path + "（" + d.lines + " 行）");
-  }catch(e){
-    toast("生成失败：" + e.message);
-  }
-});
-document.getElementById("permPanel").addEventListener("click", e => {
-  if(e.target === document.getElementById("permPanel")) closePermPanel();
-});
-document.getElementById("permPanel").addEventListener("keydown",e=>trapDialogFocus(document.getElementById("permPanel"),e));
-document.addEventListener("keydown", e => {
-  if(e.key === "Escape" && document.getElementById("permPanel").classList.contains("on")){
-    closePermPanel();
-  }
-});
-
-/* 复制生成结果 */
-document.getElementById("permPanel").addEventListener("click", async e => {
-  const btn = e.target.closest(".copy");
-  if(!btn) return;
-  const el = document.getElementById(btn.dataset.copy);
-  if(!el) return;
-  try{
-    await navigator.clipboard.writeText(el.textContent);
-    toast("已复制到剪贴板");
-  }catch(err){
-    const r = document.createRange();
-    r.selectNodeContents(el);
-    const sel = window.getSelection();
-    sel.removeAllRanges(); sel.addRange(r);
-    toast("已选中文本，请按 Cmd+C 复制");
-  }
-});
-
-/* 写入 md 附录 */
-/* --------------------------------------------------------------
- * 权限改动 -> 自动写入 md 附录（防抖）
- * 之前必须手动点「写入 md 附录」，容易忘 —— 附录因此长期是旧的。
- * 现在改完 0.9 秒自动落盘，面板底部实时显示保存状态。
- * -------------------------------------------------------------- */
-let permSaveTimer = null;
-function setPermSaveState(kind, text){
-  const el = document.getElementById("permSaveState");
-  if(!el) return;
-  el.className = "savestate " + kind;
-  el.textContent = text || "";
-}
-function schedulePermSave(){
-  updateSaveStatus();
-  if(!permDirty) return;               // 打开面板时的初始预览不算改动
-  if(!online){
-    setPermSaveState("offline", "离线模式：改动只在本机，不会写入文件");
-    return;
-  }
-  setPermSaveState("saving", "正在写入 md…");
-  clearTimeout(permSaveTimer);
-  permSaveTimer = setTimeout(async () => {
-    try{
-      const d = await api("/api/perm-write", {
-        selected: permSelected, descs: permDescs, descsEn: permDescsEn
-      });
-      permDirty = false;
-      setPermSaveState("saved", "✓ 已写入 md 附录");
-      DATA = mergeItems(d);
-      render();
-    }catch(e){
-      setPermSaveState("error", "写入失败：" + e.message);
-    }
-  }, 900);
-}
-
-document.getElementById("permSave").addEventListener("click", async () => {
-  if(!online){ toast("离线模式无法写入文件，请启动本地服务"); return; }
-  if(!permSelected.length){
-    const ok = await askConfirm({
-      title:"清空权限配置？",
-      icon:"warn", danger:true,
-      body:"当前未选择任何权限，写入后会<b>清空 md 附录中的权限配置</b>（清单条目不受影响）。",
-      confirmText:"确认清空", cancelText:"取消"
-    });
-    if(!ok) return;
-  }
-  try{
-    const d = await api("/api/perm-write", {selected: permSelected, descs: permDescs, descsEn: permDescsEn});
-    toast("已写入 md 附录（已自动备份原文件）");
-    closePermPanel();
-    baseRevision = d.revision;
-    gen = d.generation;
-    DATA = mergeItems(d);
-    render();
-  }catch(e){
-    toast("写入失败：" + e.message);
-  }
-});
+// @include board/permissions.js
 
 /* ------------------------------------------------------------------ *
  * 更多菜单 / 快捷操作
@@ -1511,117 +1042,7 @@ document.getElementById("mGuide").addEventListener("click", () => {
 /* 点击提示条跳到当前项 */
 document.getElementById("seqline").addEventListener("click", jumpToCurrent);
 
-/* --------------------------------------------------------------
- * 项目设置：账号系统 / 未成年用户
- * 切换后立即重算可见条目并重新连续编号；保存时写回 md 的 FEATURES 行。
- * -------------------------------------------------------------- */
-const featPush = document.getElementById("featPush");
-const featSubscription = document.getElementById("featSubscription");
-const featFeedback = document.getElementById("featFeedback");
-const featAcc = document.getElementById("featAcc");
-const featMinor = document.getElementById("featMinor");
-
-function currentFeatures(){
-  return {
-    hasAccountSystem: !!(DATA && DATA.features && DATA.features.hasAccountSystem),
-    hasPush: DATA?.features?.hasPush === true,
-    hasSubscriptions: DATA?.features?.hasSubscriptions !== false,
-    hasFeedbackSystem: !!(DATA && DATA.features && DATA.features.hasFeedbackSystem),
-    targetMinors: !!(DATA && DATA.features && DATA.features.targetMinors)
-  };
-}
-function refreshFeatUI(){
-  const f = currentFeatures();
-  featPush.checked = f.hasPush;
-  featSubscription.checked = f.hasSubscriptions;
-  featFeedback.checked = f.hasFeedbackSystem;
-  featAcc.checked = f.hasAccountSystem;
-  featMinor.checked = f.targetMinors;
-  // 顶部「已隐藏 N 项」提示
-  const hidden = featureHiddenItems();
-  const pill = document.getElementById("featPill");
-  if(pill){
-    pill.classList.toggle("hidden", hidden.length === 0);
-    const b = pill.querySelector("b");
-    if(b) b.textContent = hidden.length;
-  }
-  // 面板内的预览
-  const pv = document.getElementById("featPreview");
-  if(pv){
-    const visible = (DATA.sections || []).flatMap(sec => sec.blocks || []).filter(it => it.type === "item" && !it.gate && it.visible !== false);
-    const label = {hasAccountSystem:"无用户账号系统",hasFeedbackSystem:"无用户反馈系统",hasSubscriptions:"无订阅商品",hasPush:"无推送功能",targetMinors:"不面向未成年用户"};
-    const clean = value => escapeHtml(String(value).replace(/<[^>]+>/g, "").replace(/\*\*/g, "").replace(/`/g, ""));
-    const grouped = {};
-    hidden.forEach(it => { (grouped[it.cond] = grouped[it.cond] || []).push(it.text); });
-    const shown = visible.slice(0, 12).map(it => "· " + clean(it.text)).join("<br>");
-    const hiddenHtml = Object.keys(grouped).map(key => "<span class=\"fx\"><b>" + (label[key] || key) + "</b> — " + grouped[key].length + " 项<br>" + grouped[key].map(text => "· " + clean(text)).join("<br>") + "</span>").join("");
-    pv.innerHTML = "<b>按当前开关预览（保存后生效）</b>" +
-      "<details class=\"feature-preview-group\"><summary>将显示 " + visible.length + " 项" + (visible.length > 12 ? "（先列出 12 项）" : "") + "</summary><span class=\"fx\">" + (shown || "当前没有适用条目") + "</span></details>" +
-      "<details class=\"feature-preview-group\"><summary>将隐藏 " + hidden.length + " 项</summary>" + (hiddenHtml || "<span class=\"fx\">没有隐藏检查项；权限相关条目由「权限配置」单独控制。</span>") + "</details>" +
-      "<span class=\"feature-preview-foot\">权限相关项目仍由「权限配置」控制。" + (featureHasChanges() ? "当前预览尚未保存。" : "") + "</span>";
-  }
-}
-let featureSnapshot = null;
-let featFocusReturn = null;
-function openFeatPanel(){
-  featFocusReturn=document.activeElement;
-  featureSnapshot = JSON.parse(JSON.stringify(DATA.features));
-  refreshFeatUI();
-  document.getElementById("featPanel").classList.add("on");
-  document.getElementById("featClose").focus();
-}
-function closeFeatPanel(){
-  if(featureSnapshot){ DATA.features=featureSnapshot; featureSnapshot=null; render(); refreshFeatUI(); updateSaveStatus(); }
-  document.getElementById("featPanel").classList.remove("on");
-  if(featFocusReturn&&featFocusReturn.isConnected)featFocusReturn.focus();
-  featFocusReturn=null;
-}
-document.getElementById("btnFeat").addEventListener("click", openFeatPanel);
-document.getElementById("featClose").addEventListener("click", closeFeatPanel);
-document.getElementById("featCancel").addEventListener("click", closeFeatPanel);
-document.getElementById("featPill").addEventListener("click", openFeatPanel);
-
-// 切换开关 -> 立即预览
-function onFeatToggle(){
-  saveFailure="";
-  if(!DATA) return;
-  DATA.features = {
-    hasPush: featPush.checked, hasSubscriptions: featSubscription.checked, hasFeedbackSystem: featFeedback.checked,
-    hasAccountSystem: featAcc.checked,
-    targetMinors: featMinor.checked
-  };
-  applyFeatures();
-  render();
-  refreshFeatUI();
-  updateSaveStatus();
-}
-featPush.addEventListener("change", onFeatToggle);
-featSubscription.addEventListener("change", onFeatToggle);
-featFeedback.addEventListener("change", onFeatToggle);
-featAcc.addEventListener("change", onFeatToggle);
-featMinor.addEventListener("change", onFeatToggle);
-
-// 保存到 md
-document.getElementById("featSave").addEventListener("click", async () => {
-  const f = {hasAccountSystem: featAcc.checked, targetMinors: featMinor.checked, hasPush: featPush.checked, hasSubscriptions: featSubscription.checked, hasFeedbackSystem: featFeedback.checked};
-  if(!online){
-    toast("离线模式无法写入文件，请启动本地服务");
-    return;
-  }
-  try{
-    const d = await api("/api/features", {features: f});
-    baseRevision = d.revision;
-    DATA = mergeItems(d);
-    render();
-    refreshFeatUI();
-    featureSnapshot=null;
-    closeFeatPanel();
-    updateSaveStatus();
-    toast("项目设置已保存到 md");
-  }catch(e){
-    toast("保存失败：" + e.message);
-  }
-});
+// @include board/features.js
 
 /* ---- 使用说明入口 ---- */
 function openGuide(){
@@ -1665,94 +1086,7 @@ function baselineFromData(d){
 }
 
 
-async function persistReview(next){
-  try{
-    const d = await api("/api/review", {revision:baseRevision, review:next});
-    baseRevision = d.revision;
-    reviewData = d.review;
-    updateSummaryReleaseOptions();
-    build(); refreshAll(); saveState();
-    toast("检查记录已保存");
-    return true;
-  }catch(e){ toast("保存失败：" + e.message); return false; }
-}
-document.getElementById("releaseEdit").onclick = async () => {
-  if(!online){ toast("请先连接本地服务"); return; }
-  const next = JSON.parse(JSON.stringify(reviewData));
-  next.release = next.release || {};
-  for(const [key,label] of [["app","App 名称"],["platform","平台"],["version","版本号"],["build","构建号"],["date","检查日期"],["owner","负责人"]]){
-    const value = prompt(label, next.release[key] || (key === "date" ? new Date().toLocaleDateString("sv-SE") : ""));
-    if(value === null) return;
-    next.release[key] = value;
-  }
-  await persistReview(next);
-};
-function releaseSnapshot(){
-  return {subscriptions:JSON.parse(JSON.stringify(reviewData.subscriptions||[])), release:reviewData.release || {}, date:new Date().toISOString(), features:{...DATA.features}, selectedPermissions:[...(DATA.permSelected||[])], items:DATA.sections.flatMap(s => s.blocks).filter(b => b.type === "item" && !b.gate).map(b => ({id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false, ...(reviewData.items || {})[b.id]}))};
-}
-document.getElementById("releaseArchive").onclick = async () => {
-  if(!online || dirty || featureHasChanges() || permDirty || savingOperations>0){ toast("请先保存检查进度、项目设置和权限配置，再归档"); return; }
-  if(!confirm("归档当前发布信息和检查结果？")) return;
-  const next = JSON.parse(JSON.stringify(reviewData));
-  next.history = next.history || [];
-  next.history.push(releaseSnapshot());
-  await persistReview(next);
-};
-function releaseMetrics(snapshot){
-  const applicable=(Array.isArray(snapshot.items)?snapshot.items:[]).filter(item=>item&&item.applicable!==false);
-  const done=applicable.filter(item=>item.state==="done").length;
-  const skipped=applicable.filter(item=>item.state==="skip").length;
-  const total=applicable.length;
-  return {total,done,skipped,pending:Math.max(0,total-done-skipped),percent:total?Math.round(done/total*100):0};
-}
-function updateSummaryReleaseOptions(){
-  const select=document.getElementById("summaryVersion");if(!select)return;
-  const previous=select.value,history=reviewData.history||[];
-  select.replaceChildren(new Option("当前发布 · "+(reviewData.release?.version||"未填写版本"),"current"));
-  history.forEach((snapshot,index)=>{
-    const version=snapshot.release?.version||snapshot.version||("历史发布 "+(index+1));
-    const date=snapshot.date?new Date(snapshot.date).toLocaleDateString():"";
-    select.add(new Option(version+(date?" · "+date:""),"history:"+index));
-  });
-  if([...select.options].some(option=>option.value===previous))select.value=previous;
-}
-updateSummaryReleaseOptions();
-document.getElementById("releaseSummary").onclick = () => {
-  const selection=document.getElementById("summaryVersion").value;
-  const history=reviewData.history||[];
-  const snapshot=selection.startsWith("history:")?history[Number(selection.split(":")[1])]:releaseSnapshot();
-  if(!snapshot){toast("找不到所选发布记录");return;}
-  const versions=[...history.map((value,index)=>({snapshot:value,label:value.release?.version||value.version||("历史发布 "+(index+1))})),{snapshot:releaseSnapshot(),label:reviewData.release?.version||"当前发布"}];
-  const pendingExport=selection==="current"&&(dirty||featureHasChanges()||permDirty||savingOperations>0);
-  const lines = ["# 发布检查摘要", "", "导出版本："+(snapshot.release?.version||snapshot.version||"未填写版本"), ...Object.entries(snapshot.release||{}).filter(([key])=>key!=="version").map(([k,v])=>k+"："+v), "", "生成时间："+new Date().toLocaleString(), pendingExport?"注意：包含尚未全部保存的当前页面内容。":"", "", "## 各版本进度对比", "", "完成率按适用检查项计算；不适用项不计入分母。", "", "| 版本 | 日期 | 已完成 | 已跳过 | 待处理 | 完成率 |", "| --- | --- | ---: | ---: | ---: | ---: |"];
-  versions.forEach(({snapshot:version,label})=>{const m=releaseMetrics(version);lines.push("| "+String(label).replace(/[|\n]/g," ")+" | "+(version.date?new Date(version.date).toLocaleDateString():"—")+" | "+m.done+" / "+m.total+" | "+m.skipped+" | "+m.pending+" | "+m.percent+"% |");});
-  lines.push("", "## 订阅商品配置", "", "```json", JSON.stringify(snapshot.subscriptions||[],null,2), "```", "", "## 所选版本检查项");
-  for(const item of (Array.isArray(snapshot.items)?snapshot.items:[])){
-    lines.push("- [" + ({done:"x",skip:"-",todo:" "}[item.state]) + "] " + item.text + (item.applicable===false ? "（不适用）" : ""));
-    for(const [key,label] of [["reason","跳过原因"],["notes","备注"],["evidence","证据"]]) if(item[key]) lines.push("  "+label+"："+item[key]);
-  }
-  const url = URL.createObjectURL(new Blob([lines.join("\n")], {type:"text/markdown;charset=utf-8"}));
-  const a = document.createElement("a"); a.href=url; a.download="发布检查摘要-"+String(snapshot.release?.version||snapshot.version||"版本").replace(/[^\w.-]+/g,"_")+".md"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
-document.getElementById("backupRestore").onclick = async () => {
-  if(!online){ toast("请先连接本地服务"); return; }
-  try{
-    const d = await api("/api/backups", {});
-    if(!d.backups.length){ toast("暂无备份"); return; }
-    const choice = prompt("输入要恢复的备份序号：\n" + d.backups.map((n,i) => (i+1) + ". " + (d.entries ? new Date(d.entries[i].created_at * 1000).toLocaleString() + " · " + d.entries[i].label : n)).join("\n"));
-    if(choice === null) return;
-    const index = Number(choice)-1;
-    const name = d.backups[index];
-    if(!name){ toast("序号无效"); return; }
-    const entry = d.entries && d.entries[index];
-    const detail = entry ? "\n\n备份时间：" + new Date(entry.created_at * 1000).toLocaleString() + "\n备份说明：" + entry.label : "";
-    if(!confirm("恢复前预览" + detail + "\n\n恢复会替换当前清单与检查状态；当前数据会先创建快照。未保存草稿不会并入恢复结果。是否继续？")) return;
-    const result = await api("/api/restore", {name, revision:baseRevision});
-    localStorage.removeItem(LS_KEY);
-    dirty = false;
-    location.reload();
-  }catch(e){ toast("恢复失败：" + e.message); }
-};
+// @include board/release.js
 
 document.getElementById("mobileSave").onclick=()=>document.getElementById("btnSave").click();
 document.getElementById("mobileCurrent").onclick=jumpToCurrent;
@@ -1764,14 +1098,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElement
 const newReleaseButton=document.getElementById('newRelease');
 newReleaseButton.hidden=!(window.RELEASE_PAGES||window.RELEASE_CLOUD);
 newReleaseButton.onclick=()=>{
- if(dirty||permDirty||featureHasChanges()||savingOperations){toast('请先保存所有改动，再开始新一轮发布');return;}
+ if(dirty||permDirty||featureHasChanges()||savingOperations||boardPendingDetails().length){toast('请先保存所有改动，再开始新一轮发布');return;}
  document.getElementById('newReleaseForm').reset();document.getElementById('newReleaseError').textContent='';document.getElementById('newReleaseDialog').showModal();
 };
 document.getElementById('cancelNewRelease').onclick=()=>document.getElementById('newReleaseDialog').close();
 document.getElementById('newReleaseForm').onsubmit=async event=>{
  event.preventDefault();const form=event.target,button=form.querySelector('[type=submit]');button.disabled=true;
  try{
-  const release={...reviewData.release,version:form.elements.version.value.trim(),build:form.elements.build.value.trim(),date:new Date().toLocaleDateString('sv-SE')};
+  const release={...reviewData.release,version:form.elements.version.value.trim(),build:form.elements.build.value.trim(),date:ReleaseReadiness.calendarDate(undefined,reviewData.release?.timeZone)};
   const d=await api('/api/new-release',{release,keepNotes:form.elements.keepNotes.checked,keepEvidence:form.elements.keepEvidence.checked});
   gen=d.generation;reviewData=d.review;updateSummaryReleaseOptions();state=seedFromData(d);serverBaseline=baselineFromData(d);DATA=mergeItems(d);dirty=false;saveState();render();refreshFeatUI();document.getElementById('newReleaseDialog').close();toast('上一轮已归档，新一轮发布已开始');
  }catch(error){document.getElementById('newReleaseError').textContent=error.message;}finally{button.disabled=false;updateSaveStatus();}
@@ -1809,86 +1143,8 @@ loadFromServer().then(ok => {
   }
 });
 
-/* Subscription catalogue: saved with review metadata for backup, sync and release archives. */
-const subscriptionDialog=document.getElementById('subscriptionDialog');
-const subscriptionForm=document.getElementById('subscriptionForm');
-const subscriptionProducts=document.getElementById('subscriptionProducts');
-const subscriptionPeriods=[['week','周'],['month','月'],['year','年'],['day','天'],['custom','自定义']];
-const subscriptionFields=[
- ['基本信息',[
-  ['name','商品名称','text'],['period','订阅周期',subscriptionPeriods],['periodCount','周期数量','integer'],
-  ['customPeriod','自定义周期说明','text'],['status','销售状态',[['draft','草稿'],['review','待审核'],['active','在售'],['off','停售']]],
-  ['platform','适用平台',[['both','iOS / Android'],['ios','iOS'],['android','Android']]],
-  ['iosProductId','iOS 商品 ID','text'],['androidProductId','Android 商品 ID','text'],['basePlanId','Android 基础方案 ID','text'],
-  ['group','订阅分组 / 权益档位','text'],['currency','币种（如 CNY / USD）','currency'],['price','标准订阅金额','money'],
-  ['territories','销售地区（如 CN、US）','text'],['familySharing','家庭共享',[['off','关闭'],['on','开启']]],['renewal','续订方式',[['auto','自动续订'],['manual','非自动续订']]],
-  ['benefits','商品权益','textarea']]],
- ['免费试用',[
-  ['trialEnabled','免费试用',[['off','关闭'],['on','开启']]],['trialCount','试用周期数量','integer'],['trialUnit','试用周期单位',subscriptionPeriods.slice(0,4)],
-  ['trialEligibility','试用领取资格 / 次数限制','text']]],
- ['优惠 / 促销',[
-  ['offerEnabled','优惠状态',[['off','关闭'],['on','开启']]],['offerId','优惠 / Offer ID','text'],
-  ['offerType','优惠类型',[['intro','首次订阅优惠'],['promo','促销优惠'],['winback','回流优惠'],['code','优惠码']]],
-  ['paymentMode','优惠计费方式',[['recurring','每周期优惠价'],['upfront','优惠期一次付清'],['free','免费优惠']]],
-  ['offerPrice','优惠实付金额（所选币种）','money'],['discountAmount','减免金额（所选币种）','money'],
-  ['offerPeriodCount','每次优惠周期数量','integer'],['offerPeriod','优惠周期单位',subscriptionPeriods],['offerCustomPeriod','自定义优惠周期说明','text'],
-  ['offerCycles','优惠持续次数','integer'],['offerStart','优惠开始时间','datetime-local'],['offerEnd','优惠结束时间','datetime-local'],
-  ['offerTimezone','优惠时区（如 Asia/Shanghai）','text'],['offerLimit','每用户可享次数','integer'],
-  ['offerEligibility','优惠适用用户 / 资格','text'],['stacking','试用与优惠叠加规则','textarea'],['notes','其他配置 / 升降级 / 价格变更备注','textarea']]]
-];
-let subscriptionDraft=[],subscriptionBaseline='',subscriptionFocus=null,subscriptionSaving=false;
-function subscriptionRead(){return Array.from(subscriptionProducts.querySelectorAll('[data-subscription-product]')).map(card=>{const product={...subscriptionDraft[Number(card.dataset.subscriptionProduct)]};card.querySelectorAll('[data-field]').forEach(input=>product[input.dataset.field]=input.value.trim());return product;});}
-function subscriptionRender(){
- subscriptionProducts.replaceChildren();
- if(!subscriptionDraft.length){const empty=document.createElement('p');empty.className='subscription-empty';empty.textContent='暂无订阅商品。选择上方周期添加商品，可为同一周期配置多个档位。';subscriptionProducts.append(empty);}
- subscriptionDraft.forEach((product,index)=>{
-  const card=document.createElement('details');card.className='subscription-product';card.dataset.subscriptionProduct=index;card.open=true;
-  const summary=document.createElement('summary');summary.textContent=(product.name||'未命名商品')+' · '+(subscriptionPeriods.find(p=>p[0]===product.period)?.[1]||'自定义')+'订阅';card.append(summary);
-  for(const [heading,fields] of subscriptionFields){const title=document.createElement('h3');title.textContent=heading;card.append(title);const grid=document.createElement('div');grid.className='subscription-grid';
-   for(const [key,caption,type] of fields){const label=document.createElement('label');label.textContent=caption;let input;
-    if(Array.isArray(type)){input=document.createElement('select');for(const [value,text] of type)input.add(new Option(text,value));}
-    else{input=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea'){input.type=['integer','money'].includes(type)?'number':type==='currency'?'text':type;if(type==='integer'){input.min='1';input.step='1';}if(type==='money'){input.min='0';input.step='any';}}else label.className='subscription-wide';input.maxLength=type==='textarea'?4000:500;}
-    input.dataset.field=key;input.value=product[key]??'';if(key==='name')input.required=true;if(key==='currency'){input.pattern='[A-Z]{3}';input.placeholder='CNY';input.maxLength=3;}
-    input.setAttribute('aria-label',caption);label.append(input);grid.append(label);
-   }card.append(grid);
-  }
-  const remove=document.createElement('button');remove.type='button';remove.className='btn';remove.textContent='删除此商品';remove.style.marginTop='16px';remove.onclick=()=>{if(!confirm('删除此订阅商品？保存后生效。'))return;subscriptionDraft=subscriptionRead();subscriptionDraft.splice(index,1);subscriptionRender();subscriptionUpdateStatus();};card.append(remove);subscriptionProducts.append(card);
- });
-}
-function subscriptionUpdateStatus(){document.getElementById('subscriptionStatus').textContent=JSON.stringify(subscriptionRead())===subscriptionBaseline?'已保存 · '+subscriptionDraft.length+' 个商品':'有未保存的商品配置';document.getElementById('subscriptionError').textContent='';}
-function subscriptionClose(){if(subscriptionSaving)return;if(JSON.stringify(subscriptionRead())!==subscriptionBaseline&&!confirm('放弃尚未保存的订阅商品修改？'))return;subscriptionDialog.close();subscriptionFocus?.focus();}
-document.getElementById('btnSubscriptions').onclick=()=>{subscriptionFocus=document.activeElement;subscriptionDraft=JSON.parse(JSON.stringify(reviewData.subscriptions||[]));subscriptionRender();subscriptionBaseline=JSON.stringify(subscriptionRead());subscriptionUpdateStatus();subscriptionDialog.showModal();};
-document.getElementById('subscriptionClose').onclick=subscriptionClose;document.getElementById('subscriptionCancel').onclick=subscriptionClose;
-subscriptionDialog.addEventListener('cancel',event=>{event.preventDefault();subscriptionClose();});
-subscriptionForm.addEventListener('input',subscriptionUpdateStatus);subscriptionForm.addEventListener('change',subscriptionUpdateStatus);
-subscriptionForm.querySelectorAll('[data-add-subscription]').forEach(button=>button.onclick=()=>{subscriptionDraft=subscriptionRead();subscriptionDraft.push({id:crypto.randomUUID(),name:({week:'周订阅',month:'月订阅',year:'年订阅',custom:'自定义订阅'})[button.dataset.addSubscription],period:button.dataset.addSubscription,periodCount:'1',status:'draft',platform:'both',currency:'CNY',price:'',familySharing:'off',renewal:'auto',trialEnabled:'off',trialUnit:'day',offerEnabled:'off',offerType:'intro',paymentMode:'recurring',offerPeriod:'month',offerTimezone:'Asia/Shanghai'});subscriptionRender();subscriptionUpdateStatus();subscriptionProducts.lastElementChild.scrollIntoView({block:'nearest'});});
-function subscriptionValidate(products){
- const ids=new Set();
- for(const product of products){
-  if(!product.name)throw Error('请填写商品名称');
-  if(!/^[A-Z]{3}$/.test(product.currency))throw Error(product.name+'：请填写三位大写币种代码');
-  for(const [,fields] of subscriptionFields)for(const [key,label,type] of fields){const value=product[key];if(value&&type==='money'&&(!Number.isFinite(Number(value))||Number(value)<0))throw Error(product.name+'：'+label+'必须是非负金额');if(value&&type==='integer'&&(!Number.isSafeInteger(Number(value))||Number(value)<1))throw Error(product.name+'：'+label+'必须是正整数');}
-  if(!product.periodCount)throw Error(product.name+'：请填写周期数量');
-  if(product.period==='custom'&&!product.customPeriod)throw Error(product.name+'：请填写自定义周期说明');
-  if(product.trialEnabled==='on'&&!product.trialCount)throw Error(product.name+'：请填写试用周期数量');
-  if(product.offerEnabled==='on'){
-   if(!product.offerPeriodCount||!product.offerCycles)throw Error(product.name+'：请填写优惠周期和持续次数');
-   if(product.paymentMode!=='free'&&product.offerPrice==='')throw Error(product.name+'：请填写优惠实付金额');
-   if(product.offerPeriod==='custom'&&!product.offerCustomPeriod)throw Error(product.name+'：请填写自定义优惠周期');
-   if((product.offerStart||product.offerEnd)&&!product.offerTimezone)throw Error(product.name+'：请填写优惠时区');
-   if(product.offerStart&&product.offerEnd&&product.offerEnd<=product.offerStart)throw Error(product.name+'：优惠结束时间必须晚于开始时间');
-  }
-  for(const key of ['iosProductId','androidProductId'])if(product[key]){const id=key+':'+product[key]+(key==='androidProductId'?':'+product.basePlanId:'');if(ids.has(id))throw Error(product.name+'：商品 ID / 基础方案重复');ids.add(id);}
- }
-}
-subscriptionForm.onsubmit=async event=>{
- event.preventDefault();if(subscriptionSaving)return;
- try{const products=subscriptionRead();subscriptionValidate(products);if(!online)throw Error('请先连接存储服务');subscriptionSaving=true;subscriptionForm.querySelectorAll('button').forEach(button=>button.disabled=true);
-  const next=JSON.parse(JSON.stringify(reviewData));next.subscriptions=products;
-  if(await persistReview(next)){subscriptionDraft=JSON.parse(JSON.stringify(products));subscriptionBaseline=JSON.stringify(products);subscriptionUpdateStatus();toast('订阅商品已保存');}
- }catch(error){document.getElementById('subscriptionError').textContent=error.message;}
- finally{subscriptionSaving=false;subscriptionForm.querySelectorAll('button').forEach(button=>button.disabled=false);}
-};
-document.getElementById('subscriptionExport').onclick=()=>{try{const products=subscriptionRead();subscriptionValidate(products);const url=URL.createObjectURL(new Blob([JSON.stringify({format:'release-desk-subscriptions/v1',products},null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='订阅商品配置.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){document.getElementById('subscriptionError').textContent=error.message;}};
+// @include board/subscriptions.js
 
-window.addEventListener('beforeunload',event=>{if(subscriptionDialog.open&&JSON.stringify(subscriptionRead())!==subscriptionBaseline){event.preventDefault();event.returnValue='';}});
+// @include board/recovery.js
+
+installBoardExperience();

@@ -15,3 +15,9 @@ online/**/__pycache__/
 !permission_rules.json
 !permission_visibility.js
 !permission_visibility.py
+!board/
+!board/**
+!release_readiness.js
+!release_policy.py
+
+!release_analysis.js

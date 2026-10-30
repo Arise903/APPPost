@@ -47,6 +47,15 @@ class PersistenceTests(unittest.TestCase):
         self.assertNotEqual(before, revision(self.path))
         self.assertEqual(load_review(self.path)['release']['version'], '1')
 
+    def test_invalid_timezone_does_not_replace_review(self):
+        saved = {'release': {'timeZone': 'Asia/Shanghai'}, 'items': {}, 'history': []}
+        save_review(self.path, saved)
+        before = revision(self.path)
+        with self.assertRaises(ValueError):
+            save_review(self.path, {'release': {'timeZone': 'Invalid/Timezone'}, 'items': {}, 'history': []})
+        self.assertEqual(revision(self.path), before)
+        self.assertEqual(load_review(self.path), saved)
+
     def test_atomic_failure_keeps_original(self):
         before = self.path.read_bytes()
         with self.assertRaises(TypeError): atomic_write(self.path, None)

@@ -1685,6 +1685,17 @@ def print_status(md_path: Path):
 # 静态看板构建
 # --------------------------------------------------------------------------- #
 
+def load_board_js():
+    """Assemble shared board modules for offline, Pages and cloud renderers."""
+    source = (HERE / "board.js").read_text(encoding="utf-8")
+    def include(match):
+        path = HERE / match.group(1)
+        if path.parent not in (HERE, HERE / "board") or path.suffix != ".js":
+            raise ValueError("Invalid board module: " + match.group(1))
+        return path.read_text(encoding="utf-8")
+    return re.sub(r"^// @include ([A-Za-z_./-]+)$", include, source, flags=re.M)
+
+
 def build_html(md_path: Path, out_path: Path) -> Path:
     if not TEMPLATE.exists():
         raise SystemExit(f"找不到模板文件：{TEMPLATE}")
@@ -1697,7 +1708,7 @@ def build_html(md_path: Path, out_path: Path) -> Path:
         .replace("__PERMISSION_RULES__", (HERE / "permission_rules.json").read_text(encoding="utf-8"))
         .replace("__PERMISSION_VISIBILITY__", (HERE / "permission_visibility.js").read_text(encoding="utf-8"))
         .replace("__BOARD_CSS__", (HERE / "board.css").read_text(encoding="utf-8"))
-        .replace("__BOARD_JS__", (HERE / "board.js").read_text(encoding="utf-8"))
+        .replace("__BOARD_JS__", load_board_js())
         .replace("__TITLE__", html_mod.escape(data["title"]))
         .replace("__DATA__", payload)
         .replace("__PROFILES__", profiles)
@@ -1766,6 +1777,7 @@ def document_payload(text, md_name, generation, permissions, review, version):
         it for it in parsed["items"]
         if not it.get("gate") and feats.get(it.get("cond"), True)
         and permission_visibility.visible(it.get("permissionRule"), perm_sel, permission_profiles)
+        and permission_visibility.platform_visible(it, review.get("release", {}).get("platform"))
     ]
     items = [
         {
@@ -1779,6 +1791,7 @@ def document_payload(text, md_name, generation, permissions, review, version):
             "gate": bool(it.get("gate")),
             "cond": it.get("cond"),
             "permissionRule": it.get("permissionRule"),
+            "platform": it.get("platform"),
         }
         for it in parsed["items"]
     ]

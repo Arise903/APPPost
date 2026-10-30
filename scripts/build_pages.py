@@ -20,20 +20,22 @@ def replace_required(text, old, new):
 
 def build():
     OUT.mkdir(exist_ok=True)
-    inputs=[ROOT/'board.js',ROOT/'board.css',ROOT/'board_template.html',ROOT/'permission_rules.json',ROOT/'permission_visibility.js',ROOT/'permission_profiles.json',ROOT/'online/default_checklist.md',ROOT/'online/static/app.css',Path(__file__),*sorted(path for path in (ROOT/'pages').glob('*') if path.suffix in ('.js','.html','.css'))]
+    inputs=[ROOT/'board.js',ROOT/'release_readiness.js',ROOT/'release_analysis.js',*sorted((ROOT/'board').glob('*.js')),ROOT/'board.css',ROOT/'board_template.html',ROOT/'permission_rules.json',ROOT/'permission_visibility.js',ROOT/'permission_profiles.json',ROOT/'online/default_checklist.md',ROOT/'online/static/app.css',Path(__file__),*sorted(path for path in (ROOT/'pages').glob('*') if path.suffix in ('.js','.html','.css'))]
     digest=hashlib.sha256()
     for path in inputs:
         if path.is_file(): digest.update(path.read_bytes())
     version=digest.hexdigest()[:12]
     template_version=hashlib.sha256((ROOT/'online/default_checklist.md').read_bytes()).hexdigest()[:10]
-    for name in ('index.html','dashboard.js','store.js','github-sync.js','guide.html','guide.js','experience.js','history.js','history.css'):
+    for name in ('index.html','dashboard.js','store.js','github-sync.js','guide.html','guide.js','experience.js','history.js','history.css','enhancements.css','storage.js','bootstrap.js','templates.js','workflows.js','workflows.css'):
         shutil.copyfile(ROOT/'pages'/name,OUT/name)
     shutil.copyfile(ROOT/'online/static/app.css',OUT/'app.css')
     shutil.copyfile(ROOT/'permission_visibility.js',OUT/'permission_visibility.js')
-    data={'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles(),'rules':json.loads((ROOT/'permission_rules.json').read_text(encoding='utf-8')),'version':version,'templateVersion':template_version,'dataVersion':2}
+    shutil.copyfile(ROOT/'release_readiness.js',OUT/'release_readiness.js')
+    shutil.copyfile(ROOT/'release_analysis.js',OUT/'release_analysis.js')
+    data={'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles(),'rules':json.loads((ROOT/'permission_rules.json').read_text(encoding='utf-8')),'version':version,'templateVersion':template_version,'permissionsVersion':hashlib.sha256((ROOT/'permission_profiles.json').read_bytes()).hexdigest()[:10],'dataVersion':2}
     (OUT/'data.js').write_text('const PAGES_DATA = '+json.dumps(data,ensure_ascii=False).replace('</','<\\/')+';\n',encoding='utf-8')
     page=(ROOT/'board_template.html').read_text(encoding='utf-8')
-    js='document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;\n'+(ROOT/'board.js').read_text(encoding='utf-8')
+    js='document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;\n'+c.load_board_js()
     js=replace_required(js,'"app-guide-ack" + (window.RELEASE_CLOUD', '"app-guide-ack:pages:" + PagesStore.projectId() + (window.RELEASE_CLOUD')
     js=replace_required(js,'EMBEDDED.mdName);','"pages:" + PagesStore.projectId());')
     js=replace_required(js,'window.open(online ? (window.RELEASE_CLOUD', 'if(window.RELEASE_PAGES){ window.open("guide.html?id=" + encodeURIComponent(PagesStore.projectId()), "_blank"); return; }\n  window.open(online ? (window.RELEASE_CLOUD')
@@ -52,7 +54,8 @@ def build():
     for old,new in replacements.items():js=js.replace(old,new)
     page=page.replace('__PERMISSION_RULES__',(ROOT/'permission_rules.json').read_text(encoding='utf-8')).replace('__PERMISSION_VISIBILITY__',(ROOT/'permission_visibility.js').read_text(encoding='utf-8')).replace('__BOARD_CSS__',(ROOT/'board.css').read_text(encoding='utf-8')).replace('__BOARD_JS__',js)
     page=page.replace('const EMBEDDED = __DATA__;','const EMBEDDED = PagesStore.openProject();').replace('const EMBEDDED_PROFILES = __PROFILES__;','const EMBEDDED_PROFILES = PAGES_DATA.profiles;').replace('__TITLE__','检查项目 · Pages 个人版')
-    page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="store.js"></script><script>PagesStore.install();</script><script defer src="experience.js"></script><link rel="stylesheet" href="history.css"><script defer src="history.js"></script>')
+    page=page.replace('<script>\nconst PERMISSION_RULES', '<script type="text/plain" id="pagesBoardSource">\nconst PERMISSION_RULES').replace('</body>', '<script defer src="bootstrap.js"></script></body>')
+    page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="release_analysis.js"></script><script src="storage.js"></script><script src="store.js"></script><script>PagesStore.install();</script><script defer src="experience.js"></script><link rel="stylesheet" href="history.css"><script defer src="history.js"></script><link rel="stylesheet" href="workflows.css"><script defer src="workflows.js"></script>')
     page=page.replace('<body>','<body><div style="padding:14px 24px;background:#17243a;color:white"><a href="index.html" style="color:white">← 返回个人工作台</a>　·　<span id="pagesProjectName"></span>　·　数据仅保存在当前浏览器，请定期导出备份</div>')
     page=page.replace('勾选状态保存在本机浏览器 · 需要写回文件请使用本地服务模式','所有记录保存在当前浏览器 · 换设备或清理网站数据前请导出完整 JSON')
     unresolved=re.findall(r'__[A-Z][A-Z_]+__',page)

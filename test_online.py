@@ -139,14 +139,27 @@ class OnlineTests(unittest.TestCase):
         original=self.payload()
         task=next(x for x in original['items'] if not x['gate'])
         checked=self.post('write',{'revision':original['revision'],'states':{task['id']:'done'}}).json
-        reviewed=self.post('review',{'revision':checked['revision'],'review':{'release':{'version':'1'},'items':{task['id']:{'notes':'keep','evidence':'drop'}},'history':[]}}).json
+        reviewed=self.post('review',{'revision':checked['revision'],'review':{'release':{'version':'1'},'items':{task['id']:{'notes':'keep','evidence':'drop','required':'on','evidenceRequired':'on'}},'history':[]}}).json
         next_release=self.post('new-release',{'revision':reviewed['revision'],'release':{'version':'2'},'keepNotes':True,'keepEvidence':False})
         self.assertEqual(next_release.status_code,200)
         data=next_release.json
         self.assertEqual(data['review']['history'][0]['release']['version'],'1')
-        self.assertEqual(data['review']['items'][task['id']],{'notes':'keep'})
+        self.assertEqual(data['review']['history'][0]['readiness']['policyVersion'],3)
+        self.assertFalse(data['review']['history'][0]['readiness']['ready'])
+        self.assertEqual(data['review']['items'][task['id']],{'notes':'keep','required':'on','evidenceRequired':'on'})
         self.assertEqual(next(x for x in data['items'] if x['id']==task['id'])['state'],'todo')
         self.assertEqual(data['review']['release']['version'],'2')
+
+    def test_release_timezone_validation_preserves_saved_project(self):
+        original = self.payload()
+        invalid = self.post('review', {'revision': original['revision'], 'review': {
+            'release': {'timeZone': 'Invalid/Timezone'}, 'items': {}, 'history': []}})
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(self.payload()['revision'], original['revision'])
+        saved = self.post('review', {'revision': original['revision'], 'review': {
+            'release': {'timeZone': 'America/Los_Angeles'}, 'items': {}, 'history': []}})
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json['review']['release']['timeZone'], 'America/Los_Angeles')
 
     def test_login_throttle(self):
         anonymous=self.app.test_client()

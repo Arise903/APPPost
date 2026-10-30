@@ -16,9 +16,10 @@ function pending(){return (window.ReleaseExperience?.pending?.()||false)||(typeo
 function preview(snapshot){
  const container=node('div',undefined,'history-preview');
  const project=snapshot.document?snapshot:null,parsed=project?S.payload({...project,version:1,generation:1,permissions:project.permissions||{selected:[],descs:{},descsEn:{}},review:project.review||{release:{},items:{},history:[]}}):null;
- const items=parsed?parsed.items.filter(i=>!i.gate&&parsed.features[i.cond]!==false&&window.PermissionVisibility.visible(i.permissionRule,project.permissions.selected,PAGES_DATA.profiles)):(snapshot.items||[]).filter(i=>i.applicable!==false);
+ const items=parsed?parsed.items.filter(i=>!i.gate&&parsed.features[i.cond]!==false&&window.PermissionVisibility.visible(i.permissionRule,project.permissions.selected,PAGES_DATA.profiles)&&window.PermissionVisibility.platformVisible(i,project.review.release.platform)):(snapshot.items||[]).filter(i=>i.applicable!==false);
  const release=project?project.review.release:snapshot.release;
  container.append(node('p','版本：'+(release?.version||'未填写')+' · 完成 '+items.filter(i=>i.state==='done').length+' / '+items.length+' 项 · 跳过 '+items.filter(i=>i.state==='skip').length+' 项'));
+ const readiness=snapshot.readiness||(project?S.readiness(project):ReleaseReadiness.assess(snapshot));container.append(node('p',(readiness.ready?'发布就绪':'发布未就绪')+' · 阻塞 '+readiness.blockers+' 项 · 缺少必需证据 '+readiness.missingEvidence+' 项'));
  const details=node('details'),summary=node('summary','查看当时的检查结果、备注和配置');details.append(summary);
  const list=node('ul');for(const item of items){const li=node('li',({done:'✓ ',skip:'— ',todo:'○ '}[item.state]||'○ ')+item.text);const note=project?project.review.items?.[item.id]:item;for(const [key,label] of [['reason','跳过原因'],['notes','备注'],['evidence','证据']])if(note?.[key])li.append(node('p',label+'：'+note[key]));list.append(li);}details.append(list);
  const config=node('details');config.append(node('summary','查看项目、订阅商品和权限配置'));const pre=node('pre',JSON.stringify({release,features:project?parsed.features:snapshot.features,subscriptions:project?project.review.subscriptions||[]:snapshot.subscriptions||[],permissions:project?project.permissions:snapshot.permissions||snapshot.selectedPermissions||[]},null,2));config.append(pre);details.append(config);container.append(details);return container;

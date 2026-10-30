@@ -30,7 +30,7 @@ __BOARD_CSS__
       <span class="cnt" id="cnt" role="status" aria-live="polite"></span>
     </div>
 
-    <button class="seqline" id="seqline" title="点击跳到当前应处理的条目"></button>
+    <details class="release-readiness" id="readinessPanel"><summary id="readinessSummary">发布就绪检查</summary><p>适用项默认必需；在「备注 / 证据」可调整必需性与证据要求。填写原因的跳过项可通过检查。</p><ul id="readinessIssues"></ul></details><button class="seqline" id="seqline" title="点击跳到当前应处理的条目"></button>
 
     <nav class="workflow" aria-label="发布流程"><div><b>1 配置</b><span>按实际功能设置项目、商品和权限</span></div><div><b>2 检查</b><span>逐项处理，保存检查进度</span></div><div><b>3 发布</b><span>填写版本、归档，再开始下一轮</span></div></nav>
     <div class="toolbar">
@@ -57,7 +57,7 @@ __BOARD_CSS__
         </div>
       </span>
     </div>
-    <div id="saveStatus" role="status" aria-live="polite"></div><div class="save-explanation">检查进度：点击保存；备注、发布信息和权限配置：分别即时保存。项目设置点击保存后生效。</div>
+    <div id="saveStatus" role="status" aria-live="polite"></div><div class="save-explanation">检查进度、备注、项目设置和商品：点击各自保存按钮；权限自动保存；发布信息填写完成后保存。下方显示当前未保存内容。</div>
     <div class="secnote hidden" id="filtNote"></div>
   <div class="release-actions" aria-label="发布与归档">
 <button class="btn" id="releaseEdit">发布信息</button>
@@ -251,6 +251,8 @@ __BOARD_CSS__
   </div>
 </div>
 
+<dialog id="releaseEditDialog" aria-labelledby="releaseEditTitle"><form id="releaseEditForm"><h2 id="releaseEditTitle">发布信息</h2><div class="subscription-grid"><label>App 名称<input name="app" maxlength="200"></label><label>平台<select name="platform"><option value="">未指定</option><option value="iOS / Android">iOS / Android</option><option value="iOS">iOS</option><option value="Android">Android</option></select></label><label>版本号<input name="version" maxlength="100"></label><label>构建号<input name="build" maxlength="100"></label><label>检查日期<input name="date" type="date"></label><label>负责人<input name="owner" maxlength="200"></label></div><div class="subscription-grid"><label>iOS 应用标识<input name="appIdIOS" maxlength="200"></label><label>Android 应用标识<input name="appIdAndroid" maxlength="200"></label><label>环境<select name="environment"><option value="production">production</option><option value="staging">staging</option><option value="development">development</option></select></label><label>API 基础地址<input name="apiBaseUrl" type="url" maxlength="1000"></label><label>目标发布日期<input name="targetDate" type="date"></label><label>发布时区<input name="timeZone" maxlength="100" placeholder="Asia/Shanghai"></label><label>发布状态<select name="status"><option value="planning">计划中</option><option value="review">待发布</option><option value="released">已发布</option></select></label><label>完整发布检查<select name="strictValidation"><option value="off">仅检查条目</option><option value="on">同时检查发布信息及商品完整性</option></select></label></div><p id="releaseEditError" role="alert"></p><p class="save-explanation">草稿 · 保存平台后会更新适用清单，已有进度保留。</p><button class="btn" type="button" id="releaseEditCancel">取消</button><button class="btn primary" type="submit">保存发布信息</button></form></dialog>
+<dialog id="itemReviewDialog" aria-labelledby="itemReviewTitle"><form id="itemReviewForm"><h2 id="itemReviewTitle">备注 / 证据</h2><p id="itemReviewText"></p><label>跳过原因<textarea name="reason" maxlength="4000"></textarea></label><label>检查备注<textarea name="notes" maxlength="4000"></textarea></label><label>验证证据（路径或链接）<textarea name="evidence" maxlength="4000"></textarea></label><label><input name="required" type="checkbox" checked>发布必需项</label><label><input name="evidenceRequired" type="checkbox">完成时必须提供证据</label><label>证据路径有效至<input name="evidenceExpiresAt" type="date"></label><details class="exception-fields"><summary>跳过分类、负责人和复查记录</summary><label>跳过类型<select name="exceptionType"><option value="legacy">普通跳过（兼容原记录）</option><option value="not-applicable">不适用</option><option value="deferred">暂缓处理</option><option value="risk-accepted">风险接受</option></select></label><label>负责人<input name="exceptionOwner" maxlength="200"></label><label>复查期限<input name="reviewDue" type="date"></label><label>复查状态<select name="reviewStatus"><option value="pending">待复查</option><option value="reviewed">已复查</option></select></label><label>复查日期<input name="reviewedAt" type="date"></label><p>审批记录由你手动登记，用于追溯；风险接受需填写已批准状态、批准人和日期。</p><label>审批状态<select name="approvalStatus"><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已拒绝</option></select></label><label>批准人<input name="approvalBy" maxlength="200"></label><label>批准日期<input name="approvalDate" type="date"></label></details><p id="itemReviewError" role="alert"></p><p class="save-explanation">草稿 · 点击保存后生效</p><button type="button" class="btn" id="itemReviewCancel">取消</button><button type="submit" class="btn primary">保存备注与检查要求</button></form></dialog>
 <dialog id="subscriptionDialog" aria-labelledby="subscriptionTitle">
 <form id="subscriptionForm">
 <div class="subscription-head"><div><h2 id="subscriptionTitle">订阅商品</h2><p>按商品记录周期、价格、试用和优惠；支持同一周期的多个档位。保存于当前项目，不会自动修改商店后台。</p></div><button class="btn" type="button" id="subscriptionClose" aria-label="关闭订阅商品">关闭</button></div>

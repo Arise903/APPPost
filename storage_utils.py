@@ -43,6 +43,8 @@ def load_review(path):
 def save_review(path, value):
     if not isinstance(value, dict) or not isinstance(value.get("release", {}), dict) or not isinstance(value.get("items", {}), dict):
         raise ValueError("发布记录格式无效")
+    from release_policy import calendar_date
+    calendar_date(time_zone=value.get("release", {}).get("timeZone"))
     for item in value.get("items", {}).values():
         if not isinstance(item, dict) or any(not isinstance(v, str) for v in item.values()):
             raise ValueError("备注和证据必须为文本")

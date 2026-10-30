@@ -5,10 +5,8 @@ const KEY='release-desk-pages:v1';
 const copy=value=>JSON.parse(JSON.stringify(value));
 const validId=id=>typeof id==='string'&&/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)&&!['__proto__','constructor','prototype'].includes(id);
 const conflict=()=>Object.assign(Error('本机数据已变化，请重新查看差异后再拉取。'),{status:409});
-const empty=()=>({schema:1,projects:{}});
-function read(){const raw=localStorage.getItem(KEY);if(!raw)return empty();let data;try{data=JSON.parse(raw);}catch(_){throw Error('浏览器记录损坏，请先保留浏览器数据，不要清空存储。');}if((data.storageVersion||1)>2)throw Error('本地数据版本较新，请更新网页后再操作');if(data.schema!==1||!data.projects||typeof data.projects!=='object')throw Error('不支持的本地数据版本');return data;}
-function save(data,serialized=JSON.stringify(data)){try{localStorage.setItem(KEY,serialized);}catch(_){throw Error('浏览器空间不足或禁止存储，本次修改未保存。请先导出项目，再整理历史备份。');}}
-async function transaction(action){if(!navigator.locks)throw Error('此浏览器不支持安全保存，请使用新版 Chrome、Edge、Safari 或 Firefox，并通过 HTTP/HTTPS 打开。');return navigator.locks.request('release-desk-pages-write',()=>{const before=localStorage.getItem(KEY);const data=read();const result=action(data);const serialized=JSON.stringify(data);if(serialized!==before){save(data,serialized);if(typeof global.dispatchEvent==='function')global.dispatchEvent(new Event('projectchanged'));}return result;});}
+const repository=global.PagesStorage.open(KEY);
+const {read,transaction,usage:storageUsage}=repository;
 function hash(text){let h=0x811c9dc5;for(const byte of new TextEncoder().encode(text)){h^=byte;h=Math.imul(h,0x01000193)>>>0;}return h.toString(16).padStart(8,'0');}
 const parseCache=new Map();
 function copyParsed(value){const result=copy(value),items=new Map(result.items.map(item=>[item.id,item]));for(const section of result.sections)section.blocks=section.blocks.map(block=>block.type==='item'?items.get(block.id):block);result.preamble=result.preamble.map(block=>block.type==='item'?items.get(block.id):block);return result;}
@@ -50,11 +48,17 @@ function stabilize(text){
 }
 function apply(text,states){const parsed=parse(text),lines=text.split('\n');for(const item of parsed.items){const value=states[item.id];if(value===undefined)continue;if(!['todo','done','skip'].includes(value))throw Error('检查状态无效');const [a,b]=item.span;lines[item.line]=lines[item.line].slice(0,a)+({todo:'[ ]',done:'[x]',skip:'[-]'}[value])+lines[item.line].slice(b);}return lines.join('\n');}
 function payload(project){const parsed=parse(project.document);global.PermissionVisibility.annotate(parsed.sections,PAGES_DATA.rules);const gate=parsed.sections.find(s=>s.is_gate||s.title.includes('确认已了解使用说明'))?.blocks.find(b=>b.type==='item');let n=0;for(const item of parsed.items){item.gate=item.id===gate?.id;item.seq=item.gate?'':++n;}
- const items=parsed.items.filter(x=>!x.gate&&parsed.features[x.cond]!==false&&global.PermissionVisibility.visible(x.permissionRule,project.permissions.selected,PAGES_DATA.profiles));
- return {...parsed,mdName:project.name+'.md',mdText:project.document,generation:project.generation,revision:String(project.version),review:copy(project.review),createdAt:project.createdAt,updatedAt:project.updatedAt,activity:copy(project.activity||[]),permSelected:copy(project.permissions.selected),permDescs:copy(project.permissions.descs),permDescsEn:copy(project.permissions.descsEn),gateId:gate?.id||null,gateDone:!gate||gate.state==='done',gateState:gate?.state||'done',total:items.length,done:items.filter(x=>x.state==='done').length,skipped:items.filter(x=>x.state==='skip').length,built:'Pages 个人版'};
+ const items=parsed.items.filter(x=>!x.gate&&parsed.features[x.cond]!==false&&global.PermissionVisibility.visible(x.permissionRule,project.permissions.selected,PAGES_DATA.profiles)&&global.PermissionVisibility.platformVisible(x,project.review.release.platform));
+ return {...parsed,mdName:project.name+'.md',mdText:project.document,generation:project.generation,revision:String(project.version),review:copy(project.review),assetIds:Object.keys(project.assets||{}),createdAt:project.createdAt,updatedAt:project.updatedAt,activity:copy(project.activity||[]),permSelected:copy(project.permissions.selected),permDescs:copy(project.permissions.descs),permDescsEn:copy(project.permissions.descsEn),gateId:gate?.id||null,gateDone:!gate||gate.state==='done',gateState:gate?.state||'done',total:items.length,done:items.filter(x=>x.state==='done').length,skipped:items.filter(x=>x.state==='skip').length,built:'Pages 个人版'};
 }
-function get(id){const project=validId(id)?read().projects[id]:null;if(!project)throw Error('项目不存在或已删除，请返回工作台。');return project;}
-function state(project){const value=copy(project);delete value.snapshots;return value;}
+function get(id){const project=validId(id)?repository.readProject(id):null;if(!project)throw Error('项目不存在或已删除，请返回工作台。');return project;}
+function state(project){const value=copy(project);delete value.snapshots;delete value.assets;return value;}
+function validateAssets(assets){
+if(!assets||Array.isArray(assets)||typeof assets!=='object'||Object.keys(assets).length>100)throw Error('附件数据格式无效，最多 100 个附件');let assetBytes=0;
+ for(const [id,asset] of Object.entries(assets)){if(!validId(id)||!asset||typeof asset.data!=='string'||asset.data.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(asset.data)||!/^[a-f0-9]{64}$/.test(asset.sha256||'')||typeof asset.size!=='number'||asset.size<0||asset.size>5*1024*1024||Math.floor(asset.data.length*3/4)-(asset.data.endsWith('==')?2:asset.data.endsWith('=')?1:0)!==asset.size)throw Error('附件格式或大小无效');assetBytes+=asset.size;}
+ if(assetBytes>20*1024*1024)throw Error('每个项目附件总量最多 20 MiB');
+}
+function mergeAssets(...groups){const merged=groups.reduce((result,group)=>({...result,...(group||{})}),{});try{validateAssets(merged);}catch(error){throw Error('合并附件失败：'+error.message+'。同步未写入，请先导出备份并清理无引用附件。');}return merged;}
 function validate(input){
  if(!input||typeof input!=='object'||typeof input.document!=='string'||input.document.length>800000||!parse(input.document).items.length)throw Error('清单无效，至少需要一个 Markdown 检查项，且小于 800 KB。');
  if(input.activity!==undefined&&(!Array.isArray(input.activity)||input.activity.length>100||input.activity.some(a=>!a||typeof a.id!=='string'||!Number.isFinite(a.date)||typeof a.label!=='string'||a.label.length>500||!Array.isArray(a.changes)||a.changes.length>31||a.changes.some(c=>typeof c!=='string'||c.length>4000))))throw Error('修改历史格式无效');
@@ -64,11 +68,19 @@ function validate(input){
  for(const descs of [permissions.descs,permissions.descsEn])if(Array.isArray(descs)||Object.values(descs).some(v=>typeof v!=='string'||v.length>10000))throw Error('权限用途描述必须为文本');
  const known=new Set(PAGES_DATA.profiles.permissions.map(p=>p.id));if(permissions.selected.some(id=>!known.has(id)))throw Error('包含不支持的权限');
  if(!review||typeof review.release!=='object'||!review.release||typeof review.items!=='object'||!review.items||!Array.isArray(review.history))throw Error('发布记录无效');
+ if(review.release.timeZone){try{new Intl.DateTimeFormat('en-US',{timeZone:review.release.timeZone}).format(new Date());}catch(_){throw Error('发布时区无效，请填写有效的 IANA 时区，例如 Asia/Shanghai');}}
+ if(review.preflight!==undefined&&review.preflight!==null){const report=review.preflight;if(typeof report!=='object'||!Array.isArray(report.findings)||!Array.isArray(report.files)||typeof report.basis!=='string'||!Number.isSafeInteger(report.errors)||report.errors<0||report.errors!==report.findings.filter(f=>f.severity==='error').length)throw Error('配置预检报告格式无效');}
  if(review.subscriptions!==undefined&&(!Array.isArray(review.subscriptions)||review.subscriptions.length>100||review.subscriptions.some(p=>!p||typeof p!=='object'||Array.isArray(p)||Object.values(p).some(v=>typeof v!=='string'||v.length>4000))))throw Error('订阅商品配置无效，最多 100 个商品，字段须为文本');
- for(const item of Object.values(review.items)){if(!item||typeof item!=='object'||Object.values(item).some(v=>typeof v!=='string'))throw Error('备注字段必须为文本');}
- return {permissions:copy(permissions),review:copy(review)};
+ for(const item of Object.values(review.items)){if(!item||typeof item!=='object'||Object.values(item).some(v=>typeof v!=='string'))throw Error('备注字段必须为文本');for(const key of ['reviewDue','approvalDate','reviewedAt','evidenceExpiresAt'])if(item[key]&&!/^\d{4}-\d{2}-\d{2}$/.test(item[key]))throw Error('日期应为 YYYY-MM-DD');}
+ const assets=input.assets||{};validateAssets(assets);
+ if(review.evidenceFiles!==undefined&&(!review.evidenceFiles||Array.isArray(review.evidenceFiles)||typeof review.evidenceFiles!=='object'||Object.entries(review.evidenceFiles).some(([id,f])=>!validId(id)||!f||!validId(f.assetId)||typeof f.name!=='string'||f.name.length>200||!Array.isArray(f.taskIds)||f.taskIds.some(id=>!validId(id)))))throw Error('证据附件关联格式无效');
+ return {permissions:copy(permissions),review:copy(review),assets:copy(assets)};
 }
-async function create(input){const checked=validate({...input,document:input.document??PAGES_DATA.document});const name=String(input.name||'').trim();if(!name||name.length>100)throw Error('项目名称需要 1–100 个字符');return transaction(data=>{const id=crypto.randomUUID();data.projects[id]={id,name,document:stabilize(input.document??PAGES_DATA.document),dataVersion:2,templateVersion:input.templateVersion||(input.document?'custom':PAGES_DATA.templateVersion),templateBaseline:Object.fromEntries(parse(input.document??PAGES_DATA.document).items.map(x=>[x.id,x.text])),...checked,activity:copy(input.activity||[]),version:1,generation:1,createdAt:Date.now(),updatedAt:Date.now(),snapshots:[]};return id;});}
+function configureDocument(document,features){if(!features)return document;const allowed=['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush'];if(allowed.some(k=>typeof features[k]!=='boolean'))throw Error('项目特征无效');const line='<!-- FEATURES '+allowed.map(k=>k+'='+(features[k]?1:0)).join(' ')+' -->';return /<!--\s*FEATURES\s+[\s\S]*?-->/.test(document)?document.replace(/<!--\s*FEATURES\s+[\s\S]*?-->/,line):line+'\n'+document;}
+function snapshot(project){const d=payload(project);return {release:copy(project.review.release),subscriptions:copy(project.review.subscriptions||[]),features:copy(d.features),permissions:copy(project.permissions),selectedPermissions:copy(project.permissions.selected),evidenceFiles:copy(project.review.evidenceFiles||{}),assetIds:Object.keys(project.assets||{}),preflight:copy(project.review.preflight||null),items:d.items.map(i=>({...d.review.items[i.id],...i,applicable:!i.gate&&d.features[i.cond]!==false&&global.PermissionVisibility.visible(i.permissionRule,project.permissions.selected,PAGES_DATA.profiles)&&global.PermissionVisibility.platformVisible(i,project.review.release.platform)}))};}
+function readiness(project,now){return global.ReleaseReadiness.assess(snapshot(project),now);}
+function templateDiff(project){const old=parse(project.document),latest=parse(PAGES_DATA.document),previous=new Map(old.items.map(i=>[i.id,i]));return {added:latest.items.filter(i=>!previous.has(i.id)),changed:latest.items.filter(i=>previous.has(i.id)&&i.text!==(project.templateBaseline?.[i.id]||previous.get(i.id).text)),removed:old.items.filter(i=>!latest.items.some(n=>n.id===i.id))};}
+async function create(input){await verifyAssets(input.assets||{});if(input.features)input={...input,document:configureDocument(input.document??PAGES_DATA.document,input.features),templateVersion:input.templateVersion||PAGES_DATA.templateVersion};const checked=validate({...input,document:input.document??PAGES_DATA.document});const name=String(input.name||'').trim();if(!name||name.length>100)throw Error('项目名称需要 1–100 个字符');const id=await transaction(data=>{const id=crypto.randomUUID();data.projects[id]={id,name,document:stabilize(input.document??PAGES_DATA.document),dataVersion:2,templateId:input.templateId||null,templateVersion:input.templateVersion||(input.document?'custom':PAGES_DATA.templateVersion),templateBaseline:Object.fromEntries(parse(input.document??PAGES_DATA.document).items.map(x=>[x.id,x.text])),...checked,activity:copy(input.activity||[]),version:1,generation:1,createdAt:Date.now(),updatedAt:Date.now(),snapshots:[]};return id;});if(input.formDraft?.format==='release-desk-form-draft/v1')try{localStorage.setItem('app-release-checklist-state-v2:pages:'+id+':forms',JSON.stringify({...input.formDraft,generation:1,revision:'1'}));}catch(_){throw Error('项目已导入，但表单草稿空间不足。请保留原备份。');}return id;}
 function describeChanges(before,after,label){
  const changes=[],same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),oldItems=new Map(parse(before.document).items.map(i=>[i.id,i]));
  const status={todo:'待检查',done:'已完成',skip:'已跳过'};
@@ -87,7 +99,7 @@ function describeChanges(before,after,label){
 }
 async function mutate(id,version,label,action){return transaction(data=>{
  const p=data.projects[id];if(!p)throw Error('项目不存在');if(String(version)!==String(p.version))throw Object.assign(Error('另一个页面已更新项目，请先导出草稿，再刷新核对。'),{status:409});
- const before=state(p),activity=copy(p.activity||[]),snapshots=copy(p.snapshots||[]);p.document=stabilize(p.document);p.dataVersion=2;action(p);
+ const before=state(p),activity=copy(p.activity||[]),snapshots=copy(p.snapshots||[]);p.document=stabilize(p.document);p.dataVersion=2;action(p);validate(p);
  if(JSON.stringify(before)===JSON.stringify(state(p)))return payload(p);
  const date=Date.now(),labels={write:'保存检查进度',review:'保存配置 / 备注',features:'修改项目设置','perm-write':'修改权限配置',ack:'确认阅读说明',unack:'取消阅读确认',clear:'清空检查进度','new-release':'开始新一轮发布',restore:'恢复历史快照'};
  p.activity=[{id:crypto.randomUUID(),date,label:labels[label]||label,changes:describeChanges(before,p,label)},...activity].slice(0,100);
@@ -121,9 +133,13 @@ function english(data){const cfg=config({...data,lang:'en'});return ['# Privacy 
 function download(name,text,type='application/json'){const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 const projectId=()=>new URLSearchParams(location.search).get('id');
 let initialization;
+async function verifyAssets(assets){for(const asset of Object.values(assets)){if(!asset||typeof asset.data!=='string')throw Error('附件数据无效');const bytes=Uint8Array.from(atob(asset.data),c=>c.charCodeAt(0)),digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');if(digest!==asset.sha256)throw Error('附件校验失败，文件内容已损坏');}}
+function listTemplates(){return [...(global.ReleaseTemplates||[]),...Object.values(read().templates||{})].map(copy);}
+async function saveTemplate(template){if(!validId(template.id)||typeof template.name!=='string'||!template.name.trim()||template.name.length>100)throw Error('请填写模板名称');if((global.ReleaseTemplates||[]).some(t=>t.id===template.id))throw Error('内置模板请另存为副本');const document=stabilize(template.document);validate({document});return transaction(data=>{data.templates=data.templates||{};data.templates[template.id]={...copy(template),document,builtin:false,updatedAt:Date.now()};});}
+async function removeTemplate(id){return transaction(data=>{if(data.templates)delete data.templates[id];});}
 function initialize(){
  if(initialization)return initialization;
- initialization=transaction(data=>{
+ initialization=repository.ready().then(()=>transaction(data=>{
   let migrated=0;
   for(const project of Object.values(data.projects)){
    if((project.dataVersion||1)>=2)continue;
@@ -135,12 +151,13 @@ function initialize(){
   }
   data.storageVersion=2;
   return {migrated};
- });return initialization;
+ })).catch(error=>{initialization=null;throw error;});return initialization;
 }
 function validDraft(draft){return !!draft&&typeof draft==='object'&&!Array.isArray(draft)&&!!draft.state&&typeof draft.state==='object'&&!Array.isArray(draft.state)&&Object.entries(draft.state).every(([id,value])=>!!id&&['todo','done','skip',true,false].includes(value));}
-function exportAll(){const data=read(),drafts={};for(const id of Object.keys(data.projects)){const raw=localStorage.getItem('app-release-checklist-state-v2:pages:'+id);if(raw){try{const parsed=JSON.parse(raw);drafts[id]=validDraft(parsed)?parsed:{unreadable:raw};}catch(_){drafts[id]={unreadable:raw};}}}return {format:'release-desk-workspace/v1',exportedAt:new Date().toISOString(),projects:Object.values(data.projects).map(p=>({format:'release-desk/v1',...copy(p)})),drafts};}
+function exportAll(){const data=read(),drafts={};for(const id of Object.keys(data.projects)){const raw=localStorage.getItem('app-release-checklist-state-v2:pages:'+id);if(raw){try{const parsed=JSON.parse(raw);drafts[id]=validDraft(parsed)?parsed:{unreadable:raw};}catch(_){drafts[id]={unreadable:raw};}}}for(const id of Object.keys(data.projects)){const forms=localStorage.getItem('app-release-checklist-state-v2:pages:'+id+':forms');if(forms){try{drafts[id]=drafts[id]||{state:{},__gen:data.projects[id].generation,revision:String(data.projects[id].version)};drafts[id].forms=JSON.parse(forms);}catch(_){}}}return {format:'release-desk-workspace/v1',templates:copy(data.templates||{}),exportedAt:new Date().toISOString(),projects:Object.values(data.projects).map(p=>({format:'release-desk/v1',...copy(p)})),drafts};}
 function inspectImportAll(bundle){
  if(!bundle||bundle.format!=='release-desk-workspace/v1'||!Array.isArray(bundle.projects)||bundle.projects.length>100)throw Error('请选择完整工作台备份，最多一次导入 100 个项目');
+ if(bundle.templates!==undefined){if(!bundle.templates||typeof bundle.templates!=='object'||Array.isArray(bundle.templates)||Object.keys(bundle.templates).length>100)throw Error('模板库格式无效');for(const [id,t] of Object.entries(bundle.templates)){if((global.ReleaseTemplates||[]).some(b=>b.id===id)||!validId(id)||t.id!==id||typeof t.name!=='string'||!t.name.trim()||t.name.length>100)throw Error('模板数据无效');validate({document:t.document});}}
  const names=[],ids=new Set();let snapshots=0;
  for(const input of bundle.projects){
   if(!validId(input.id)||ids.has(input.id))throw Error('备份中有项目 ID 格式无效或重复');ids.add(input.id);
@@ -159,13 +176,15 @@ function mergeActivity(...groups){const seen=new Set();return groups.flat().filt
 function mergeSnapshots(...groups){const seen=new Set();return groups.flat().filter(item=>{if(seen.has(item.id))return false;seen.add(item.id);return true;}).sort((a,b)=>Number(b.date)-Number(a.date)).slice(0,10).map(copy);}
 function workspaceToken(){return JSON.stringify(exportAll(),(key,value)=>key==='exportedAt'?undefined:value);}
 async function mergeRemoteAll(bundle,expectedToken){
- inspectImportAll(bundle);const incomingIds=new Set(bundle.projects.map(p=>p.id)),localOnly=Object.keys(read().projects).filter(id=>!incomingIds.has(id)).length;let added=0,updated=0;
+ inspectImportAll(bundle);await Promise.all(bundle.projects.map(p=>verifyAssets(p.assets||{})));const incomingIds=new Set(bundle.projects.map(p=>p.id)),localOnly=Object.keys(read().projects).filter(id=>!incomingIds.has(id)).length;let added=0,updated=0;
  await transaction(data=>{
   if(expectedToken!==undefined&&workspaceToken()!==expectedToken)throw conflict();
+  data.templates=data.templates||{};for(const [id,t] of Object.entries(bundle.templates||{})){const old=data.templates[id];if(old&&JSON.stringify(old)!==JSON.stringify(t)){const savedId=crypto.randomUUID();data.templates[savedId]={...copy(old),id:savedId,name:(old.name+'（同步前副本）').slice(0,100)};}data.templates[id]=copy(t);}
   for(const input of bundle.projects){
    const checked=validate(input),current=data.projects[input.id],remote={...copy(input),...checked,id:input.id};
    remote.snapshots=(remote.snapshots||[]).map(snapshot=>({...snapshot,state:{...snapshot.state,id:input.id}}));
    if(current){
+    remote.assets=mergeAssets(current.assets,remote.assets);
     const before=state(current),after=state(remote);
     if(JSON.stringify(before)!==JSON.stringify(after)){
      remote.snapshots=mergeSnapshots([{id:crypto.randomUUID(),date:Date.now(),label:'GitHub 同步前保留的本机版本',state:before}],remote.snapshots,current.snapshots||[]);
@@ -175,6 +194,7 @@ async function mergeRemoteAll(bundle,expectedToken){
     remote.version=Math.max(current.version,remote.version)+1;
     remote.generation=Math.max(current.generation,remote.generation)+1;remote.updatedAt=Date.now();
    }else added++;
+   validate(remote);
    data.projects[input.id]=remote;
   }
  });
@@ -188,23 +208,23 @@ async function mergeRemoteAll(bundle,expectedToken){
   if(chosen&&chosen.state&&typeof chosen.state==='object'){
    const state={};for(const [itemId,value] of Object.entries(chosen.state))if(validIds.has(itemId)&&['todo','done','skip',true,false].includes(value))state[itemId]=value;
    chosen={...chosen,__gen:project.generation,revision:String(project.version),state};
-   try{localStorage.setItem(localKey,JSON.stringify(chosen));}catch(_){draftError=true;}
+   try{localStorage.setItem(localKey,JSON.stringify(chosen));if(chosen.forms&&!localStorage.getItem(localKey+':forms'))localStorage.setItem(localKey+':forms',JSON.stringify({...chosen.forms,generation:project.generation,revision:String(project.version)}));}catch(_){draftError=true;}
   }
  }
  return {added,updated,draftError,localOnly};
 }
 async function importAll(bundle){
- inspectImportAll(bundle);
+ inspectImportAll(bundle);await Promise.all(bundle.projects.map(p=>verifyAssets(p.assets||{})));
  const drafts=[];
- const ids=await transaction(data=>bundle.projects.map(input=>{
+ const ids=await transaction(data=>{data.templates=data.templates||{};for(const t of Object.values(bundle.templates||{})){const id=crypto.randomUUID();data.templates[id]={...copy(t),id,builtin:false};}return bundle.projects.map(input=>{
   const checked=validate(input),id=crypto.randomUUID(),name=String(input.name||'导入项目').slice(0,100);
-  const project={id,name,document:stabilize(input.document),...checked,version:1,generation:1,createdAt:Date.now(),updatedAt:Date.now(),activity:copy(input.activity||[]),dataVersion:2,templateVersion:input.templateVersion||'legacy',templateBaseline:input.templateBaseline||Object.fromEntries(parse(input.document).items.map(x=>[x.id,x.text])),snapshots:[]};
+  const project={id,name,document:stabilize(input.document),...checked,version:1,generation:1,createdAt:Date.now(),updatedAt:Date.now(),activity:copy(input.activity||[]),dataVersion:2,templateId:input.templateId||null,templateVersion:input.templateVersion||'legacy',templateBaseline:input.templateBaseline||Object.fromEntries(parse(input.document).items.map(x=>[x.id,x.text])),snapshots:[]};
   project.snapshots=(input.snapshots||[]).slice(0,10).map(saved=>{validate(saved.state);return {id:crypto.randomUUID(),date:Number(saved.date)||Date.now(),label:String(saved.label||'导入快照'),state:{...copy(saved.state),id}};});
   data.projects[id]=project;
   if(bundle.drafts?.[input.id]?.state)drafts.push([id,{...bundle.drafts[input.id],revision:'1',__gen:1}]);
   return id;
- }));
- let draftError=Object.values(bundle.drafts||{}).some(draft=>typeof draft?.unreadable==='string');for(const [id,draft] of drafts){try{localStorage.setItem('app-release-checklist-state-v2:pages:'+id,JSON.stringify(draft));}catch(_){draftError=true;}}
+ });});
+ let draftError=Object.values(bundle.drafts||{}).some(draft=>typeof draft?.unreadable==='string');for(const [id,draft] of drafts){try{localStorage.setItem('app-release-checklist-state-v2:pages:'+id,JSON.stringify(draft));if(draft.forms)localStorage.setItem('app-release-checklist-state-v2:pages:'+id+':forms',JSON.stringify({...draft.forms,generation:1,revision:'1'}));}catch(_){draftError=true;}}
  return {ids,draftError};
 }
 async function markExport(){return transaction(data=>{data.lastBackupAt=Date.now();return data.lastBackupAt;});}
@@ -234,10 +254,10 @@ async function handle(path,options={}){
   else if(op==='new-release'){
    if(typeof data.keepNotes!=='boolean'||typeof data.keepEvidence!=='boolean'||!data.release||typeof data.release.version!=='string'||!data.release.version.trim())throw Error('请填写新版本号及备注保留选项');
    const before=payload(project);project.review.history=project.review.history||[];
-   project.review.history.push({subscriptions:copy(project.review.subscriptions||[]),release:copy(project.review.release),date:new Date().toISOString(),features:copy(before.features),permissions:copy(project.permissions),items:before.items.filter(x=>!x.gate).map(x=>({id:x.id,text:x.text,state:x.state,applicable:before.features[x.cond]!==false&&global.PermissionVisibility.visible(x.permissionRule,project.permissions.selected,PAGES_DATA.profiles),...project.review.items[x.id]}))});
+   project.review.history.push({...snapshot(project),readiness:readiness(project),subscriptions:copy(project.review.subscriptions||[]),release:copy(project.review.release),date:new Date().toISOString(),features:copy(before.features),permissions:copy(project.permissions),items:before.items.filter(x=>!x.gate).map(x=>({...project.review.items[x.id],id:x.id,text:x.text,state:x.state,applicable:before.features[x.cond]!==false&&global.PermissionVisibility.visible(x.permissionRule,project.permissions.selected,PAGES_DATA.profiles)&&global.PermissionVisibility.platformVisible(x,project.review.release.platform)}))});
    project.document=apply(project.document,Object.fromEntries(before.items.filter(x=>!x.gate).map(x=>[x.id,'todo'])));
-   const next={};for(const [key,item] of Object.entries(project.review.items)){const saved={};if(data.keepNotes){if(item.notes)saved.notes=item.notes;if(item.reason)saved.reason=item.reason;}if(data.keepEvidence&&item.evidence)saved.evidence=item.evidence;if(Object.keys(saved).length)next[key]=saved;}
-   project.review.items=next;project.review.release=copy(data.release);project.generation++;
+   const next={};for(const [key,item] of Object.entries(project.review.items)){const saved={};for(const flag of ['required','evidenceRequired'])if(item[flag])saved[flag]=item[flag];if(data.keepNotes){for(const flag of ['exceptionType','exceptionOwner','reviewDue'])if(item[flag])saved[flag]=item[flag];if(item.exceptionType&&item.exceptionType!=='legacy'){saved.approvalStatus='pending';saved.reviewStatus='pending';}if(item.notes)saved.notes=item.notes;if(item.reason)saved.reason=item.reason;}if(data.keepEvidence)for(const flag of ['evidence','attachmentIds','evidenceExpiresAt'])if(item[flag])saved[flag]=item[flag];if(Object.keys(saved).length)next[key]=saved;}
+   project.review.items=next;if(!data.keepEvidence)project.review.evidenceFiles={};project.review.release=copy(data.release);project.generation++;
   }
   else if(op==='restore'){const selected=project.snapshots.find(x=>x.id===data.name);if(!selected)throw Error('备份不存在');const version=project.version;Object.assign(project,copy(selected.state));project.version=version;project.generation++;}
   else throw Error('不支持的操作：'+op);
@@ -246,5 +266,5 @@ async function handle(path,options={}){
  return updated;
 }
 function install(){global.RELEASE_PAGES={projectId:projectId()};initialize().catch(()=>{});const native=global.fetch.bind(global);global.fetch=async(path,options)=>{if(typeof path==='string'&&path.startsWith('/api/')){try{return new Response(JSON.stringify(await handle(path,options)),{status:200,headers:{'Content-Type':'application/json'}});}catch(error){return new Response(JSON.stringify({error:error.message}),{status:error.status||400,headers:{'Content-Type':'application/json'}});}}return native(path,options);};}
-global.PagesStore={KEY,validId,mergeSnapshots,mergeActivity,workspaceToken,initialize,exportAll,inspectImportAll,importAll,mergeRemoteAll,markExport,updateTemplate,stabilize,read,get,parse,apply,payload,create,mutate,config,english,download,escape,projectId,install,openProject:()=>payload(get(projectId())),list:()=>Object.values(read().projects).sort((a,b)=>b.updatedAt-a.updatedAt),export:id=>({format:'release-desk/v1',...state(get(id))}),remove:id=>transaction(data=>{delete data.projects[id];})};
+global.PagesStore={mergeAssets,snapshot,listTemplates,saveTemplate,removeTemplate,verifyAssets,storageRecovery:repository.recovery,adoptLegacyStorage:repository.adoptLegacy,adoptIndexedDBStorage:repository.adoptIndexedDB,rollbackStorage:repository.rollback,migrateStorage:repository.migrate,refreshStorage:repository.refresh,storageUsage,configureDocument,readiness,templateDiff,KEY,validId,mergeSnapshots,mergeActivity,workspaceToken,initialize,exportAll,inspectImportAll,importAll,mergeRemoteAll,markExport,updateTemplate,stabilize,read,get,parse,apply,payload,create,mutate,config,english,download,escape,projectId,install,openProject:()=>payload(get(projectId())),list:()=>Object.values(read().projects).sort((a,b)=>b.updatedAt-a.updatedAt),export:id=>({format:'release-desk/v1',...state(get(id)),assets:copy(get(id).assets||{}),formDraft:(()=>{try{return JSON.parse(localStorage.getItem('app-release-checklist-state-v2:pages:'+id+':forms')||'null');}catch(_){return null;}})()}),remove:id=>transaction(data=>{delete data.projects[id];})};
 })(window);
