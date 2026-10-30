@@ -31,40 +31,22 @@ const server=http.createServer((req,res)=>{
   await clickCommand('#btnFeat');await page.locator('#featPush').check();await page.locator('#featSave').click();await page.waitForFunction(()=>!document.getElementById('featPanel').classList.contains('on'));
   await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.equal(await pushRows().count(),1);
   await clickCommand('#btnFeat');await page.locator('#featPush').uncheck();await page.locator('#featSave').click();await page.waitForFunction(()=>!document.getElementById('featPanel').classList.contains('on'));assert.equal(await pushRows().count(),0);
-  // Independent subscription catalogue: price validation, persistence and cancellation.
+  // Only IDs, currency, price and period are editable; required labels carry stars.
+  await page.evaluate(async()=>{const p=PagesStore.get(PagesStore.projectId());await PagesStore.mutate(p.id,p.version,'subscription fixture',p=>p.review.subscriptions=[{id:'legacy-product',name:'保留商品名称',platform:'both',period:'week',periodCount:'1',currency:'CNY',price:'18.50',iosProductId:'ios.week',androidProductId:'android.week',basePlanId:'original-plan',trialEnabled:'on',trialCount:'7',trialUnit:'day',offerEnabled:'on',offerPrice:'6.00',offerCycles:'3',offerStart:'2026-11-29T08:00',offerEnd:'2026-10-28T08:00',benefits:'<script>alert(1)</script>',customMetadata:'保留未显示字段'}]);await loadFromServer();});
   await clickCommand('#btnSubscriptions');
-  for(const period of ['week','month','year'])await page.locator('[data-add-subscription="'+period+'"]').click();
+  for(const period of ['month','year'])await page.locator('[data-add-subscription="'+period+'"]').click();
   assert.equal(await page.locator('[data-subscription-product]').count(),3);
   const product=page.locator('[data-subscription-product]').first();
-  // Optional groups stay hidden until enabled, preserve values while off, and restore on reopening.
-  for(const field of ['trialCount','trialUnit','trialEligibility','offerPrice','offerCycles'])assert.equal(await product.locator('[data-field="'+field+'"]').isVisible(),false,field);
-  await product.locator('[data-field="trialEnabled"]').selectOption('on');
-  await product.locator('[data-field="trialCount"]').fill('7');
-  await product.locator('[data-field="trialUnit"]').selectOption('day');
-  await product.locator('[data-field="trialEnabled"]').selectOption('off');
-  assert.equal(await product.locator('[data-field="trialCount"]').isVisible(),false);
-  assert.equal(await product.locator('[data-field="trialCount"]').isDisabled(),true);
-  await product.locator('[data-field="trialEnabled"]').selectOption('on');
-  assert.equal(await product.locator('[data-field="trialCount"]').inputValue(),'7');
-  await product.locator('[data-field="price"]').fill('18.50');
-  await product.locator('[data-field="offerEnabled"]').selectOption('on');
-  await product.locator('[data-field="offerPrice"]').fill('6.00');
-  await product.locator('[data-field="offerPeriodCount"]').fill('1');
-  await product.locator('[data-field="offerCycles"]').fill('3');
-  await product.locator('[data-field="offerEnabled"]').selectOption('off');
-  assert.equal(await product.locator('[data-field="offerCycles"]').isVisible(),false);
-  await product.locator('[data-field="offerEnabled"]').selectOption('on');
-  assert.equal(await product.locator('[data-field="offerCycles"]').inputValue(),'3');
-  await product.locator('[data-field="offerStart"]').fill('2026-10-29T08:00');
-  await product.locator('[data-field="offerEnd"]').fill('2026-10-28T08:00');
-  await page.locator('#subscriptionSave').click();assert.match(await page.locator('#subscriptionError').textContent(),/结束时间/);
-  await product.locator('[data-field="offerEnd"]').fill('2026-11-29T08:00');
-  await product.locator('[data-field="benefits"]').fill('<script>alert(1)</script>');
+  for(const field of ['name','status','platform','basePlanId','benefits','trialEnabled','trialCount','offerEnabled','offerPrice','offerCycles'])assert.equal(await product.locator('[data-field="'+field+'"]').isDisabled(),true,field);
+  const required=['iosProductId','androidProductId','currency','price','period','periodCount'];
+  for(const field of required){assert.equal(await product.locator('[data-field="'+field+'"]').isEnabled(),true,field);assert.equal(await product.locator('[data-field="'+field+'"]').getAttribute('required'),'',field);assert.equal(await product.locator('[data-field-label="'+field+'"] .required-mark').isVisible(),true,field);}
+  const validation=await page.evaluate(()=>{const p=subscriptionRead()[0];return [{...p,price:''},{...p,androidProductId:''},{...p,periodCount:'0'}].map(product=>{try{subscriptionValidate([product]);return false;}catch(_){return true;}});});assert.deepEqual(validation,[true,true,true]);
+  for(const [index,card] of (await page.locator('[data-subscription-product]').all()).entries()){await card.locator('[data-field="iosProductId"]').fill('ios.'+index);await card.locator('[data-field="androidProductId"]').fill('android.'+index);await card.locator('[data-field="price"]').fill(index?'39.90':'18.50');}
   await page.locator('#subscriptionSave').click();await page.waitForFunction(()=>document.getElementById('subscriptionStatus').textContent.includes('已保存'));
+  assert.equal(await product.locator('[data-field="basePlanId"]').isDisabled(),true,'Save must not unlock read-only controls');
   await page.locator('#subscriptionClose').click();await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);
+  const preserved=await page.evaluate(()=>reviewData.subscriptions[0]);assert.equal(preserved.basePlanId,'original-plan');assert.equal(preserved.trialCount,'7');assert.equal(preserved.offerCycles,'3');assert.equal(preserved.offerStart,'2026-11-29T08:00');assert.equal(preserved.offerEnd,'2026-10-28T08:00');assert.equal(preserved.benefits,'<script>alert(1)</script>');assert.equal(preserved.customMetadata,'保留未显示字段');
   await clickCommand('#btnSubscriptions');assert.equal(await page.locator('[data-subscription-product]').count(),3);
-  assert.equal(await page.locator('[data-field="trialCount"]').first().inputValue(),'7');
-  assert.equal(await page.locator('[data-field="price"]').first().inputValue(),'18.50');assert.equal(await page.locator('[data-field="offerCycles"]').first().inputValue(),'3');assert.equal(await page.locator('[data-field="benefits"]').first().inputValue(),'<script>alert(1)</script>');
   await page.locator('[data-field="price"]').first().fill('999');page.once('dialog',dialog=>dialog.accept());await page.locator('#subscriptionCancel').click();
   await clickCommand('#btnSubscriptions');assert.equal(await page.locator('[data-field="price"]').first().inputValue(),'18.50');await page.locator('#subscriptionClose').click();
   // History is always reachable; viewing does not save, and snapshots show saved content.

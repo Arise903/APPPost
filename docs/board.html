@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=98d5d121a374"></script><script src="release_analysis.js?v=98d5d121a374"></script><script src="storage.js?v=98d5d121a374"></script><script src="store.js?v=98d5d121a374"></script><script>PagesStore.install();</script><script defer src="experience.js?v=98d5d121a374"></script><link rel="stylesheet" href="history.css?v=98d5d121a374"><script defer src="history.js?v=98d5d121a374"></script><link rel="stylesheet" href="workflows.css?v=98d5d121a374"><script defer src="workflows.js?v=98d5d121a374"></script>
+<script src="data.js?v=e489868cf1ad"></script><script src="release_analysis.js?v=e489868cf1ad"></script><script src="storage.js?v=e489868cf1ad"></script><script src="store.js?v=e489868cf1ad"></script><script>PagesStore.install();</script><script defer src="experience.js?v=e489868cf1ad"></script><link rel="stylesheet" href="history.css?v=e489868cf1ad"><script defer src="history.js?v=e489868cf1ad"></script><link rel="stylesheet" href="workflows.css?v=e489868cf1ad"><script defer src="workflows.js?v=e489868cf1ad"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -578,6 +578,8 @@ li.item.gateitem>.item-evidence-summary{grid-column:1 / -1}
 @media(max-width:700px){.board-header{padding:16px}.board-heading h1{font-size:18px}.board-header .hrow{flex-wrap:wrap;gap:8px}.board-header .hrow .grow{display:none}.board-heading{flex:1 1 100%}.board-overview{display:block;margin-top:16px}.primary-actions{display:none}.board-header .mode{font-size:10px;padding:3px 8px}.board-commands{gap:18px;margin-top:14px;padding-top:10px}.board-commands summary{font-size:12px}.board-commands #btnMore{font-size:11px}.board-commands>.morewrap{margin-left:auto}.check-toolbar{gap:8px;padding:10px 0;top:0}.check-toolbar .seg{flex:1 1 100%}.check-toolbar .seg button{flex:1;padding:7px}.check-toolbar input{flex:1 1 100%;min-width:0}.check-toolbar #sectionFilter{flex:1;width:auto;max-width:60%;min-width:0;font-size:11px}.check-toolbar #viewMode{flex:0 0 35%;max-width:40%;font-size:11px}.board-menu-content,.board-menu.workflow-menu>div{width:210px;min-width:0}.board-commands #publishMenu>div{left:-60px}.board-commands #historyMenu>div{left:auto;right:-40px}.item-main{grid-column:2;grid-row:1}.item-actions .item-detail{opacity:1!important;min-height:32px}.item-actions .item-status{margin-right:auto}.item-actions>.btn{margin-left:0}li.item.gateitem>.item-main{grid-column:1 / -1}.form-heading{padding:16px}.form-body{padding:16px}.form-footer{padding:12px 16px}.app-dialog .workflow-heading,.app-dialog .workflow-body{padding:16px}.detail-title{font-size:15px}#itemReviewDialog.item-drawer{border-radius:0;width:100vw}.workspace-topbar{padding:14px 14px 0;gap:12px}.workspace-local{font-size:10px}.board-header .release-readiness summary{font-size:11px}.board-header .release-readiness{padding:8px 10px}}
 .item-title .txt{display:block}.board-header #historyMenu .board-menu-content>div{display:contents}dialog.app-dialog{width:min(760px,calc(100vw - 32px))}.app-dialog .form-footer:has(.form-error:empty):not(:has(button)){display:none}.app-dialog>.conflict-preview,.app-dialog>h2{margin:20px 24px}.app-dialog>button{margin:0 24px 20px}li.item.gateitem>.item-main{grid-column:1 / 3}@media(max-width:700px){li.item.gateitem>.item-main{grid-column:1 / -1}}
 
+.subscription-grid .field-caption{display:block}.required-mark{color:var(--danger);font-weight:700}.subscription-grid .subscription-readonly input,.subscription-grid .subscription-readonly select,.subscription-grid .subscription-readonly textarea{background:var(--surface-2);color:var(--text-3);cursor:default;opacity:1;-webkit-text-fill-color:var(--text-3)}
+
 </style>
 </head>
 <body><nav class="workspace-topbar"><a href="index.html">← 我的项目</a><span id="pagesProjectName"></span><span class="workspace-local">本机工作台</span></nav>
@@ -785,7 +787,7 @@ li.item.gateitem>.item-evidence-summary{grid-column:1 / -1}
 <dialog id="itemReviewDialog" class="item-drawer" aria-labelledby="itemReviewTitle"><form id="itemReviewForm"><header class="form-heading"><div><span id="itemReviewMeta" class="detail-meta"></span><h2 id="itemReviewTitle">检查项详情</h2></div><button class="btn" type="button" id="itemReviewClose" aria-label="关闭条目详情">关闭</button></header><div class="form-body"><p id="itemReviewText" class="detail-title"></p><input type="hidden" name="attachmentIds"><section class="detail-section"><h3>检查记录</h3><label>检查备注<textarea name="notes" maxlength="4000" placeholder="记录验证过程和结果"></textarea></label></section><details class="detail-section" id="itemEvidenceSection"><summary>证据与附件 <span id="itemEvidenceCount"></span></summary><label>验证证据（路径或链接）<textarea name="evidence" maxlength="4000"></textarea></label><label>证据有效至<input name="evidenceExpiresAt" type="date"></label><div id="itemAttachments"></div><label id="itemAttachmentPicker">添加截图或文件<input id="itemAttachmentUpload" type="file" multiple></label><p class="form-hint">附件与本次详情一起保存。单文件最多 5 MiB。</p></details><section class="detail-section"><h3>例外与复查</h3><label>跳过原因<textarea name="reason" maxlength="4000"></textarea></label><details class="exception-fields"><summary>跳过分类、负责人和复查记录</summary><label>跳过类型<select name="exceptionType"><option value="legacy">普通跳过（兼容原记录）</option><option value="not-applicable">不适用</option><option value="deferred">暂缓处理</option><option value="risk-accepted">风险接受</option></select></label><label>负责人<input name="exceptionOwner" maxlength="200"></label><label>复查期限<input name="reviewDue" type="date"></label><label>复查状态<select name="reviewStatus"><option value="pending">待复查</option><option value="reviewed">已复查</option></select></label><label>复查日期<input name="reviewedAt" type="date"></label><p>审批记录由你手动登记，用于追溯；风险接受需填写已批准状态、批准人和日期。</p><label>审批状态<select name="approvalStatus"><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已拒绝</option></select></label><label>批准人<input name="approvalBy" maxlength="200"></label><label>批准日期<input name="approvalDate" type="date"></label></details></section><details class="detail-section"><summary>检查要求</summary><label class="inline-check"><input name="required" type="checkbox" checked>发布必需项</label><label class="inline-check"><input name="evidenceRequired" type="checkbox">完成时必须提供证据</label></details></div><footer class="form-footer"><p id="itemReviewError" role="alert"></p><button type="button" class="btn" id="itemReviewCancel">取消</button><button type="submit" class="btn primary">保存详情</button></footer></form></dialog>
 <dialog id="subscriptionDialog" aria-labelledby="subscriptionTitle">
 <form id="subscriptionForm">
-<div class="subscription-head"><div><h2 id="subscriptionTitle">订阅商品</h2><p>按商品记录周期、价格、试用和优惠；支持同一周期的多个档位。保存于当前项目，不会自动修改商店后台。</p></div><button class="btn" type="button" id="subscriptionClose" aria-label="关闭订阅商品">关闭</button></div>
+<div class="subscription-head"><div><h2 id="subscriptionTitle">订阅商品</h2><p>仅商品 ID、币种、价格和周期可编辑，其他信息为只读记录。星号 * 表示必填；保存于当前项目。</p></div><button class="btn" type="button" id="subscriptionClose" aria-label="关闭订阅商品">关闭</button></div>
 <label class="subscription-enabled"><input type="checkbox" id="subscriptionEnabled"><span><b>此 App 有订阅商品</b><small>启用后配置下方商品；关闭会隐藏订阅检查，保留商品和已有记录。</small></span></label><div id="subscriptionConfiguration"><div class="subscription-actions"><button class="btn" type="button" data-add-subscription="week">＋ 周订阅</button><button class="btn" type="button" data-add-subscription="month">＋ 月订阅</button><button class="btn" type="button" data-add-subscription="year">＋ 年订阅</button><button class="btn" type="button" data-add-subscription="custom">＋ 自定义周期</button></div>
 <div id="subscriptionProducts"></div></div><p id="subscriptionError" role="alert"></p>
 <div class="subscription-footer"><span id="subscriptionStatus" role="status"></span><button class="btn" type="button" id="subscriptionCancel">取消</button><button class="btn" type="button" id="subscriptionExport">导出商品 JSON</button><button class="btn primary" type="submit" id="subscriptionSave">保存订阅设置与商品</button></div>
@@ -1238,10 +1240,10 @@ function assess(snapshot,now=new Date()){
  const release=snapshot.release||{};
  if(release.strictValidation==='on'){
   for(const [key,label] of [['app','App 名称'],['platform','平台'],['version','版本号'],['build','构建号'],['owner','负责人']])if(!String(release[key]||'').trim())add('__release',label,'发布信息不完整');
-  if(snapshot.features?.hasSubscriptions){const products=(snapshot.subscriptions||[]).filter(p=>p.status!=='off');if(!products.length)add('__subscriptions','订阅商品','尚未配置可发布商品');const seen=new Set();for(const p of products){const platform=p.platform||'both';let error=!p.name||p.price===''||p.price===undefined||!Number.isFinite(Number(p.price))||Number(p.price)<0||!/^[A-Z]{3}$/.test(p.currency||'')||!Number.isSafeInteger(Number(p.periodCount))||Number(p.periodCount)<1||!p.benefits||p.status==='draft';if((platform==='ios'||platform==='both')&&!p.iosProductId)error=true;if((platform==='android'||platform==='both')&&(!p.androidProductId||!p.basePlanId))error=true;for(const key of ['iosProductId','androidProductId'])if(p[key]){const id=key+':'+p[key]+(key==='androidProductId'?':'+(p.basePlanId||''):'');if(seen.has(id))error=true;seen.add(id);}if(error)add('__subscriptions',p.name||'未命名商品','商品配置不完整或重复');}}
+  if(snapshot.features?.hasSubscriptions){const products=(snapshot.subscriptions||[]).filter(p=>p.status!=='off');if(!products.length)add('__subscriptions','订阅商品','尚未配置可发布商品');const seen=new Set();for(const p of products){const projectPlatform=String(snapshot.release?.platform||'').toLowerCase(),rawPlatform=p.platform||(['ios','android'].includes(projectPlatform)?projectPlatform:'both'),platform=['ios','android','both'].includes(rawPlatform)?rawPlatform:'both';let error=p.price==null||String(p.price).trim()===''||!Number.isFinite(Number(p.price))||Number(p.price)<0||!/^[A-Z]{3}$/.test(p.currency||'')||!Number.isSafeInteger(Number(p.periodCount))||Number(p.periodCount)<1||!['day','week','month','year','custom'].includes(p.period)||p.period==='custom'&&!String(p.customPeriod||'').trim();if((platform==='ios'||platform==='both')&&!String(p.iosProductId||'').trim())error=true;if((platform==='android'||platform==='both')&&!String(p.androidProductId||'').trim())error=true;for(const key of (platform==='ios'?['iosProductId']:platform==='android'?['androidProductId']:['iosProductId','androidProductId']))if(p[key]){const id=key+':'+p[key]+(key==='androidProductId'?':'+(p.basePlanId||''):'');if(seen.has(id))error=true;seen.add(id);}if(error)add('__subscriptions',p.name||'未命名商品','商品配置不完整或重复');}}
  }
  if(snapshot.preflight){const report=snapshot.preflight;if(root.ReleaseAnalysis&&report.basis!==root.ReleaseAnalysis.basis(snapshot))add('__preflight','配置预检','发布配置已变化，预检结果需重新生成');else if(report.errors>0)add('__preflight','配置预检',report.errors+' 项配置预检错误未解决');}
- return {policyVersion:3,timeZone,assessedOn:today,total:items.length,done,skipped,pending,blockers:issues.length,missingEvidence:issues.filter(i=>i.reason==='缺少必需证据').length,ready:items.length>0&&!issues.length,issues};
+ return {policyVersion:4,timeZone,assessedOn:today,total:items.length,done,skipped,pending,blockers:issues.length,missingEvidence:issues.filter(i=>i.reason==='缺少必需证据').length,ready:items.length>0&&!issues.length,issues};
 }
 root.ReleaseReadiness={assess,calendarDate,DEFAULT_TIME_ZONE};
 })(typeof window==='undefined'?globalThis:window);
@@ -3177,24 +3179,29 @@ const subscriptionFields=[
   ['offerTimezone','优惠时区（如 Asia/Shanghai）','text'],['offerLimit','每用户可享次数','integer'],
   ['offerEligibility','优惠适用用户 / 资格','text'],['stacking','试用与优惠叠加规则','textarea'],['notes','其他配置 / 升降级 / 价格变更备注','textarea']]]
 ];
+const subscriptionEditableFields=new Set(['iosProductId','androidProductId','currency','price','period','periodCount','customPeriod']);
+function subscriptionRequiredFields(product){const platform=product.platform||subscriptionProjectPlatform();return new Set(['currency','price','period','periodCount',...(platform==='ios'?['iosProductId']:platform==='android'?['androidProductId']:['iosProductId','androidProductId']),...(product.period==='custom'?['customPeriod']:[])]);}
+function subscriptionProjectPlatform(){const value=String(reviewData.release?.platform||'').toLowerCase();return ['ios','android'].includes(value)?value:'both';}
+function subscriptionPeriodName(product){return product.period==='custom'?(product.customPeriod||'自定义订阅'):(product.periodCount==='1'?'':product.periodCount||'')+({day:'天订阅',week:'周订阅',month:'月订阅',year:'年订阅'}[product.period]||'订阅');}
 let subscriptionDraft=[],subscriptionBaseline='',subscriptionFocus=null,subscriptionSaving=false;
 const subscriptionEnabled=document.getElementById('subscriptionEnabled');
 function subscriptionState(){return {enabled:subscriptionEnabled.checked,products:subscriptionRead()};}
 function subscriptionHasChanges(){return subscriptionDialog.open&&JSON.stringify(subscriptionState())!==subscriptionBaseline;}
-function subscriptionRead(){return Array.from(subscriptionProducts.querySelectorAll('[data-subscription-product]')).map(card=>{const product={...subscriptionDraft[Number(card.dataset.subscriptionProduct)]};card.querySelectorAll('[data-field]').forEach(input=>product[input.dataset.field]=input.value.trim());return product;});}
+function subscriptionRead(){return Array.from(subscriptionProducts.querySelectorAll('[data-subscription-product]')).map(card=>{const product={...subscriptionDraft[Number(card.dataset.subscriptionProduct)]};card.querySelectorAll('[data-field]').forEach(input=>{if(subscriptionEditableFields.has(input.dataset.field))product[input.dataset.field]=input.value.trim();});if(product.nameGenerated==='on')product.name=subscriptionPeriodName(product);return product;});}
 function subscriptionConditions(){
  const enabled=subscriptionEnabled.checked;
  document.getElementById('subscriptionConfiguration').classList.toggle('subscription-off',!enabled);
  subscriptionForm.querySelectorAll('[data-add-subscription]').forEach(button=>button.disabled=!enabled||subscriptionSaving);
  for(const card of subscriptionProducts.querySelectorAll('[data-subscription-product]')){
-  const get=key=>card.querySelector('[data-field="'+key+'"]')?.value;
+  const get=key=>card.querySelector('[data-field="'+key+'"]')?.value;const product={...subscriptionDraft[Number(card.dataset.subscriptionProduct)],period:get('period')};const required=subscriptionRequiredFields(product);const platform=product.platform||subscriptionProjectPlatform();
   for(const label of card.querySelectorAll('[data-field-label]')){const key=label.dataset.fieldLabel;let visible=true;
    if(label.dataset.group==='trial'&&key!=='trialEnabled')visible=get('trialEnabled')==='on';
    if(label.dataset.group==='offer'&&key!=='offerEnabled')visible=get('offerEnabled')==='on';
    if(key==='customPeriod')visible=get('period')==='custom';
    if(key==='offerCustomPeriod')visible=visible&&get('offerPeriod')==='custom';
    if(key==='offerPrice')visible=visible&&get('paymentMode')!=='free';
-   label.hidden=!visible;label.querySelectorAll('input,select,textarea').forEach(input=>input.disabled=!enabled||!visible||subscriptionSaving);
+   if(key==='iosProductId'&&platform==='android'||key==='androidProductId'&&platform==='ios')visible=false;
+   label.hidden=!visible;const editable=subscriptionEditableFields.has(key);label.classList.toggle('subscription-readonly',!editable);label.querySelector('.required-mark').hidden=!required.has(key);label.querySelectorAll('input,select,textarea').forEach(input=>{input.disabled=!enabled||!visible||subscriptionSaving||!editable;input.required=required.has(key)&&editable&&visible;});
   }
   card.querySelector('[data-remove-product]').disabled=!enabled||subscriptionSaving;
  }
@@ -3207,40 +3214,36 @@ function subscriptionRender(){
   const summary=document.createElement('summary');summary.textContent=(product.name||'未命名商品')+' · '+(subscriptionPeriods.find(p=>p[0]===product.period)?.[1]||'自定义')+'订阅';card.append(summary);
   for(const [heading,fields] of subscriptionFields){const title=document.createElement('h3');title.textContent=heading;card.append(title);const grid=document.createElement('div');grid.className='subscription-grid';
    const group=heading==='免费试用'?'trial':heading==='优惠 / 促销'?'offer':'basic';
-   for(const [key,caption,type] of fields){const label=document.createElement('label');label.textContent=caption;label.dataset.fieldLabel=key;label.dataset.group=group;let input;
+   for(const [key,caption,type] of fields){const label=document.createElement('label');const star=document.createElement('span');star.className='required-mark';star.textContent='* ';star.setAttribute('aria-hidden','true');const captionText=document.createElement('span');captionText.textContent=caption;const captionLine=document.createElement('span');captionLine.className='field-caption';captionLine.append(star,captionText);label.append(captionLine);label.dataset.fieldLabel=key;label.dataset.group=group;let input;
     if(Array.isArray(type)){input=document.createElement('select');for(const [value,text] of type)input.add(new Option(text,value));}
     else{input=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea'){input.type=['integer','money'].includes(type)?'number':type==='currency'?'text':type;if(type==='integer'){input.min='1';input.step='1';}if(type==='money'){input.min='0';input.step='any';}}else label.className='subscription-wide';input.maxLength=type==='textarea'?4000:500;}
-    input.dataset.field=key;input.value=product[key]??(['trialEnabled','offerEnabled'].includes(key)?'off':'');if(key==='name')input.required=true;if(key==='currency'){input.pattern='[A-Z]{3}';input.maxLength=3;}
+    input.dataset.field=key;input.value=product[key]??(['trialEnabled','offerEnabled'].includes(key)?'off':'');if(key==='currency'){input.pattern='[A-Z]{3}';input.maxLength=3;}
     input.setAttribute('aria-label',caption);label.append(input);grid.append(label);
    }card.append(grid);
   }
   const remove=document.createElement('button');remove.type='button';remove.className='btn danger';remove.dataset.removeProduct='';remove.textContent='删除此商品';remove.onclick=()=>{if(!confirm('删除此订阅商品？保存后生效。'))return;subscriptionDraft=subscriptionRead();subscriptionDraft.splice(index,1);subscriptionRender();subscriptionUpdateStatus();};card.append(remove);subscriptionProducts.append(card);
  });subscriptionConditions();
 }
-function subscriptionUpdateStatus(){subscriptionConditions();document.getElementById('subscriptionStatus').textContent=JSON.stringify(subscriptionState())===subscriptionBaseline?'已保存 · '+(subscriptionEnabled.checked?'已启用 · '+subscriptionDraft.length+' 个商品':'未启用订阅'):'有未保存的订阅设置';document.getElementById('subscriptionError').textContent='';setTimeout(updateSaveStatus,0);}
+function subscriptionUpdateStatus(){for(const [index,product] of subscriptionRead().entries())if(product.nameGenerated==='on'){const card=subscriptionProducts.querySelector('[data-subscription-product="'+index+'"]');card.querySelector('[data-field=name]').value=product.name;card.querySelector('summary').textContent=product.name;}subscriptionConditions();document.getElementById('subscriptionStatus').textContent=JSON.stringify(subscriptionState())===subscriptionBaseline?'已保存 · '+(subscriptionEnabled.checked?'已启用 · '+subscriptionDraft.length+' 个商品':'未启用订阅'):'有未保存的订阅设置';document.getElementById('subscriptionError').textContent='';setTimeout(updateSaveStatus,0);}
 function subscriptionClose(){if(subscriptionSaving)return;if(subscriptionHasChanges()&&!confirm('放弃尚未保存的订阅设置与商品修改？'))return;subscriptionDialog.close();updateSaveStatus();subscriptionFocus?.focus();}
 document.getElementById('btnSubscriptions').onclick=()=>{subscriptionFocus=document.activeElement;subscriptionDraft=JSON.parse(JSON.stringify(reviewData.subscriptions||[]));subscriptionEnabled.checked=DATA?.features?.hasSubscriptions!==false;subscriptionRender();subscriptionBaseline=JSON.stringify(subscriptionState());subscriptionUpdateStatus();subscriptionDialog.showModal();};
 document.getElementById('subscriptionClose').onclick=subscriptionClose;document.getElementById('subscriptionCancel').onclick=subscriptionClose;
 subscriptionDialog.addEventListener('cancel',event=>{event.preventDefault();subscriptionClose();});
 subscriptionForm.addEventListener('input',subscriptionUpdateStatus);subscriptionForm.addEventListener('change',subscriptionUpdateStatus);
-subscriptionForm.querySelectorAll('[data-add-subscription]').forEach(button=>button.onclick=()=>{subscriptionDraft=subscriptionRead();subscriptionDraft.push({id:crypto.randomUUID(),name:({week:'周订阅',month:'月订阅',year:'年订阅',custom:'自定义订阅'})[button.dataset.addSubscription],period:button.dataset.addSubscription,periodCount:'1',status:'draft',platform:'both',currency:'CNY',price:'',familySharing:'off',renewal:'auto',trialEnabled:'off',trialUnit:'day',offerEnabled:'off',offerType:'intro',paymentMode:'recurring',offerPeriod:'month',offerTimezone:ReleaseReadiness.DEFAULT_TIME_ZONE});subscriptionRender();subscriptionUpdateStatus();subscriptionProducts.lastElementChild.scrollIntoView({block:'nearest'});});
+subscriptionForm.querySelectorAll('[data-add-subscription]').forEach(button=>button.onclick=()=>{subscriptionDraft=subscriptionRead();subscriptionDraft.push({id:crypto.randomUUID(),nameGenerated:'on',name:({week:'周订阅',month:'月订阅',year:'年订阅',custom:'自定义订阅'})[button.dataset.addSubscription],period:button.dataset.addSubscription,periodCount:'1',status:'draft',platform:subscriptionProjectPlatform(),currency:'CNY',price:'',familySharing:'off',renewal:'auto',trialEnabled:'off',trialUnit:'day',offerEnabled:'off',offerType:'intro',paymentMode:'recurring',offerPeriod:'month',offerTimezone:ReleaseReadiness.DEFAULT_TIME_ZONE});subscriptionRender();subscriptionUpdateStatus();subscriptionProducts.lastElementChild.scrollIntoView({block:'nearest'});});
 function subscriptionValidate(products){
  const ids=new Set();
  for(const product of products){
-  if(!product.name)throw Error('请填写商品名称');
-  if(!/^[A-Z]{3}$/.test(product.currency))throw Error(product.name+'：请填写三位大写币种代码');
-  for(const [heading,fields] of subscriptionFields)for(const [key,label,type] of fields){if(heading==='免费试用'&&product.trialEnabled!=='on'||heading==='优惠 / 促销'&&product.offerEnabled!=='on')continue;const value=product[key];if(value&&type==='money'&&(!Number.isFinite(Number(value))||Number(value)<0))throw Error(product.name+'：'+label+'必须是非负金额');if(value&&type==='integer'&&(!Number.isSafeInteger(Number(value))||Number(value)<1))throw Error(product.name+'：'+label+'必须是正整数');}
-  if(!product.periodCount)throw Error(product.name+'：请填写周期数量');
-  if(product.period==='custom'&&!product.customPeriod)throw Error(product.name+'：请填写自定义周期说明');
-  if(product.trialEnabled==='on'&&!product.trialCount)throw Error(product.name+'：请填写试用周期数量');
-  if(product.offerEnabled==='on'){
-   if(!product.offerPeriodCount||!product.offerCycles)throw Error(product.name+'：请填写优惠周期和持续次数');
-   if(product.paymentMode!=='free'&&product.offerPrice==='')throw Error(product.name+'：请填写优惠实付金额');
-   if(product.offerPeriod==='custom'&&!product.offerCustomPeriod)throw Error(product.name+'：请填写自定义优惠周期');
-   if((product.offerStart||product.offerEnd)&&!product.offerTimezone)throw Error(product.name+'：请填写优惠时区');
-   if(product.offerStart&&product.offerEnd&&product.offerEnd<=product.offerStart)throw Error(product.name+'：优惠结束时间必须晚于开始时间');
+  const name=product.name||subscriptionPeriodName(product);
+  if(!/^[A-Z]{3}$/.test(product.currency||''))throw Error(name+'：请填写三位大写币种代码');
+  if(product.price===''||product.price===undefined||!Number.isFinite(Number(product.price))||Number(product.price)<0)throw Error(name+'：请填写有效的标准订阅金额');
+  if(!subscriptionPeriods.some(([value])=>value===product.period))throw Error(name+'：请选择订阅周期');
+  if(!Number.isSafeInteger(Number(product.periodCount))||Number(product.periodCount)<1)throw Error(name+'：周期数量必须是正整数');
+  if(product.period==='custom'&&!product.customPeriod?.trim())throw Error(name+'：请填写自定义周期说明');
+  for(const key of subscriptionRequiredFields(product))if(['iosProductId','androidProductId'].includes(key)){
+   if(!product[key]?.trim())throw Error(name+'：请填写'+(key==='iosProductId'?'iOS':'Android')+' 商品 ID');
+   const id=key+':'+product[key]+(key==='androidProductId'?':'+(product.basePlanId||''):'');if(ids.has(id))throw Error(name+'：商品 ID 重复');ids.add(id);
   }
-  for(const key of ['iosProductId','androidProductId'])if(product[key]){const id=key+':'+product[key]+(key==='androidProductId'?':'+product.basePlanId:'');if(ids.has(id))throw Error(product.name+'：商品 ID / 基础方案重复');ids.add(id);}
  }
 }
 subscriptionForm.onsubmit=async event=>{
@@ -3386,5 +3389,5 @@ installSaveRecovery();
 installBoardExperience();
 
 </script>
-<script defer src="bootstrap.js?v=98d5d121a374"></script></body>
+<script defer src="bootstrap.js?v=e489868cf1ad"></script></body>
 </html>

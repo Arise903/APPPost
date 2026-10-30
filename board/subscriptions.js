@@ -25,24 +25,29 @@ const subscriptionFields=[
   ['offerTimezone','优惠时区（如 Asia/Shanghai）','text'],['offerLimit','每用户可享次数','integer'],
   ['offerEligibility','优惠适用用户 / 资格','text'],['stacking','试用与优惠叠加规则','textarea'],['notes','其他配置 / 升降级 / 价格变更备注','textarea']]]
 ];
+const subscriptionEditableFields=new Set(['iosProductId','androidProductId','currency','price','period','periodCount','customPeriod']);
+function subscriptionRequiredFields(product){const platform=product.platform||subscriptionProjectPlatform();return new Set(['currency','price','period','periodCount',...(platform==='ios'?['iosProductId']:platform==='android'?['androidProductId']:['iosProductId','androidProductId']),...(product.period==='custom'?['customPeriod']:[])]);}
+function subscriptionProjectPlatform(){const value=String(reviewData.release?.platform||'').toLowerCase();return ['ios','android'].includes(value)?value:'both';}
+function subscriptionPeriodName(product){return product.period==='custom'?(product.customPeriod||'自定义订阅'):(product.periodCount==='1'?'':product.periodCount||'')+({day:'天订阅',week:'周订阅',month:'月订阅',year:'年订阅'}[product.period]||'订阅');}
 let subscriptionDraft=[],subscriptionBaseline='',subscriptionFocus=null,subscriptionSaving=false;
 const subscriptionEnabled=document.getElementById('subscriptionEnabled');
 function subscriptionState(){return {enabled:subscriptionEnabled.checked,products:subscriptionRead()};}
 function subscriptionHasChanges(){return subscriptionDialog.open&&JSON.stringify(subscriptionState())!==subscriptionBaseline;}
-function subscriptionRead(){return Array.from(subscriptionProducts.querySelectorAll('[data-subscription-product]')).map(card=>{const product={...subscriptionDraft[Number(card.dataset.subscriptionProduct)]};card.querySelectorAll('[data-field]').forEach(input=>product[input.dataset.field]=input.value.trim());return product;});}
+function subscriptionRead(){return Array.from(subscriptionProducts.querySelectorAll('[data-subscription-product]')).map(card=>{const product={...subscriptionDraft[Number(card.dataset.subscriptionProduct)]};card.querySelectorAll('[data-field]').forEach(input=>{if(subscriptionEditableFields.has(input.dataset.field))product[input.dataset.field]=input.value.trim();});if(product.nameGenerated==='on')product.name=subscriptionPeriodName(product);return product;});}
 function subscriptionConditions(){
  const enabled=subscriptionEnabled.checked;
  document.getElementById('subscriptionConfiguration').classList.toggle('subscription-off',!enabled);
  subscriptionForm.querySelectorAll('[data-add-subscription]').forEach(button=>button.disabled=!enabled||subscriptionSaving);
  for(const card of subscriptionProducts.querySelectorAll('[data-subscription-product]')){
-  const get=key=>card.querySelector('[data-field="'+key+'"]')?.value;
+  const get=key=>card.querySelector('[data-field="'+key+'"]')?.value;const product={...subscriptionDraft[Number(card.dataset.subscriptionProduct)],period:get('period')};const required=subscriptionRequiredFields(product);const platform=product.platform||subscriptionProjectPlatform();
   for(const label of card.querySelectorAll('[data-field-label]')){const key=label.dataset.fieldLabel;let visible=true;
    if(label.dataset.group==='trial'&&key!=='trialEnabled')visible=get('trialEnabled')==='on';
    if(label.dataset.group==='offer'&&key!=='offerEnabled')visible=get('offerEnabled')==='on';
    if(key==='customPeriod')visible=get('period')==='custom';
    if(key==='offerCustomPeriod')visible=visible&&get('offerPeriod')==='custom';
    if(key==='offerPrice')visible=visible&&get('paymentMode')!=='free';
-   label.hidden=!visible;label.querySelectorAll('input,select,textarea').forEach(input=>input.disabled=!enabled||!visible||subscriptionSaving);
+   if(key==='iosProductId'&&platform==='android'||key==='androidProductId'&&platform==='ios')visible=false;
+   label.hidden=!visible;const editable=subscriptionEditableFields.has(key);label.classList.toggle('subscription-readonly',!editable);label.querySelector('.required-mark').hidden=!required.has(key);label.querySelectorAll('input,select,textarea').forEach(input=>{input.disabled=!enabled||!visible||subscriptionSaving||!editable;input.required=required.has(key)&&editable&&visible;});
   }
   card.querySelector('[data-remove-product]').disabled=!enabled||subscriptionSaving;
  }
@@ -55,40 +60,36 @@ function subscriptionRender(){
   const summary=document.createElement('summary');summary.textContent=(product.name||'未命名商品')+' · '+(subscriptionPeriods.find(p=>p[0]===product.period)?.[1]||'自定义')+'订阅';card.append(summary);
   for(const [heading,fields] of subscriptionFields){const title=document.createElement('h3');title.textContent=heading;card.append(title);const grid=document.createElement('div');grid.className='subscription-grid';
    const group=heading==='免费试用'?'trial':heading==='优惠 / 促销'?'offer':'basic';
-   for(const [key,caption,type] of fields){const label=document.createElement('label');label.textContent=caption;label.dataset.fieldLabel=key;label.dataset.group=group;let input;
+   for(const [key,caption,type] of fields){const label=document.createElement('label');const star=document.createElement('span');star.className='required-mark';star.textContent='* ';star.setAttribute('aria-hidden','true');const captionText=document.createElement('span');captionText.textContent=caption;const captionLine=document.createElement('span');captionLine.className='field-caption';captionLine.append(star,captionText);label.append(captionLine);label.dataset.fieldLabel=key;label.dataset.group=group;let input;
     if(Array.isArray(type)){input=document.createElement('select');for(const [value,text] of type)input.add(new Option(text,value));}
     else{input=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea'){input.type=['integer','money'].includes(type)?'number':type==='currency'?'text':type;if(type==='integer'){input.min='1';input.step='1';}if(type==='money'){input.min='0';input.step='any';}}else label.className='subscription-wide';input.maxLength=type==='textarea'?4000:500;}
-    input.dataset.field=key;input.value=product[key]??(['trialEnabled','offerEnabled'].includes(key)?'off':'');if(key==='name')input.required=true;if(key==='currency'){input.pattern='[A-Z]{3}';input.maxLength=3;}
+    input.dataset.field=key;input.value=product[key]??(['trialEnabled','offerEnabled'].includes(key)?'off':'');if(key==='currency'){input.pattern='[A-Z]{3}';input.maxLength=3;}
     input.setAttribute('aria-label',caption);label.append(input);grid.append(label);
    }card.append(grid);
   }
   const remove=document.createElement('button');remove.type='button';remove.className='btn danger';remove.dataset.removeProduct='';remove.textContent='删除此商品';remove.onclick=()=>{if(!confirm('删除此订阅商品？保存后生效。'))return;subscriptionDraft=subscriptionRead();subscriptionDraft.splice(index,1);subscriptionRender();subscriptionUpdateStatus();};card.append(remove);subscriptionProducts.append(card);
  });subscriptionConditions();
 }
-function subscriptionUpdateStatus(){subscriptionConditions();document.getElementById('subscriptionStatus').textContent=JSON.stringify(subscriptionState())===subscriptionBaseline?'已保存 · '+(subscriptionEnabled.checked?'已启用 · '+subscriptionDraft.length+' 个商品':'未启用订阅'):'有未保存的订阅设置';document.getElementById('subscriptionError').textContent='';setTimeout(updateSaveStatus,0);}
+function subscriptionUpdateStatus(){for(const [index,product] of subscriptionRead().entries())if(product.nameGenerated==='on'){const card=subscriptionProducts.querySelector('[data-subscription-product="'+index+'"]');card.querySelector('[data-field=name]').value=product.name;card.querySelector('summary').textContent=product.name;}subscriptionConditions();document.getElementById('subscriptionStatus').textContent=JSON.stringify(subscriptionState())===subscriptionBaseline?'已保存 · '+(subscriptionEnabled.checked?'已启用 · '+subscriptionDraft.length+' 个商品':'未启用订阅'):'有未保存的订阅设置';document.getElementById('subscriptionError').textContent='';setTimeout(updateSaveStatus,0);}
 function subscriptionClose(){if(subscriptionSaving)return;if(subscriptionHasChanges()&&!confirm('放弃尚未保存的订阅设置与商品修改？'))return;subscriptionDialog.close();updateSaveStatus();subscriptionFocus?.focus();}
 document.getElementById('btnSubscriptions').onclick=()=>{subscriptionFocus=document.activeElement;subscriptionDraft=JSON.parse(JSON.stringify(reviewData.subscriptions||[]));subscriptionEnabled.checked=DATA?.features?.hasSubscriptions!==false;subscriptionRender();subscriptionBaseline=JSON.stringify(subscriptionState());subscriptionUpdateStatus();subscriptionDialog.showModal();};
 document.getElementById('subscriptionClose').onclick=subscriptionClose;document.getElementById('subscriptionCancel').onclick=subscriptionClose;
 subscriptionDialog.addEventListener('cancel',event=>{event.preventDefault();subscriptionClose();});
 subscriptionForm.addEventListener('input',subscriptionUpdateStatus);subscriptionForm.addEventListener('change',subscriptionUpdateStatus);
-subscriptionForm.querySelectorAll('[data-add-subscription]').forEach(button=>button.onclick=()=>{subscriptionDraft=subscriptionRead();subscriptionDraft.push({id:crypto.randomUUID(),name:({week:'周订阅',month:'月订阅',year:'年订阅',custom:'自定义订阅'})[button.dataset.addSubscription],period:button.dataset.addSubscription,periodCount:'1',status:'draft',platform:'both',currency:'CNY',price:'',familySharing:'off',renewal:'auto',trialEnabled:'off',trialUnit:'day',offerEnabled:'off',offerType:'intro',paymentMode:'recurring',offerPeriod:'month',offerTimezone:ReleaseReadiness.DEFAULT_TIME_ZONE});subscriptionRender();subscriptionUpdateStatus();subscriptionProducts.lastElementChild.scrollIntoView({block:'nearest'});});
+subscriptionForm.querySelectorAll('[data-add-subscription]').forEach(button=>button.onclick=()=>{subscriptionDraft=subscriptionRead();subscriptionDraft.push({id:crypto.randomUUID(),nameGenerated:'on',name:({week:'周订阅',month:'月订阅',year:'年订阅',custom:'自定义订阅'})[button.dataset.addSubscription],period:button.dataset.addSubscription,periodCount:'1',status:'draft',platform:subscriptionProjectPlatform(),currency:'CNY',price:'',familySharing:'off',renewal:'auto',trialEnabled:'off',trialUnit:'day',offerEnabled:'off',offerType:'intro',paymentMode:'recurring',offerPeriod:'month',offerTimezone:ReleaseReadiness.DEFAULT_TIME_ZONE});subscriptionRender();subscriptionUpdateStatus();subscriptionProducts.lastElementChild.scrollIntoView({block:'nearest'});});
 function subscriptionValidate(products){
  const ids=new Set();
  for(const product of products){
-  if(!product.name)throw Error('请填写商品名称');
-  if(!/^[A-Z]{3}$/.test(product.currency))throw Error(product.name+'：请填写三位大写币种代码');
-  for(const [heading,fields] of subscriptionFields)for(const [key,label,type] of fields){if(heading==='免费试用'&&product.trialEnabled!=='on'||heading==='优惠 / 促销'&&product.offerEnabled!=='on')continue;const value=product[key];if(value&&type==='money'&&(!Number.isFinite(Number(value))||Number(value)<0))throw Error(product.name+'：'+label+'必须是非负金额');if(value&&type==='integer'&&(!Number.isSafeInteger(Number(value))||Number(value)<1))throw Error(product.name+'：'+label+'必须是正整数');}
-  if(!product.periodCount)throw Error(product.name+'：请填写周期数量');
-  if(product.period==='custom'&&!product.customPeriod)throw Error(product.name+'：请填写自定义周期说明');
-  if(product.trialEnabled==='on'&&!product.trialCount)throw Error(product.name+'：请填写试用周期数量');
-  if(product.offerEnabled==='on'){
-   if(!product.offerPeriodCount||!product.offerCycles)throw Error(product.name+'：请填写优惠周期和持续次数');
-   if(product.paymentMode!=='free'&&product.offerPrice==='')throw Error(product.name+'：请填写优惠实付金额');
-   if(product.offerPeriod==='custom'&&!product.offerCustomPeriod)throw Error(product.name+'：请填写自定义优惠周期');
-   if((product.offerStart||product.offerEnd)&&!product.offerTimezone)throw Error(product.name+'：请填写优惠时区');
-   if(product.offerStart&&product.offerEnd&&product.offerEnd<=product.offerStart)throw Error(product.name+'：优惠结束时间必须晚于开始时间');
+  const name=product.name||subscriptionPeriodName(product);
+  if(!/^[A-Z]{3}$/.test(product.currency||''))throw Error(name+'：请填写三位大写币种代码');
+  if(product.price===''||product.price===undefined||!Number.isFinite(Number(product.price))||Number(product.price)<0)throw Error(name+'：请填写有效的标准订阅金额');
+  if(!subscriptionPeriods.some(([value])=>value===product.period))throw Error(name+'：请选择订阅周期');
+  if(!Number.isSafeInteger(Number(product.periodCount))||Number(product.periodCount)<1)throw Error(name+'：周期数量必须是正整数');
+  if(product.period==='custom'&&!product.customPeriod?.trim())throw Error(name+'：请填写自定义周期说明');
+  for(const key of subscriptionRequiredFields(product))if(['iosProductId','androidProductId'].includes(key)){
+   if(!product[key]?.trim())throw Error(name+'：请填写'+(key==='iosProductId'?'iOS':'Android')+' 商品 ID');
+   const id=key+':'+product[key]+(key==='androidProductId'?':'+(product.basePlanId||''):'');if(ids.has(id))throw Error(name+'：商品 ID 重复');ids.add(id);
   }
-  for(const key of ['iosProductId','androidProductId'])if(product[key]){const id=key+':'+product[key]+(key==='androidProductId'?':'+product.basePlanId:'');if(ids.has(id))throw Error(product.name+'：商品 ID / 基础方案重复');ids.add(id);}
  }
 }
 subscriptionForm.onsubmit=async event=>{

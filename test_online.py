@@ -178,7 +178,7 @@ class OnlineTests(unittest.TestCase):
         self.assertEqual(next_release.status_code,200)
         data=next_release.json
         self.assertEqual(data['review']['history'][0]['release']['version'],'1')
-        self.assertEqual(data['review']['history'][0]['readiness']['policyVersion'],3)
+        self.assertEqual(data['review']['history'][0]['readiness']['policyVersion'],4)
         self.assertFalse(data['review']['history'][0]['readiness']['ready'])
         self.assertEqual(data['review']['items'][task['id']],{'notes':'keep','required':'on','evidenceRequired':'on'})
         self.assertEqual(next(x for x in data['items'] if x['id']==task['id'])['state'],'todo')

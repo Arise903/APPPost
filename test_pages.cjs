@@ -284,3 +284,14 @@ test('Initialization chapter uses OR for Adjust and AnalysisApi in original and 
   const visible=items.filter(i=>d.features[i.cond]!==false);assert.equal(visible.length>0,hasAdjust||hasAnalysisApi);
  }
 });
+
+test('Subscription readiness requires only platform IDs, currency, price and period with server parity',()=>{
+ const {context}=setup(),assess=context.window.ReleaseReadiness.assess,now='2026-10-30T12:00:00Z';
+ const base={items:[{id:'proof',text:'Ready',state:'done'}],features:{hasSubscriptions:true},release:{strictValidation:'on',app:'Demo',platform:'Android',version:'1',build:'1',owner:'Owner',targetDate:'2026-11-01',appIdAndroid:'com.example.demo',environment:'production',apiBaseUrl:'https://example.com'}};
+ const product={platform:'android',androidProductId:'yearly',currency:'USD',price:'39.90',period:'year',periodCount:'1',status:'draft'};
+ for(const patch of [{},{androidProductId:''},{currency:''},{price:''},{period:''},{periodCount:'0'},{period:'custom',customPeriod:''},{period:'custom',customPeriod:'每 18 个月'}]){
+  const snapshot={...base,subscriptions:[{...product,...patch}]},result=assess(snapshot,now);
+  const expected=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,sys;from release_policy import assess;print(json.dumps(assess(json.loads(sys.argv[1]),sys.argv[2]),ensure_ascii=False))",JSON.stringify(snapshot),now],{encoding:'utf8'}));assert.deepEqual(JSON.parse(JSON.stringify(result)),expected);
+  assert.equal(result.issues.some(i=>i.id==='__subscriptions'),Object.keys(patch).length>0&&!patch.customPeriod);
+ }
+});

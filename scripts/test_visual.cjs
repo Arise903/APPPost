@@ -22,14 +22,14 @@ const server=http.createServer((req,res)=>{try{const name=decodeURIComponent(new
   await page.locator('#viewMode').selectOption('focus');await snap('focus',true);await page.locator('#viewMode').selectOption('all');
   await page.locator('li[data-id=flow] .item-title').click();await snap('details');await page.locator('#itemReviewClose').click();
   await command('#btnSubscriptions');await snap('subscription-off');
-  await page.locator('[data-field=trialEnabled]').selectOption('on');await page.locator('[data-field=offerEnabled]').selectOption('on');await page.locator('[data-field=trialEnabled]').evaluate(el=>el.closest('label').scrollIntoView({block:'start'}));await snap('subscription-on');await page.locator('[data-field=offerEnabled]').evaluate(el=>el.closest('label').scrollIntoView({block:'start'}));await snap('promotion-on');
-  page.once('dialog',d=>d.accept());await page.locator('#subscriptionClose').click();
+  await page.locator('#subscriptionClose').click();await page.evaluate(async()=>{const p=PagesStore.get(PagesStore.projectId());await PagesStore.mutate(p.id,p.version,'read-only offer fixture',p=>{p.review.subscriptions[0].trialEnabled='on';p.review.subscriptions[0].offerEnabled='on';});await loadFromServer();});await command('#btnSubscriptions');await page.locator('[data-field=trialEnabled]').evaluate(el=>el.closest('label').scrollIntoView({block:'start'}));await snap('subscription-on');await page.locator('[data-field=offerEnabled]').evaluate(el=>el.closest('label').scrollIntoView({block:'start'}));await snap('promotion-on');
+  await page.locator('#subscriptionClose').click();
   await command('#btnFeat');await snap('features');await page.locator('#featCancel').click();
   await command('#releaseEdit');await snap('release');await page.locator('#releaseEditCancel').click();
   await page.evaluate(()=>{saveFailure='网络暂时不可用';saveConflict=true;updateSaveStatus();});await snap('conflict',true);
   await page.close();
  }
  assert.deepEqual(errors,[]);
- if(process.env.UPDATE_VISUAL==='1'){fs.mkdirSync(path.join(assets,'reference',process.platform),{recursive:true});for(const name of fs.readdirSync(output).filter(n=>/^(desktop|mobile)-.*\.png$/.test(n)))fs.copyFileSync(path.join(output,name),path.join(assets,'reference',name));console.log('Visual references updated; review PNGs before committing.');}
+ if(process.env.UPDATE_VISUAL==='1'){fs.mkdirSync(path.join(assets,'reference',process.platform),{recursive:true});for(const name of fs.readdirSync(output).filter(n=>/^(desktop|mobile)-.*\.png$/.test(n)))fs.copyFileSync(path.join(output,name),path.join(assets,'reference',process.platform,name));console.log('Visual references updated; review PNGs before committing.');}
  else execFileSync(process.env.VISUAL_PYTHON||'python3',[path.join(__dirname,'compare_visual.py'),path.join(assets,'reference',process.platform),output],{stdio:'inherit'});
 }finally{if(browser)await browser.close();await new Promise(r=>server.close(r));}})().catch(e=>{console.error(e);process.exitCode=1;});

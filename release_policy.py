@@ -43,7 +43,7 @@ def assess(snapshot, now=None):
     time_zone = (snapshot.get('release') or {}).get('timeZone') or DEFAULT_TIME_ZONE
     today = calendar_date(now, time_zone)
     items = [i for i in snapshot.get('items', []) if not i.get('gate') and i.get('applicable') is not False]
-    result = dict(policyVersion=3, timeZone=time_zone, assessedOn=today, total=len(items), done=0, skipped=0, pending=0, blockers=0, missingEvidence=0, ready=False, issues=[])
+    result = dict(policyVersion=4, timeZone=time_zone, assessedOn=today, total=len(items), done=0, skipped=0, pending=0, blockers=0, missingEvidence=0, ready=False, issues=[])
 
     def add(id, text, reason):
         result['issues'].append(dict(id=id, text=text, reason=reason))
@@ -111,13 +111,16 @@ def assess(snapshot, now=None):
                     period_ok = math.isfinite(period) and period.is_integer() and 1 <= period <= 9007199254740991
                 except (ValueError, TypeError):
                     period_ok = False
-                platform = p.get('platform') or 'both'
-                error = not p.get('name') or not price_ok or not re.fullmatch(r'[A-Z]{3}', p.get('currency', '')) or not period_ok or not p.get('benefits') or p.get('status') == 'draft'
-                if platform in ('ios', 'both') and not p.get('iosProductId'):
+                project_platform = str(release.get('platform') or '').lower()
+                platform = p.get('platform') or (project_platform if project_platform in ('ios', 'android') else 'both')
+                if platform not in ('ios', 'android', 'both'):
+                    platform = 'both'
+                error = not price_ok or not re.fullmatch(r'[A-Z]{3}', p.get('currency', '')) or not period_ok or p.get('period') not in ('day', 'week', 'month', 'year', 'custom') or (p.get('period') == 'custom' and not str(p.get('customPeriod') or '').strip())
+                if platform in ('ios', 'both') and not str(p.get('iosProductId') or '').strip():
                     error = True
-                if platform in ('android', 'both') and (not p.get('androidProductId') or not p.get('basePlanId')):
+                if platform in ('android', 'both') and not str(p.get('androidProductId') or '').strip():
                     error = True
-                for key in ('iosProductId', 'androidProductId'):
+                for key in (('iosProductId',) if platform == 'ios' else ('androidProductId',) if platform == 'android' else ('iosProductId', 'androidProductId')):
                     if p.get(key):
                         id = key + ':' + p[key] + (':' + p.get('basePlanId', '') if key == 'androidProductId' else '')
                         if id in seen:
