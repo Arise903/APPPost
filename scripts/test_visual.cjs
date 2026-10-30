@@ -30,6 +30,6 @@ const server=http.createServer((req,res)=>{try{const name=decodeURIComponent(new
   await page.close();
  }
  assert.deepEqual(errors,[]);
- if(process.env.UPDATE_VISUAL==='1'){fs.mkdirSync(path.join(assets,'reference'),{recursive:true});for(const name of fs.readdirSync(output).filter(n=>/^(desktop|mobile)-.*\.png$/.test(n)))fs.copyFileSync(path.join(output,name),path.join(assets,'reference',name));console.log('Visual references updated; review PNGs before committing.');}
- else execFileSync(process.env.VISUAL_PYTHON||'python3',[path.join(__dirname,'compare_visual.py'),path.join(assets,'reference'),output],{stdio:'inherit'});
+ if(process.env.UPDATE_VISUAL==='1'){fs.mkdirSync(path.join(assets,'reference',process.platform),{recursive:true});for(const name of fs.readdirSync(output).filter(n=>/^(desktop|mobile)-.*\.png$/.test(n)))fs.copyFileSync(path.join(output,name),path.join(assets,'reference',name));console.log('Visual references updated; review PNGs before committing.');}
+ else execFileSync(process.env.VISUAL_PYTHON||'python3',[path.join(__dirname,'compare_visual.py'),path.join(assets,'reference',process.platform),output],{stdio:'inherit'});
 }finally{if(browser)await browser.close();await new Promise(r=>server.close(r));}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -4,7 +4,9 @@ Visual references
 `node scripts/test_visual.cjs` checks desktop (1280×900) and mobile (390×844)
 whole pages, focus view, item drawer, subscription fields off/on, promotions,
 project settings, release form and conflicts. The date, locale, timezone,
-viewport, motion and font are fixed. Toasts and the build hash are excluded.
+viewport, motion and font are fixed. Native scrollbar/control rendering differs
+between operating systems, so `reference/darwin` and `reference/linux` keep
+independently reviewed baselines with the same strict comparison threshold. Toasts and the build hash are excluded.
 
 Install Playwright and Chromium as in CI, and Python Pillow for comparisons.
 `UPDATE_VISUAL=1 node scripts/test_visual.cjs` replaces the references. Review
