@@ -9,10 +9,28 @@ function categories(result){return [
  ['例外需处理',result.issues.filter(i=>/例外|跳过|暂缓|审批/.test(i.reason))],
  ['配置需完善',result.issues.filter(i=>i.id.startsWith('__'))]
 ];}
+/* 导入的清单常带一张从分支源码提取的「配置项 / 值」表。发布信息还没保存过这些字段时，
+   先显示表里已提取的值，避免明明提取到了却显示「未填写」。 */
+const RELEASE_DOC_LABELS={appIdAndroid:['Android 应用标识','应用标识'],privacyPolicyUrl:['隐私政策地址','隐私政策'],termsUrl:['用户协议地址','用户协议'],supportUrl:['用户支持地址','支持地址'],feedbackUrl:['反馈地址','反馈服务地址'],analysisApiUrl:['AnalysisApi 地址','Analysis API 地址','自有统计地址'],analysisApiProjectId:['AnalysisApi projectId','AnalysisApi projectID','统计 projectId'],adjustTokenSource:['Adjust Token 配置位置','Adjust Token 存放位置','Adjust Token','Adjust'],minAndroidSdk:['最低 Android SDK','minSdk'],compileSdk:['compileSdk'],targetSdk:['targetSdk']};
+const RELEASE_KEY_ALIASES={analysisApiProjectId:['analysisProjectId','analysisProjectID'],analysisApiUrl:['analysisBaseUrl','analysisApiBaseUrl'],adjustTokenSource:['adjustToken','adjustAppToken']};
+function documentConfigValues(){
+ const values=new Map();
+ const scan=blocks=>{for(const block of blocks||[]){if(block.type!=='table')continue;for(const row of block.rows||[]){if(row.length<2)continue;const label=String(row[0]||'').trim();if(label&&!values.has(label))values.set(label,String(row[1]||'').trim());}}};
+ scan(DATA&&DATA.preamble);
+ for(const section of (DATA&&DATA.sections)||[])scan(section.blocks);
+ return values;
+}
+function configValue(release,key,doc){
+ const direct=String(release[key]||'').trim();if(direct)return direct;
+ for(const alias of RELEASE_KEY_ALIASES[key]||[]){const value=String(release[alias]||'').trim();if(value)return value;}
+ for(const label of RELEASE_DOC_LABELS[key]||[]){const value=doc.get(label);if(value)return value;}
+ return '';
+}
 function refresh(){
  if(!DATA)return;
  const config=$('projectConfigurationLines'),release=reviewData.release||{},features=DATA.features||{},names=new Map((EMBEDDED_PROFILES.permissions||[]).map(permission=>[permission.id,permission.name]));
- const entries=[['应用名称',release.app||DATA.title],['发布平台',release.platform],['版本 / 构建',[release.version,release.build].filter(Boolean).join(' / ')],['iOS 应用标识',release.appIdIOS],['Android 应用标识',release.appIdAndroid],['发布环境',release.environment],['API 基础地址',release.apiBaseUrl],['隐私政策地址',release.privacyPolicyUrl],['用户协议地址',release.termsUrl],['用户支持地址',release.supportUrl],['反馈地址',release.feedbackUrl],['AnalysisApi 地址',release.analysisApiUrl],['AnalysisApi projectId',release.analysisApiProjectId],['Adjust Token 配置位置',release.adjustTokenSource],['最低 Android SDK',release.minAndroidSdk],['compileSdk',release.compileSdk],['targetSdk',release.targetSdk],['负责人',release.owner],['目标发布日期',release.targetDate],['发布时区',release.timeZone],['订阅商品',features.hasSubscriptions?'已启用':'未启用'],['Adjust 广告归因',features.hasAdjust?'已启用':'未启用'],['AnalysisApi 自有统计',features.hasAnalysisApi?'已启用':'未启用'],['初始化流程核对',features.hasAdjust||features.hasAnalysisApi?'已启用':'未启用'],['账号系统',features.hasAccountSystem?'已启用':'未启用'],['推送',features.hasPush?'已启用':'未启用'],['反馈系统',features.hasFeedbackSystem?'已启用':'未启用'],['面向未成年用户',features.targetMinors?'是':'否'],['权限',(DATA.permSelected||[]).map(id=>names.get(id)||id).join('、')]];
+ const doc=documentConfigValues();
+ const entries=[['应用名称',configValue(release,'app',doc)||DATA.title],['发布平台',configValue(release,'platform',doc)],['版本 / 构建',[release.version,release.build].filter(Boolean).join(' / ')],['iOS 应用标识',configValue(release,'appIdIOS',doc)],['Android 应用标识',configValue(release,'appIdAndroid',doc)],['发布环境',configValue(release,'environment',doc)],['API 基础地址',configValue(release,'apiBaseUrl',doc)],['隐私政策地址',configValue(release,'privacyPolicyUrl',doc)],['用户协议地址',configValue(release,'termsUrl',doc)],['用户支持地址',configValue(release,'supportUrl',doc)],['反馈地址',configValue(release,'feedbackUrl',doc)],['AnalysisApi 地址',configValue(release,'analysisApiUrl',doc)],['AnalysisApi projectId',configValue(release,'analysisApiProjectId',doc)],['Adjust Token 配置位置',configValue(release,'adjustTokenSource',doc)],['最低 Android SDK',configValue(release,'minAndroidSdk',doc)],['compileSdk',configValue(release,'compileSdk',doc)],['targetSdk',configValue(release,'targetSdk',doc)],['负责人',configValue(release,'owner',doc)],['目标发布日期',configValue(release,'targetDate',doc)],['发布时区',release.timeZone],['订阅商品',features.hasSubscriptions?'已启用':'未启用'],['Adjust 广告归因',features.hasAdjust?'已启用':'未启用'],['AnalysisApi 自有统计',features.hasAnalysisApi?'已启用':'未启用'],['初始化流程核对',features.hasAdjust||features.hasAnalysisApi?'已启用':'未启用'],['账号系统',features.hasAccountSystem?'已启用':'未启用'],['推送',features.hasPush?'已启用':'未启用'],['反馈系统',features.hasFeedbackSystem?'已启用':'未启用'],['面向未成年用户',features.targetMinors?'是':'否'],['权限',(DATA.permSelected||[]).map(id=>names.get(id)||id).join('、')]];
  for(const product of reviewData.subscriptions||[])entries.push(['订阅商品 ID',[product.iosProductId,product.androidProductId].filter(Boolean).join(' / ')]);
  const configSignature=JSON.stringify(entries);if(config&&config.dataset.signature!==configSignature){config.dataset.signature=configSignature;const table=document.createElement('table');table.className='project-configuration-table';const body=document.createElement('tbody');for(const [label,value] of entries){const row=document.createElement('tr'),key=document.createElement('th'),cell=document.createElement('td');key.scope='row';key.textContent=label;cell.textContent=String(value||'未填写');row.append(key,cell);body.append(row);}table.append(body);config.replaceChildren(table);}
  const snapshot=releaseSnapshot(),result=snapshot.readiness,host=$('releasePriorities');
@@ -79,6 +97,7 @@ for(const selector of ['#itemReviewForm .form-footer','#releaseEditForm .form-fo
  const button=document.createElement('button');button.type='button';button.className='btn save-all-form';button.textContent='保存全部修改';button.onclick=saveAll;footer.append(button);
 }
 $('mobileSave').textContent='保存全部';$('mobileSave').onclick=saveAll;
+window.BoardConfig={documentConfigValues,configValue};
 // Keep data transfer/recovery operations in the same menu.
 for(const id of ['mExport','mClear']){$(id).classList.add('btn');$('dataTools').append($(id));}
 $('btnMore').textContent='帮助与草稿';
