@@ -395,3 +395,23 @@ test('Saving an optional module item adds its section to a legacy document',asyn
  assert.equal(response.status,200,body.error);
  assert.equal(S.payload(S.get(id)).items.find(x=>x.id==='module_adjust_tokens').state,'done');
 });
+
+test('Optional modules are not injected when the checklist already has that section',()=>{
+ const modules=JSON.parse(fs.readFileSync('checklist_modules.json','utf8'));
+ const context=vm.createContext({});
+ vm.runInContext(fs.readFileSync('board/modules.js','utf8').replace('__OPTIONAL_MODULES__',JSON.stringify(modules)),context);
+ const ids=()=>JSON.parse(JSON.stringify(vm.runInContext('DATA.sections.map(s=>s.id)',context)));
+ const load=sections=>{
+  vm.runInContext(`DATA={features:{hasAdjust:false,hasAnalysisApi:true},sections:${JSON.stringify(sections)}};function st(){return 'todo';}`,context);
+  vm.runInContext('ensureFeatureModules()',context);
+ };
+ // 同一个模块章节出现两次时，改动会落在文档里不存在的那一份上，刷新后看起来像被重置。
+ load([{id:'module_initialization',title:'初始化流程核对',blocks:[{type:'item',id:'module_init_start',text:'自定义条目'}]},
+        {id:'module_analysis_api',title:'AnalysisApi（自有统计）',blocks:[{type:'item',id:'module_analysis_environment',text:'自定义条目'}]}]);
+ assert.deepEqual(ids(),['module_initialization','module_analysis_api'],'sections already exist');
+ load([{id:'sec_init',title:'二、初始化流程核对',blocks:[{type:'item',id:'module_init_start',text:'自定义条目'}]},
+        {id:'sec_analysis',title:'AnalysisApi（自有统计）',blocks:[{type:'item',id:'module_analysis_environment',text:'自定义条目'}]}]);
+ assert.deepEqual(ids(),['sec_init','sec_analysis'],'same titles under other ids');
+ load([{id:'custom',title:'自定义',blocks:[]}]);
+ assert.deepEqual(ids(),['custom','module_analysis_api','module_initialization'],'missing modules are still injected');
+});

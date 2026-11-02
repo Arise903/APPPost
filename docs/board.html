@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=50f3e4778da5"></script><script src="release_analysis.js?v=50f3e4778da5"></script><script src="storage.js?v=50f3e4778da5"></script><script src="store.js?v=50f3e4778da5"></script><script>PagesStore.install();</script><script defer src="experience.js?v=50f3e4778da5"></script><link rel="stylesheet" href="history.css?v=50f3e4778da5"><script defer src="history.js?v=50f3e4778da5"></script><link rel="stylesheet" href="workflows.css?v=50f3e4778da5"><script defer src="workflows.js?v=50f3e4778da5"></script>
+<script src="data.js?v=292b762728c5"></script><script src="release_analysis.js?v=292b762728c5"></script><script src="storage.js?v=292b762728c5"></script><script src="store.js?v=292b762728c5"></script><script>PagesStore.install();</script><script defer src="experience.js?v=292b762728c5"></script><link rel="stylesheet" href="history.css?v=292b762728c5"><script defer src="history.js?v=292b762728c5"></script><link rel="stylesheet" href="workflows.css?v=292b762728c5"><script defer src="workflows.js?v=292b762728c5"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -1435,6 +1435,9 @@ function ensureFeatureModules(){
  for(const module of OPTIONAL_MODULES){
   if(DATA.features[module.feature]===undefined)DATA.features[module.feature]=[module.legacyTaskId,...module.items.map(item=>item[0])].some(id=>ids.has(id));
   if(!DATA.features[module.feature]||[module.legacyTaskId,...module.items.map(item=>item[0])].some(id=>ids.has(id)))continue;
+  // 导入或旧模板的清单可能已用自己的条目实现了同一模块；有同名章节就不再重复注入，
+  // 否则同一节会出现两次，改动会落在文件里根本不存在的那一份上。
+  if((DATA.sections||[]).some(section=>section.id==='module_'+module.id||String(section.title||'').trim()===module.title))continue;
   DATA.sections.push({id:'module_'+module.id,title:module.title,blocks:module.items.map(([id,text,condition])=>({type:'item',id,text,level:0,state:st(id),checked:st(id)==='done',cond:condition||module.feature}))});
  }
 }
@@ -3702,5 +3705,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=50f3e4778da5"></script></body>
+<script defer src="bootstrap.js?v=292b762728c5"></script></body>
 </html>
