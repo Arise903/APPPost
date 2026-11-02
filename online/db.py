@@ -43,6 +43,14 @@ CREATE INDEX IF NOT EXISTS attempts_bucket ON login_attempts(bucket,created_at);
 """
 
 
+MIGRATIONS = (
+    (1, SCHEMA),
+    (2, "CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);"
+        "CREATE INDEX IF NOT EXISTS invitations_expiry ON invitations(expires_at);"
+        "CREATE INDEX IF NOT EXISTS member_user ON members(user_id);"),
+)
+
+
 class Database:
     def __init__(self, url):
         self.url = url
@@ -73,9 +81,18 @@ class Database:
         with self.connect(write=True) as conn:
             if self.postgres:
                 conn.execute('SELECT pg_advisory_xact_lock(82409132)')
-            for statement in SCHEMA.split(';'):
-                if statement.strip():
-                    conn.execute(statement)
+            conn.execute('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at BIGINT NOT NULL)')
+            applied = {row['version'] for row in conn.all('SELECT version FROM schema_migrations')}
+            known = {version for version, _ in MIGRATIONS}
+            if applied - known:
+                raise RuntimeError('数据库版本高于当前程序，请使用匹配版本启动')
+            for version, sql in MIGRATIONS:
+                if version in applied:
+                    continue
+                for statement in sql.split(';'):
+                    if statement.strip():
+                        conn.execute(statement)
+                conn.execute('INSERT INTO schema_migrations VALUES (?,?)', (version, int(time.time())))
 
 
 class Connection:

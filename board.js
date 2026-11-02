@@ -618,7 +618,7 @@ function refreshProgress(){
     else if(s === "skip") skip++;
     else if(!cur){ cur = li.dataset.id; curSeq = li.dataset.seq || "?"; }
   });
-  const pct = total ? Math.round(done/total*100) : 0;
+  const pct = total ? (done===total?100:Math.min(99,Math.round(done/total*100))) : 0;
   document.getElementById("pct").textContent = pct + "%";
   document.querySelector(".track[role=progressbar]").setAttribute("aria-valuenow", String(pct));
   document.getElementById("cnt").textContent =
@@ -889,11 +889,11 @@ document.getElementById("q").addEventListener("input", e => {
 });
 
 /* ---- 保存到 md ---- */
-document.getElementById("btnSave").addEventListener("click", async () => {
+async function saveProgress(options={}){
   if(!online){ toast("当前是离线模式，无法写回文件"); return; }
   const doneCount = Object.values(state).filter(v => v === "done").length;
   const skipCount = Object.values(state).filter(v => v === "skip").length;
-  const ok = window.RELEASE_PAGES || window.RELEASE_CLOUD ? true : await askConfirm({
+  const ok = options.all===true || window.RELEASE_PAGES || window.RELEASE_CLOUD ? true : await askConfirm({
     title:"保存勾选状态到 md 文件？",
     icon:"info",
     body:`将把当前看板上的 <strong>${doneCount}</strong> 项完成、
@@ -919,10 +919,13 @@ document.getElementById("btnSave").addEventListener("click", async () => {
     document.getElementById("btnSave").textContent = "保存进度";
     render();
     toast("已写回文件");
+    return true;
   }catch(e){
     toast("保存失败：" + e.message);
+    return false;
   }
-});
+}
+document.getElementById("btnSave").addEventListener("click", saveProgress);
 
 /* ---- 导出副本（只下载，不动原文件） ---- */
 document.getElementById("mExport").addEventListener("click", () => {
@@ -1170,3 +1173,5 @@ loadFromServer().then(ok => {
 // @include board/recovery.js
 
 installBoardExperience();
+
+// @include board/productivity.js

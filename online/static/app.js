@@ -25,7 +25,7 @@ function bindForm(id, action, errorId){
 document.querySelectorAll('[data-close]').forEach(button=>button.onclick=()=>button.closest('dialog').close());
 bindForm('loginForm',async form=>{ await api('/api/auth/login',formObject(form));location.href='/'; },'formError');
 bindForm('joinForm',async form=>{ await api('/api/invitations/accept',{...formObject(form),token:location.hash.slice(1)});location.href='/'; },'formError');
-function openCreate(){ $('createForm').reset();$('createError').textContent='';$('createDialog').showModal(); }
+function openCreate(){ $('createForm').reset();if($('cloudCreateSetup'))$('cloudCreateSetup').disabled=false;$('createError').textContent='';$('createDialog').showModal(); }
 async function loadProjects(){
  const data=await api('/api/projects'); projects=data.projects;
  $('projectCount').textContent=projects.length;
@@ -44,7 +44,7 @@ function renderProjects(){
  $('projectGrid').innerHTML=visible.map(p=>{
   const resolved=p.done+p.skipped,percent=p.total?Math.round(resolved/p.total*100):0;
   const meta=[p.release?.platform,p.release?.version?'v'+p.release.version:'',new Date(p.updated_at*1000).toLocaleDateString('zh-CN')+' 更新'].filter(Boolean).join(' · ');
-  return `<article class="project-card"><div class="card-top"><span class="project-icon">${escape(p.name.slice(0,1).toUpperCase())}</span><span class="role-tag">${{owner:'所有者',editor:'编辑者',viewer:'查看者'}[p.role]}</span></div><h3><a href="/projects/${p.id}">${escape(p.name)}</a></h3><p class="project-meta">${escape(meta)}</p><div class="progress-label"><span>${resolved} / ${p.total} 项已处理 · ${p.skipped} 项跳过</span><b>${percent}%</b></div><div class="progress-track" role="progressbar" aria-label="${escape(p.name)}检查进度" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><div style="width:${percent}%"></div></div><div class="card-bottom"><div class="card-actions"><button data-export="${p.id}">导出完整记录</button>${p.role==='owner'?`<button data-team="${p.id}">管理成员</button>`:''}</div><a class="open-project" href="/projects/${p.id}">继续检查 ↗</a></div></article>`;
+  return `<article class="project-card"><div class="card-top"><span class="project-icon">${escape(p.name.slice(0,1).toUpperCase())}</span><span class="role-tag">${{owner:'所有者',editor:'编辑者',viewer:'查看者'}[p.role]}</span></div><h3><a href="/projects/${p.id}">${escape(p.name)}</a></h3><p class="project-meta">${escape(meta)}</p><div class="project-configuration" aria-label="项目配置信息">${(p.configuration||[]).map(line=>`<p>${escape(line)}</p>`).join('')}</div><div class="progress-label"><span>${resolved} / ${p.total} 项已处理 · ${p.skipped} 项跳过</span><b>${percent}%</b></div><div class="progress-track" role="progressbar" aria-label="${escape(p.name)}检查进度" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><div style="width:${percent}%"></div></div><div class="card-bottom"><div class="card-actions"><button data-export="${p.id}">导出完整记录</button>${p.role==='owner'?`<button data-team="${p.id}">管理成员</button>`:''}</div><a class="open-project" href="/projects/${p.id}">继续检查 ↗</a></div></article>`;
  }).join('');
 }
 bindForm('createForm',async form=>{
@@ -55,9 +55,10 @@ bindForm('createForm',async form=>{
   if(file.name.toLowerCase().endsWith('.json')){
    let imported;try{imported=JSON.parse(text);}catch(_){throw new Error('JSON 文件格式不正确');}
    if(imported.format!=='release-desk/v1' || typeof imported.document!=='string')throw new Error('请选择工作台导出的完整项目 JSON');
-   Object.assign(data,{document:imported.document,permissions:imported.permissions,review:imported.review});
+   Object.assign(data,{document:imported.document,permissions:imported.permissions,review:imported.review,assets:imported.assets});
   }else data.document=text;
  }
+ if(!file){data.setup={platform:form.elements.platform.value,features:Object.fromEntries(['hasAccountSystem','hasSubscriptions','hasPush','hasFeedbackSystem','targetMinors','hasAdjust','hasAnalysisApi'].map(key=>[key,form.elements[key].checked])),selected:[...document.querySelectorAll('#cloudCreatePermissions input:checked')].map(input=>input.value)};}
  const result=await api('/api/projects',data);location.href='/projects/'+result.id;
 },'createError');
 async function showTeam(id){
@@ -105,3 +106,10 @@ async function startDashboard(){
  };
 }
 if(document.body.dataset.page==='dashboard')startDashboard();
+
+if(document.getElementById('cloudCreateSetup')){
+ const form=document.getElementById('createForm');
+ form.elements.file.addEventListener('change',()=>{document.getElementById('cloudCreateSetup').disabled=!!form.elements.file.files.length;});
+ form.addEventListener('change',()=>{if(!form.elements.file.files.length&&form.elements.hasAdjust.checked){const att=document.querySelector('#cloudCreatePermissions input[value=tracking]');if(att)att.checked=true;}});
+ api('/api/profiles').then(profiles=>{for(const p of profiles.permissions||[]){const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=p.id;label.append(input,document.createTextNode(p.name));document.getElementById('cloudCreatePermissions').append(label);}}).catch(error=>notify(error.message));
+}

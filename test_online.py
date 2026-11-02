@@ -23,6 +23,31 @@ class OnlineTests(unittest.TestCase):
         self.project = self.client.post('/api/projects', json={'name':'Test App'}, headers=self.headers).json['id']
         self.prefix = '/api/projects/'+self.project
 
+    def test_creation_setup_and_profiles_are_private(self):
+        self.assertEqual(self.app.test_client().get('/api/profiles').status_code, 401)
+        profiles = self.client.get('/api/profiles').json
+        self.assertGreater(len(profiles['permissions']), 0)
+        setup = {'platform': 'Android', 'features': {key: False for key in ('hasAccountSystem', 'hasSubscriptions', 'hasPush', 'hasFeedbackSystem', 'targetMinors', 'hasAdjust', 'hasAnalysisApi')}, 'selected': []}
+        response = self.client.post('/api/projects', json={'name': 'Configured', 'setup': setup}, headers=self.headers)
+        self.assertEqual(response.status_code, 201)
+        created = self.client.get('/api/projects/' + response.json['id'] + '/list').json
+        self.assertEqual(created['review']['release']['platform'], 'Android')
+        self.assertFalse(created['features']['hasSubscriptions'])
+        self.assertFalse(created['features']['hasAccountSystem'])
+        setup['features']['hasAdjust'] = True
+        adjusted = self.client.post('/api/projects', json={'name': 'Adjust Setup', 'setup': setup}, headers=self.headers)
+        self.assertEqual(adjusted.status_code, 201)
+        payload = self.client.get('/api/projects/' + adjusted.json['id'] + '/list').json
+        self.assertIn('tracking', payload['permSelected'])
+        self.assertTrue(payload['features']['hasInitialization'])
+        listed = next(p for p in self.client.get('/api/projects').json['projects'] if p['id'] == adjusted.json['id'])
+        self.assertIn('Adjust 广告归因', '、'.join(listed['configuration']))
+        self.assertIn('ATT', '、'.join(listed['configuration']))
+        self.assertTrue(any(item['id'].startswith('module_init_') or item['id'] == 't_98829c38' for item in payload['items']))
+        setup['features']['hasPush'] = 'yes'
+        invalid = self.client.post('/api/projects', json={'name': 'Bad', 'setup': setup}, headers=self.headers)
+        self.assertEqual(invalid.status_code, 400)
+
     def test_subscription_settings_save_atomically_and_preserve_disabled_values(self):
         products = [{'id': 'month', 'name': '月订阅', 'trialEnabled': 'off', 'trialCount': '7', 'offerEnabled': 'off', 'offerPrice': '6'}]
         original = self.payload()

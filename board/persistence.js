@@ -20,7 +20,7 @@ async function apiRequest(path, body){
   if(!r.ok){ const err = await r.json().catch(() => ({})); throw Object.assign(new Error(err.error || (path + " -> HTTP " + r.status)),{status:r.status}); }
   const data = await r.json();
   if(body !== undefined && data.revision){ baseRevision = data.revision; saveState(); }
-  if(writing){lastSavedAt=Date.now();if(typeof clearFailedWrite==='function')clearFailedWrite(path);}
+  if(writing){lastSavedAt=Date.now();if(typeof clearFailedWrite==='function')clearFailedWrite(path);if(data.revision)saveConflict=!!window.RELEASE_PAGES&&String(PagesStore.get(PagesStore.projectId()).version)!==String(data.revision);}
   return data;
   }catch(error){ if(writing){saveFailure=error.message;if(typeof rememberFailedWrite==='function')rememberFailedWrite(path,body,error);} throw error; }
   finally{ if(writing) savingOperations--; setTimeout(updateSaveStatus,0); }

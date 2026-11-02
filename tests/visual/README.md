@@ -20,3 +20,10 @@ The font is used only by screenshot tests and is not shipped with the app.
 It was subset with fontTools from the characters in board/pages sources and
 this test fixture, retaining the variable weight axis. Refresh the subset
 when a fixture introduces characters that are not covered.
+
+Current workflow update: the new priority overview, save-all actions and command
+labels have reviewed macOS references. Linux references still describe the prior
+layout and must be regenerated and reviewed on Linux before the visual CI check
+can pass. Do not copy macOS PNGs over the Linux references: native controls and
+whole-page heights differ. Functional DOM, workflow and layout tests cover the
+new behavior independently.

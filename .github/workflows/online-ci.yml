@@ -34,7 +34,7 @@ jobs:
           node-version: '22'
       - run: pip install -r requirements-online.txt
       - name: Local and cloud regression tests
-        run: python -m unittest -v test_checklist test_online
+        run: python -m unittest -v test_checklist test_online test_migrations
       - name: PostgreSQL integration tests
         env:
           TEST_DATABASE_URL: postgresql://release_test:test-only-password@localhost:5432/release_test
@@ -59,6 +59,7 @@ jobs:
           node scripts/test_workflows.cjs
           node scripts/test_checklist_layout.cjs
           node scripts/test_workspace.cjs
+          node scripts/test_release_flow.cjs
           pip install "Pillow>=11,<13"
           node scripts/test_visual.cjs
       - name: Upload visual comparison on failure
