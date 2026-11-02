@@ -137,7 +137,7 @@ class FlutterConfigExtractionTests(unittest.TestCase):
         self.assertEqual(rows["iOS 最低系统版本"], "15.0")
         self.assertIn("NSCameraUsageDescription", rows["iOS 权限用途说明"])
         self.assertIn("adjust_manager.dart", rows["Adjust Token 配置位置"])
-        self.assertNotIn("tokenvalue", rows["Adjust Token 配置位置"])
+        self.assertEqual(rows["Adjust appToken"], "tokenvalue")
 
     def test_markdown_and_branch_reading(self):
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)

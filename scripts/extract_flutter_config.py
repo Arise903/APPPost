@@ -223,7 +223,8 @@ def extract(repo: Repo, platform: str) -> Config:
         if found:
             line = text[:found.start()].count("\n") + 1
             env = "sandbox（debug）/ production（release）由 kDebugMode 决定"
-            cfg.add("Adjust Token 配置位置", f"{path}:{line} 硬编码 AdjustConfig 第一个参数；环境：{env}；{SECRET_HINT}")
+            cfg.add("Adjust appToken", found.group(1))
+            cfg.add("Adjust Token 配置位置", f"{path}:{line} 硬编码 AdjustConfig 第一个参数（appToken）；环境：{env}")
             if ios:
                 cfg.add("Adjust", "已启用：启动即 initSdk（首会话延迟），随后等待 ATT 结果再完成首次会话")
             else:
@@ -343,7 +344,7 @@ def extract(repo: Repo, platform: str) -> Config:
     cfg.add("发布环境", "production（release 构建；debug 走 sandbox）")
     cfg.suggest("environment", "production")
     cfg.add("未填写的信息", "、".join(["负责人", "目标发布日期", "商店价格与销售地区", "推送证书 / 远程推送配置"]))
-    cfg.add("密钥处理", "仅记录变量与文件位置，不复制明文")
+    cfg.add("密钥处理", "Adjust appToken 为应用标识，已在上方记录；反馈 API Key、签名密码等仅记录变量与文件位置，不复制明文")
     return cfg
 
 
