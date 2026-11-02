@@ -124,16 +124,45 @@ def load_checklist_modules():
     return read_json_shared(HERE / 'checklist_modules.json')
 
 
+def _module_section_text(module) -> str:
+    """Markdown for one optional module section (heading, intro, items)."""
+    text = '## ' + module['title'] + ' <!-- section:module_' + module['id'] + ' -->\n'
+    if module.get('intro'):
+        text += '\n' + module['intro'].strip() + '\n\n'
+    text += '\n'.join('- [ ] ' + item[1] + ' <!-- if:' + (item[2] if len(item) > 2 else module['feature']) + ' --> <!-- task:' + item[0] + ' -->' for item in module['items']) + '\n'
+    return text
+
+
+def ensure_module_sections(text: str, ids) -> str:
+    """Append an optional module section when its items are written but missing.
+
+    The board renders optional modules client-side, so a project created from an
+    older template can show rows that its file does not contain yet. Saving those
+    rows used to be rejected; materialise the section first instead.
+    """
+    wanted = set(ids or ())
+    if not wanted:
+        return text
+    known = {item['id'] for item in parse_md(text)['items']}
+    if wanted <= known:
+        return text
+    for module in load_checklist_modules():
+        module_ids = [item[0] for item in module['items']]
+        if not any(item_id in wanted and item_id not in known for item_id in module_ids):
+            continue
+        if any(item_id in known for item_id in module_ids):
+            continue
+        text = text.rstrip() + '\n\n' + _module_section_text(module)
+    return text
+
+
 def configure_document_features(text, features):
     current = parse_md(text)['features']
     current.update(features)
     current['hasInitialization'] = current['hasAdjust'] or current['hasAnalysisApi']
     for module in load_checklist_modules():
         if current.get(module['feature']) and not any(('task:' + task_id) in text for task_id in [module['legacyTaskId'], *[item[0] for item in module['items']]]):
-            text = text.rstrip() + '\n\n## ' + module['title'] + ' <!-- section:module_' + module['id'] + ' -->\n'
-            if module.get('intro'):
-                text += '\n' + module['intro'].strip() + '\n\n'
-            text += '\n'.join('- [ ] ' + item[1] + ' <!-- if:' + (item[2] if len(item) > 2 else module['feature']) + ' --> <!-- task:' + item[0] + ' -->' for item in module['items']) + '\n'
+            text = text.rstrip() + '\n\n' + _module_section_text(module)
     keys = ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush', 'hasAdjust', 'hasAnalysisApi')
     if any(type(current.get(k)) is not bool for k in keys):
         raise ValueError('项目特征无效')
@@ -2080,12 +2109,13 @@ def make_handler():
             return 200, _board_payload(self.server.md_path)
         def _op_write(self, payload):
             md_path = self.server.md_path
-            text = md_path.read_text(encoding="utf-8")
-            parsed = parse_md(text)
-            self._require_revision(payload, "文件已被其他页面或程序修改，请导出当前进度后刷新再保存")
             states = payload.get("states") or {}
             if not isinstance(states, dict) or any(v not in ("done", "skip", "todo") for v in states.values()):
                 raise BoardError(400, "状态格式无效")
+            # 看板会渲染文件里还没有的可选模块条目，写回前先把对应章节补齐
+            text = ensure_module_sections(md_path.read_text(encoding="utf-8"), states)
+            parsed = parse_md(text)
+            self._require_revision(payload, "文件已被其他页面或程序修改，请导出当前进度后刷新再保存")
             gate = find_gate_item(parsed)
             acknowledged = gate["state"] == "done" if gate else load_review(md_path).get("guideAcknowledged") == "on"
             if not acknowledged and not (gate and states.get(gate["id"]) == "done"):

@@ -412,6 +412,7 @@ def create_app(overrides=None):
                 states = data.get('states')
                 if not isinstance(states, dict) or any(v not in ('todo', 'done', 'skip') for v in states.values()):
                     abort(400, '检查状态无效')
+                project['document'] = checklist.ensure_module_sections(project['document'], states)
                 parsed = checklist.parse_md(project['document'])
                 allowed = {x['id'] for x in parsed['items']}
                 if not set(states).issubset(allowed):

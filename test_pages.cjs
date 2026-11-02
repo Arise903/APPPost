@@ -382,3 +382,16 @@ test('Checklist diff only reports rows that really changed',()=>{
  assert.deepEqual(diff({a:'done'}, {a:'done'}), {});
  assert.deepEqual(diff({c:'done'}, {a:'todo'}), {c:'done'}, 'rows added after the last load');
 });
+
+test('Saving an optional module item adds its section to a legacy document',async()=>{
+ const {S,context}=setup();
+ const legacy='# App\n\n<!-- FEATURES hasAccountSystem=1 targetMinors=1 hasFeedbackSystem=0 hasSubscriptions=1 hasPush=0 hasAdjust=1 hasAnalysisApi=0 -->\n\n## 一、确认\n<!-- GATE -->\n- [ ] 我已阅读使用说明 <!-- task:t_gate -->\n\n## 二、检查\n- [ ] One <!-- task:t_one -->\n';
+ const id=await S.create({name:'Legacy',document:legacy,requireGuideConfirmation:false});
+ const before=S.payload(S.get(id));
+ assert.ok(!before.items.some(x=>x.id==='module_adjust_tokens'),'legacy document has no module rows');
+ context.location.search='?id='+id;context.window.fetch=async()=>{throw Error('Unexpected network request');};S.install();
+ const response=await context.window.fetch('/api/write',{method:'POST',body:JSON.stringify({revision:String(before.revision),states:{t_gate:'done',module_adjust_tokens:'done'}})});
+ const body=await response.json();
+ assert.equal(response.status,200,body.error);
+ assert.equal(S.payload(S.get(id)).items.find(x=>x.id==='module_adjust_tokens').state,'done');
+});

@@ -118,4 +118,29 @@ class PagesBuildContractTests(unittest.TestCase):
                 self.assertTrue(value.strip())
         self.assertNotIn('{gen}', PAGES_STRINGS.get('connectedBadge', ''))
 
+class OptionalModuleWriteTests(unittest.TestCase):
+    LEGACY = ('# App\n\n<!-- FEATURES hasAccountSystem=1 targetMinors=1 hasFeedbackSystem=0 '
+              'hasSubscriptions=1 hasPush=0 hasAdjust=1 hasAnalysisApi=0 -->\n\n'
+              '## Checks\n- [ ] One <!-- task:t_one -->\n')
+
+    def test_writing_module_items_adds_the_missing_section(self):
+        out = c.ensure_module_sections(self.LEGACY, {'module_adjust_tokens'})
+        self.assertIn('task:module_adjust_tokens', out)
+        self.assertIn('section:module_adjust', out)
+        self.assertNotIn('module_analysis', out)
+        self.assertEqual(c.ensure_module_sections(out, {'module_adjust_tokens'}), out)
+
+    def test_module_items_become_writable_after_materialising(self):
+        out = c.ensure_module_sections(self.LEGACY, {'module_adjust_tokens'})
+        parsed = c.parse_md(out)
+        self.assertIn('module_adjust_tokens', {item['id'] for item in parsed['items']})
+        applied = c.apply_states(out, parsed, {'module_adjust_tokens': 'done'})
+        self.assertEqual({item['id']: item['state'] for item in c.parse_md(applied)['items']}['module_adjust_tokens'], 'done')
+
+    def test_known_or_unrelated_ids_leave_the_document_untouched(self):
+        self.assertEqual(c.ensure_module_sections(self.LEGACY, {'t_one'}), self.LEGACY)
+        self.assertEqual(c.ensure_module_sections(self.LEGACY, {'not_a_module_item'}), self.LEGACY)
+        self.assertEqual(c.ensure_module_sections(self.LEGACY, set()), self.LEGACY)
+
+
 if __name__ == '__main__': unittest.main()
