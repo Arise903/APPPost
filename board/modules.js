@@ -1,5 +1,17 @@
 /* Optional SDK checklists share stable task identities across templates and editions. */
 const OPTIONAL_MODULES=__OPTIONAL_MODULES__;
+
+/* Only report real differences from the saved baseline. Items missing from
+   `state` mean "todo", never "changed": treating undefined as a change made every
+   untouched row part of the save request and failed the post-save verification. */
+function stateDiff(state, baseline){
+ const out={};
+ for(const id of new Set([...Object.keys(baseline), ...Object.keys(state)])){
+  const value=state[id]||"todo";
+  if(value!==(baseline[id]||"todo")) out[id]=value;
+ }
+ return out;
+}
 function ensureFeatureModules(){
  DATA.features.hasInitialization=!!(DATA.features.hasAdjust||DATA.features.hasAnalysisApi);
  const ids=new Set((DATA.sections||[]).flatMap(s=>s.blocks||[]).filter(b=>b.type==='item').map(b=>b.id));

@@ -372,3 +372,13 @@ print(json.dumps([[rule,[bool(v.visible(rule,selected,profiles)) for selected in
  for(const platform of ['iOS','Android','iOS / Android','',undefined])for(const platformItem of ['ios','android'])
   assert.equal(PV.platformVisible({platform:platformItem},platform),JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,sys;from permission_visibility import platform_visible;print(json.dumps(platform_visible({'platform':sys.argv[1]},None if sys.argv[2]=='null' else sys.argv[2])))",platformItem,platform===undefined?'null':platform],{encoding:'utf8'})));
 });
+
+test('Checklist diff only reports rows that really changed',()=>{
+ const context=vm.createContext({});
+ vm.runInContext(fs.readFileSync('board/modules.js','utf8').replace('__OPTIONAL_MODULES__','[]'),context);
+ const diff=(state,baseline)=>JSON.parse(JSON.stringify(context.stateDiff(state,baseline)));
+ assert.deepEqual(diff({}, {a:'todo', b:'done'}), {b:'todo'}, 'untouched rows and reversions');
+ assert.deepEqual(diff({a:'done', b:'skip'}, {a:'todo', b:'skip'}), {a:'done'});
+ assert.deepEqual(diff({a:'done'}, {a:'done'}), {});
+ assert.deepEqual(diff({c:'done'}, {a:'todo'}), {c:'done'}, 'rows added after the last load');
+});

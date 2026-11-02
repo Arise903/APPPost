@@ -740,7 +740,7 @@ async function loadFromServer(){
     const d = await api("/api/list");
     const changes = {};
     const validIds=new Set(Object.keys(baselineFromData(d)));
-    if(dirty) for(const k in state){ if(validIds.has(k)&&state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k]; }
+    if(dirty){ const pending = stateDiff(state, serverBaseline); for(const k of Object.keys(pending)) if(validIds.has(k)) changes[k] = pending[k]; }
     if(dirty && baseRevision !== d.revision) throw new Error("服务端已变化，请先导出未保存进度");
     baseRevision = d.revision;
     gen = d.generation;
@@ -910,8 +910,7 @@ async function saveProgress(options={}){
   });
   if(!ok) return;
   try{
-    const changes = {};
-    for(const k of Object.keys(serverBaseline)) if(state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k];
+    const changes = stateDiff(state, serverBaseline);
     const d = await api("/api/write", {states: changes, revision: baseRevision});
     const savedBaseline=baselineFromData(d);
     const gateIds=new Set((d.sections||[]).flatMap(section=>(section.blocks||[]).filter(block=>block.type==="item"&&block.gate).map(block=>block.id)));
@@ -1156,7 +1155,7 @@ state = normalizeState(loadState(gen));
 const initialBaselineIds=new Set(Object.keys(serverBaseline));
 state=Object.fromEntries(Object.entries(state).filter(([id])=>initialBaselineIds.has(id)));
 state = Object.assign(seedFromData(EMBEDDED), state);
-dirty = Object.keys(state).some(k => state[k] !== (serverBaseline[k] || "todo"));
+dirty = Object.keys(state).some(k => st(k) !== (serverBaseline[k] || "todo"));
 if(dirty) markDirty();
 gateDone = !!(EMBEDDED.gateDone);
 setMode(false);
