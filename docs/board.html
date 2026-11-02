@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=033c407744a5"></script><script src="release_analysis.js?v=033c407744a5"></script><script src="storage.js?v=033c407744a5"></script><script src="store.js?v=033c407744a5"></script><script>PagesStore.install();</script><script defer src="experience.js?v=033c407744a5"></script><link rel="stylesheet" href="history.css?v=033c407744a5"><script defer src="history.js?v=033c407744a5"></script><link rel="stylesheet" href="workflows.css?v=033c407744a5"><script defer src="workflows.js?v=033c407744a5"></script>
+<script src="data.js?v=adf75ccde9a4"></script><script src="release_analysis.js?v=adf75ccde9a4"></script><script src="storage.js?v=adf75ccde9a4"></script><script src="store.js?v=adf75ccde9a4"></script><script>PagesStore.install();</script><script defer src="experience.js?v=adf75ccde9a4"></script><link rel="stylesheet" href="history.css?v=adf75ccde9a4"><script defer src="history.js?v=adf75ccde9a4"></script><link rel="stylesheet" href="workflows.css?v=adf75ccde9a4"><script defer src="workflows.js?v=adf75ccde9a4"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -2417,6 +2417,13 @@ async function saveProgress(options={}){
     const changes = {};
     for(const k of Object.keys(serverBaseline)) if(state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k];
     const d = await api("/api/write", {states: changes, revision: baseRevision});
+    const savedBaseline=baselineFromData(d);
+    const unapplied=Object.entries(changes).filter(([id,value])=>(savedBaseline[id]||"todo")!==value);
+    if(unapplied.length){
+      dirty=true;saveFailure="服务端返回的检查状态与本次修改不一致";updateSaveStatus();
+      toast("服务端未确认保存这些检查项，修改已留在当前页面；请刷新前先导出草稿");
+      return false;
+    }
     baseRevision = d.revision;
     gen = d.generation;
     DATA = mergeItems(d);
@@ -3660,5 +3667,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=033c407744a5"></script></body>
+<script defer src="bootstrap.js?v=adf75ccde9a4"></script></body>
 </html>
