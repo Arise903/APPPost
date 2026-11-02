@@ -154,6 +154,7 @@ function privacyAuditLines(snapshot,profiles={}){
 }
 function aiReviewMarkdown(snapshot,profiles={},metadata={}){
  const progress=aiReviewProgress(snapshot);if(!progress.complete)throw Error('检查进度达到 100% 后才能导出 AI 排查文档；还需完成 '+progress.remaining+' 项');
+ if(snapshot.guideDone!==true)throw Error('请先阅读并确认使用说明，再导出 AI 排查文档');
  const quote=value=>String(value??'').split(/\r?\n/).map(line=>'> '+line).join('\n');
  const block=(text,language)=>{const runs=text.match(/`+/g)||[],fence='`'.repeat(Math.max(3,...runs.map(r=>r.length+1)));return [fence+language,text,fence];};
  const json=value=>block(JSON.stringify(value,null,2),'json');

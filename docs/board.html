@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=7c29da52f346"></script><script src="release_analysis.js?v=7c29da52f346"></script><script src="storage.js?v=7c29da52f346"></script><script src="store.js?v=7c29da52f346"></script><script>PagesStore.install();</script><script defer src="experience.js?v=7c29da52f346"></script><link rel="stylesheet" href="history.css?v=7c29da52f346"><script defer src="history.js?v=7c29da52f346"></script><link rel="stylesheet" href="workflows.css?v=7c29da52f346"><script defer src="workflows.js?v=7c29da52f346"></script>
+<script src="data.js?v=0b67b587a81e"></script><script src="release_analysis.js?v=0b67b587a81e"></script><script src="storage.js?v=0b67b587a81e"></script><script src="store.js?v=0b67b587a81e"></script><script>PagesStore.install();</script><script defer src="experience.js?v=0b67b587a81e"></script><link rel="stylesheet" href="history.css?v=0b67b587a81e"><script defer src="history.js?v=0b67b587a81e"></script><link rel="stylesheet" href="workflows.css?v=0b67b587a81e"><script defer src="workflows.js?v=0b67b587a81e"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -1298,6 +1298,7 @@ function privacyAuditLines(snapshot,profiles={}){
 }
 function aiReviewMarkdown(snapshot,profiles={},metadata={}){
  const progress=aiReviewProgress(snapshot);if(!progress.complete)throw Error('检查进度达到 100% 后才能导出 AI 排查文档；还需完成 '+progress.remaining+' 项');
+ if(snapshot.guideDone!==true)throw Error('请先阅读并确认使用说明，再导出 AI 排查文档');
  const quote=value=>String(value??'').split(/\r?\n/).map(line=>'> '+line).join('\n');
  const block=(text,language)=>{const runs=text.match(/`+/g)||[],fence='`'.repeat(Math.max(3,...runs.map(r=>r.length+1)));return [fence+language,text,fence];};
  const json=value=>block(JSON.stringify(value,null,2),'json');
@@ -1395,6 +1396,18 @@ function ensureFeatureModules(){
   if(!DATA.features[module.feature]||[module.legacyTaskId,...module.items.map(item=>item[0])].some(id=>ids.has(id)))continue;
   DATA.sections.push({id:'module_'+module.id,title:module.title,blocks:module.items.map(([id,text])=>({type:'item',id,text,level:0,state:st(id),checked:st(id)==='done',cond:module.feature}))});
  }
+}
+
+/* Newly enabled initialization checks must not remain hidden by an old view. */
+function revealInitializationChecks(){
+ if(!DATA?.features?.hasInitialization)return;
+ filter='all';query='';sectionFilter='all';
+ document.getElementById('q').value='';document.getElementById('sectionFilter').value='all';document.getElementById('viewMode').value='all';
+ document.querySelectorAll('#seg button').forEach(button=>{const active=button.dataset.f==='all';button.classList.toggle('on',active);button.setAttribute('aria-pressed',String(active));});
+ applyFilter();
+ const section=DATA.sections.find(s=>s.title.includes('初始化流程核对'));
+ const element=section&&[...document.querySelectorAll('#list section.card')].find(el=>el.dataset.sec===section.id);
+ window.BoardWorkspace?.reveal(element?.querySelector('li.item'));
 }
 
 /* Item evidence stays in the same draft and commit as notes and exceptions. */
@@ -2217,22 +2230,7 @@ async function loadFromServer(){
     reviewData = d.review || reviewData;
     updateSummaryReleaseOptions();
     DATA = mergeItems(d);
-    // 门禁状态：md 为准。
-    // 只有「从未确认过」（gateState=todo）才允许用本机的离线确认记录补写，
-    // 明确取消过（gateState=skip）的门禁不会被悄悄复活。
-    let localAck = false;
-    try{ localAck = localStorage.getItem(GUIDE_KEY) === "1"; }catch(e){}
-    if(!d.gateDone && localAck && (d.gateState === "todo" || d.gateState === undefined)){
-      try{
-        const ackRes = await api("/api/ack", {});
-        if(ackRes && ackRes.gateDone){
-          d.gateDone = true;
-          d.gateState = "done";
-          baseRevision = ackRes.revision;
-          DATA = mergeItems(ackRes);
-        }
-      }catch(e){}
-    }
+    // 使用当前项目的确认记录；浏览器全局标记不能自动解锁其他项目。
     gateDone = !!d.gateDone;
     if(d.gateId && changes[d.gateId]) gateDone = changes[d.gateId] === "done";
     if(gateDone){
@@ -2375,6 +2373,7 @@ document.getElementById("q").addEventListener("input", e => {
 
 /* ---- 保存到 md ---- */
 async function saveProgress(options={}){
+  if(!gateDone){toast("请先阅读并确认使用说明");return false;}
   if(!online){ toast("当前是离线模式，无法写回文件"); return; }
   const doneCount = Object.values(state).filter(v => v === "done").length;
   const skipCount = Object.values(state).filter(v => v === "skip").length;
@@ -3094,6 +3093,7 @@ document.getElementById("featSave").addEventListener("click", async () => {
     return;
   }
   try{
+    const revealInitialization=f.hasAdjust&&!featureSnapshot?.hasAdjust;
     const d = await api("/api/features", {features: f});
     baseRevision = d.revision;
     DATA = mergeItems(d);
@@ -3101,6 +3101,7 @@ document.getElementById("featSave").addEventListener("click", async () => {
     refreshFeatUI();
     featureSnapshot=null;
     closeFeatPanel();
+    if(revealInitialization)revealInitializationChecks();
     updateSaveStatus();
     toast("项目设置已保存到 md");
   }catch(e){
@@ -3171,6 +3172,7 @@ function releaseSnapshot(){
   snapshot.readiness=ReleaseReadiness.assess(snapshot);return snapshot;
 }
 document.getElementById("releaseArchive").onclick = async () => {
+  if(!gateDone){toast("请先阅读并确认使用说明");return;}
   if(!online || dirty || featureHasChanges() || permDirty || savingOperations>0 || boardPendingDetails().length){ toast("请先保存检查进度、项目设置和权限配置，再归档"); return; }
   const snapshot=releaseSnapshot();
   const confirmation=await BoardProductivity.confirmArchive(snapshot,reviewData.history?.at(-1));
@@ -3251,6 +3253,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElement
 const newReleaseButton=document.getElementById('newRelease');
 newReleaseButton.hidden=!(window.RELEASE_PAGES||window.RELEASE_CLOUD);
 newReleaseButton.onclick=()=>{
+ if(!gateDone){toast('请先阅读并确认使用说明');return;}
  if(dirty||permDirty||featureHasChanges()||savingOperations||boardPendingDetails().length){toast('请先保存所有改动，再开始新一轮发布');return;}
  document.getElementById('newReleaseForm').reset();document.getElementById('newReleaseError').textContent='';document.getElementById('newReleaseDialog').showModal();
 };
@@ -3273,12 +3276,6 @@ state = Object.assign(seedFromData(EMBEDDED), state);
 dirty = Object.keys(state).some(k => state[k] !== (serverBaseline[k] || "todo"));
 if(dirty) markDirty();
 gateDone = !!(EMBEDDED.gateDone);
-const embeddedGate = (EMBEDDED.sections || []).flatMap(sec => sec.blocks || []).find(block => block.type === "item" && block.gate);
-if(embeddedGate && st(embeddedGate.id) === "done") gateDone = true;
-// 离线兜底：本地记过一次确认
-if(!gateDone){
-  try{ gateDone = localStorage.getItem(GUIDE_KEY) === "1"; }catch(e){}
-}
 setMode(false);
 applyFeatures();
 build();
@@ -3554,7 +3551,7 @@ function refresh(){
   for(const [label,issues] of categories(result)){const button=document.createElement('button');button.type='button';button.className='btn';button.textContent=label+' '+issues.length;button.disabled=!issues.length;button.onclick=()=>{const index=result.issues.indexOf(issues[0]);$('readinessPanel').open=true;$('readinessIssues').children[index]?.querySelector('button')?.click();};group.append(button);}host.append(group);
   if(result.issues.length){const next=document.createElement('p');next.textContent='优先处理：'+result.issues[0].text+' · '+result.issues[0].reason;host.append(next);}
  }
- const progress=ReleaseAnalysis.aiReviewProgress(snapshot),exportButton=$('aiReviewExport'),exportHint=$('aiReviewExportHint');exportButton.disabled=!progress.complete||!online||aiExporting;exportButton.title=progress.complete?'导出已保存的 AI 排查文档':'进度达到 100% 后可导出';exportHint.textContent=progress.complete?'进度已达 100%，保存全部修改后可导出。':!progress.total?'暂无适用检查项，不能导出；请检查项目配置。':'进度 '+progress.percent+'% · 还需完成 '+progress.remaining+' 项，达到 100% 后可导出（跳过不计为完成）。';
+ const progress=ReleaseAnalysis.aiReviewProgress(snapshot),exportButton=$('aiReviewExport'),exportHint=$('aiReviewExportHint');exportButton.disabled=!gateDone||!progress.complete||!online||aiExporting;exportButton.title=progress.complete?'导出已保存的 AI 排查文档':'进度达到 100% 后可导出';exportHint.textContent=!gateDone?'请先阅读并确认使用说明。':progress.complete?'进度已达 100%，保存全部修改后可导出。':!progress.total?'暂无适用检查项，不能导出；请检查项目配置。':'进度 '+progress.percent+'% · 还需完成 '+progress.remaining+' 项，达到 100% 后可导出（跳过不计为完成）。';
  const save=$('saveAll');save.disabled=!online||window.RELEASE_CLOUD?.role==='viewer'||busy||savingOperations>0;save.textContent=busy?'正在保存全部…':'保存全部';
 }
 async function submitDraft(id,stillDirty){
@@ -3574,11 +3571,12 @@ async function saveAll(){
   await saveQueue.catch(()=>{});
   if(saveConflict)throw Error('存在版本冲突，请先查看冲突差异');
   const features=featureHasChanges()?{...DATA.features}:null;
+  const revealInitialization=features?.hasAdjust&&!featureSnapshot?.hasAdjust;
   const permissions=permDirty?{selected:[...permSelected],descs:{...permDescs},descsEn:{...permDescsEn}}:null;
   clearTimeout(permSaveTimer);
   if(itemReviewDirty())await submitDraft('itemReviewForm',itemReviewDirty);
   if(releaseEditorDirty())await submitDraft('releaseEditForm',releaseEditorDirty);
-  if(features){const d=await api('/api/features',{features});DATA=mergeItems(d);featureSnapshot=null;closeFeatPanel();render();refreshFeatUI();}
+  if(features){const d=await api('/api/features',{features});DATA=mergeItems(d);featureSnapshot=null;closeFeatPanel();render();refreshFeatUI();if(revealInitialization)revealInitializationChecks();}
   if(subscriptionHasChanges()){await submitDraft('subscriptionForm',subscriptionHasChanges);}
   if(permissions){const d=await api('/api/perm-write',permissions);DATA=mergeItems(d);permDirty=false;setPermSaveState('saved','✓ 已保存权限配置');render();}
   if(dirty&&!await saveProgress({all:true}))throw Error('检查进度未保存');
@@ -3633,5 +3631,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=7c29da52f346"></script></body>
+<script defer src="bootstrap.js?v=0b67b587a81e"></script></body>
 </html>

@@ -6,6 +6,7 @@ import unittest
 import uuid
 
 from online.app import create_app
+import checklist_tool as checklist
 
 
 class OnlineTests(unittest.TestCase):
@@ -22,6 +23,7 @@ class OnlineTests(unittest.TestCase):
         self.headers = {'X-CSRF-Token':self.csrf}
         self.project = self.client.post('/api/projects', json={'name':'Test App'}, headers=self.headers).json['id']
         self.prefix = '/api/projects/'+self.project
+        self.post('ack', {'revision': self.payload()['revision']})
 
     def test_creation_setup_and_profiles_are_private(self):
         self.assertEqual(self.app.test_client().get('/api/profiles').status_code, 401)
@@ -65,6 +67,21 @@ class OnlineTests(unittest.TestCase):
         restored = self.post('subscriptions', {'revision': revision, 'enabled': True, 'products': products})
         self.assertTrue(restored.json['features']['hasSubscriptions'])
         self.assertEqual(restored.json['review']['subscriptions'], products)
+
+    def test_custom_project_requires_guide_confirmation(self):
+        created = self.client.post('/api/projects', json={'name': 'Gate', 'document': '# App\n## Checks\n- [ ] One\n', 'review': {'guideAcknowledged': 'on', 'release': {}, 'items': {}, 'history': []}}, headers=self.headers)
+        self.prefix = '/api/projects/' + created.json['id']
+        original = self.payload()
+        self.assertFalse(original['gateDone'])
+        task = original['items'][0]['id']
+        self.assertEqual(self.post('write', {'revision': original['revision'], 'states': {task: 'done'}}).status_code, 403)
+        confirmed = self.post('ack', {'revision': original['revision']}).json
+        self.assertTrue(confirmed['gateDone'])
+        saved = self.post('write', {'revision': confirmed['revision'], 'states': {task: 'done'}}).json
+        cancelled = self.post('unack', {'revision': saved['revision']}).json
+        self.assertFalse(cancelled['gateDone'])
+        self.assertEqual(cancelled['items'][0]['state'], 'done')
+        self.assertEqual(self.post('write', {'revision': cancelled['revision'], 'states': {task: 'todo'}}).status_code, 403)
 
     def test_optional_sdk_modules_on_custom_document(self):
         created = self.client.post('/api/projects', json={'name': 'Custom', 'document': '# App\n## Checks\n- [ ] One\n'}, headers=self.headers)
@@ -150,9 +167,10 @@ class OnlineTests(unittest.TestCase):
 
     def test_validation_and_atomic_rollback(self):
         original = self.payload()
+        snapshots_before = self.post('backups',{}).json['backups']
         bad = self.post('write',{'revision':original['revision'],'states':{'unknown':'done'}})
         self.assertEqual(bad.status_code,409)
-        self.assertEqual(self.post('backups',{}).json['backups'],[])
+        self.assertEqual(self.post('backups',{}).json['backups'],snapshots_before)
         self.assertEqual(self.payload()['revision'],original['revision'])
         self.assertEqual(self.post('perm-write',{'revision':original['revision'],'selected':['unknown']}).status_code,400)
 
@@ -166,7 +184,9 @@ class OnlineTests(unittest.TestCase):
         self.assertEqual(created.status_code,201)
         loaded = self.client.get('/api/projects/'+created.json['id']+'/list').json
         self.assertEqual(loaded['review']['release']['version'],'3')
-        self.assertEqual(loaded['mdText'],data['document'])
+        self.assertFalse(loaded['gateDone'])
+        expected = checklist.apply_states(data['document'],checklist.parse_md(data['document']),{loaded['gateId']:'todo'})
+        self.assertEqual(loaded['mdText'],expected)
 
     def test_password_reset_revokes_other_sessions(self):
         other = self.app.test_client();self.login(other)

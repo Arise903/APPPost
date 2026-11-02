@@ -732,7 +732,13 @@ def set_gate(md_path: Path, done: bool = True) -> bool:
     parsed = parse_md(text)
     item = find_gate_item(parsed)
     if item is None:
-        return False
+        review = load_review(md_path)
+        target = 'on' if done else 'off'
+        if review.get('guideAcknowledged') == target:
+            return False
+        review['guideAcknowledged'] = target
+        save_review(md_path, review)
+        return True
     target = "done" if done else "skip"
     if item["state"] == target:
         return False
@@ -1385,14 +1391,17 @@ def build_guide(md_path: Path, out_path: Path = None):
     data = parse_md(md_path.read_text(encoding="utf-8"))
     guide_sec = None
     for sec in data["sections"]:
-        if sec["title"].startswith("零"):
+        if sec.get("guide_only") or sec["title"].startswith("零"):
             guide_sec = sec
             break
     if guide_sec is None:
-        guide_sec = {"title": "使用说明", "blocks": []}
+        default = HERE / 'online' / 'default_checklist.md'
+        sections = parse_md(default.read_text(encoding='utf-8'))['sections'] if default.exists() else []
+        guide_sec = next((sec for sec in sections if sec.get('guide_only') or sec['title'].startswith('零')),
+                         {"title": "使用说明", "blocks": [{"type": "para", "text": "先确认本说明，再依次检查、保存进度并归档；证据与备注需单独核验。"}]})
 
     gate = find_gate_item(data)
-    gate_raw = (gate["state"] if gate else "todo")   # done / skip(明确取消) / todo(从未确认)
+    gate_raw = (gate["state"] if gate else ("done" if load_review(md_path).get("guideAcknowledged") == "on" else "todo"))   # done / skip(明确取消) / todo(从未确认)
     gate_state = "done" if gate_raw == "done" else "todo"
 
     body = []
@@ -1524,10 +1533,6 @@ function markAcked(on, offline){{
       if(d.gateDone) markAcked(true, false);
     }}
   }}catch(_){{}}
-  // 离线兜底：读取上次确认
-  if(!acked){{
-    try{{ if(localStorage.getItem("app-guide-ack")==="1") markAcked(true, true); }}catch(_){{}}
-  }}
 }})();
 
 box.addEventListener("change", async () => {{
@@ -1543,10 +1548,9 @@ box.addEventListener("change", async () => {{
       return;
     }}catch(e){{ /* 落到离线兜底 */ }}
   }}
-  // 离线兜底：写 localStorage
-  try{{ localStorage.setItem("app-guide-ack", "1"); }}catch(_){{}}
-  markAcked(true, true);
-  toast("已确认（离线模式）");
+  box.checked = false;
+  toast("确认未保存，请连接本地服务后重新确认");
+
 }});
 
 // 返回看板
@@ -1865,9 +1869,9 @@ def document_payload(text, md_name, generation, permissions, review, version):
         "permDescs": perm_descs,
         "permDescsEn": perm_descs_en,
         "gateId": gate_id,
-        "gateDone": bool(gate and gate["state"] == "done"),
+        "gateDone": (gate["state"] == "done" if gate else review.get("guideAcknowledged") == "on"),
         # todo=从未确认（允许从本机补写） / skip=明确取消过（不复活）
-        "gateState": (gate["state"] if gate else "todo"),
+        "gateState": (gate["state"] if gate else "done" if review.get("guideAcknowledged") == "on" else "skip" if review.get("guideAcknowledged") == "off" else "todo"),
         "features": feats,
     }
 
@@ -2024,6 +2028,11 @@ def make_handler():
                         states = payload.get("states") or {}
                         if not isinstance(states, dict) or any(v not in ("done", "skip", "todo") for v in states.values()):
                             self._json({"error": "状态格式无效"}, 400)
+                            return
+                        gate = find_gate_item(parsed)
+                        acknowledged = gate['state'] == 'done' if gate else load_review(md_path).get('guideAcknowledged') == 'on'
+                        if not acknowledged and not (gate and states.get(gate['id']) == 'done'):
+                            self._json({"error": "请先阅读并确认使用说明"}, 403)
                             return
                         new_text = apply_states(text, parsed, states)
                         if new_text != text:

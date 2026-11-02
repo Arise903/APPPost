@@ -97,6 +97,7 @@ document.getElementById("featSave").addEventListener("click", async () => {
     return;
   }
   try{
+    const revealInitialization=f.hasAdjust&&!featureSnapshot?.hasAdjust;
     const d = await api("/api/features", {features: f});
     baseRevision = d.revision;
     DATA = mergeItems(d);
@@ -104,6 +105,7 @@ document.getElementById("featSave").addEventListener("click", async () => {
     refreshFeatUI();
     featureSnapshot=null;
     closeFeatPanel();
+    if(revealInitialization)revealInitializationChecks();
     updateSaveStatus();
     toast("项目设置已保存到 md");
   }catch(e){
