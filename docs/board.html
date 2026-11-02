@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=0a9251c1cebb"></script><script src="release_analysis.js?v=0a9251c1cebb"></script><script src="storage.js?v=0a9251c1cebb"></script><script src="store.js?v=0a9251c1cebb"></script><script>PagesStore.install();</script><script defer src="experience.js?v=0a9251c1cebb"></script><link rel="stylesheet" href="history.css?v=0a9251c1cebb"><script defer src="history.js?v=0a9251c1cebb"></script><link rel="stylesheet" href="workflows.css?v=0a9251c1cebb"><script defer src="workflows.js?v=0a9251c1cebb"></script>
+<script src="data.js?v=033c407744a5"></script><script src="release_analysis.js?v=033c407744a5"></script><script src="storage.js?v=033c407744a5"></script><script src="store.js?v=033c407744a5"></script><script>PagesStore.install();</script><script defer src="experience.js?v=033c407744a5"></script><link rel="stylesheet" href="history.css?v=033c407744a5"><script defer src="history.js?v=033c407744a5"></script><link rel="stylesheet" href="workflows.css?v=033c407744a5"><script defer src="workflows.js?v=033c407744a5"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -2243,7 +2243,8 @@ async function loadFromServer(){
   try{
     const d = await api("/api/list");
     const changes = {};
-    if(dirty) for(const k in state){ if(state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k]; }
+    const validIds=new Set(Object.keys(baselineFromData(d)));
+    if(dirty) for(const k in state){ if(validIds.has(k)&&state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k]; }
     if(dirty && baseRevision !== d.revision) throw new Error("服务端已变化，请先导出未保存进度");
     baseRevision = d.revision;
     gen = d.generation;
@@ -2414,7 +2415,7 @@ async function saveProgress(options={}){
   if(!ok) return;
   try{
     const changes = {};
-    for(const k in state) if(state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k];
+    for(const k of Object.keys(serverBaseline)) if(state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k];
     const d = await api("/api/write", {states: changes, revision: baseRevision});
     baseRevision = d.revision;
     gen = d.generation;
@@ -3295,6 +3296,8 @@ serverBaseline = baselineFromData(EMBEDDED);
 gen = EMBEDDED.generation || 1;
 state = normalizeState(loadState(gen));
 // md 里已有的标记同步进来（离线模式尤其重要）
+const initialBaselineIds=new Set(Object.keys(serverBaseline));
+state=Object.fromEntries(Object.entries(state).filter(([id])=>initialBaselineIds.has(id)));
 state = Object.assign(seedFromData(EMBEDDED), state);
 dirty = Object.keys(state).some(k => state[k] !== (serverBaseline[k] || "todo"));
 if(dirty) markDirty();
@@ -3657,5 +3660,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=0a9251c1cebb"></script></body>
+<script defer src="bootstrap.js?v=033c407744a5"></script></body>
 </html>
