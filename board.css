@@ -571,3 +571,16 @@ li.item.gateitem>.item-evidence-summary{grid-column:1 / -1}
 .item-title .txt{display:block}.board-header #historyMenu .board-menu-content>div{display:contents}dialog.app-dialog{width:min(760px,calc(100vw - 32px))}.app-dialog .form-footer:has(.form-error:empty):not(:has(button)){display:none}.app-dialog>.conflict-preview,.app-dialog>h2{margin:20px 24px}.app-dialog>button{margin:0 24px 20px}li.item.gateitem>.item-main{grid-column:1 / 3}@media(max-width:700px){li.item.gateitem>.item-main{grid-column:1 / -1}}
 
 .subscription-grid .field-caption{display:block}.required-mark{color:var(--danger);font-weight:700}.subscription-grid .subscription-readonly input,.subscription-grid .subscription-readonly select,.subscription-grid .subscription-readonly textarea{background:var(--surface-2);color:var(--text-3);cursor:default;opacity:1;-webkit-text-fill-color:var(--text-3)}
+
+/* Release priorities remain visible before the full checklist. */
+.release-priorities{margin:18px 0 10px;padding:16px;border:1px solid var(--line,#dce2df);border-radius:12px;background:#f5f8f6}
+.release-priorities strong{display:block;font-size:15px;color:#244a39}
+.priority-metrics{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.release-priorities p{margin:12px 0 0;color:#53625a;font-size:12px;overflow-wrap:anywhere}
+.primary-actions{flex-wrap:wrap}
+#dataTools{display:flex;flex-direction:column;gap:6px}
+@media(max-width:600px){.priority-metrics{display:grid;grid-template-columns:1fr 1fr}.priority-metrics .btn{width:100%}.release-priorities{padding:12px}.primary-actions{gap:6px}}
+.archive-decision{width:min(680px,calc(100vw - 24px))}.archive-decision pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;font-size:12px;line-height:1.7}.archive-decision label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px}.archive-decision input[type=checkbox]{width:auto;flex-shrink:0}
+.project-configuration{margin-top:14px;padding:12px;background:var(--surface-2);border-radius:8px;font-size:12px;line-height:1.7;overflow-wrap:anywhere}.project-configuration summary{cursor:pointer;color:var(--text-2)}.project-configuration p{margin:6px 0}
+
+.ai-export-hint{margin:0 10px 8px;font-size:11px;color:var(--text-2);line-height:1.6}

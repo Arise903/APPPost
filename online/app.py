@@ -42,6 +42,17 @@ def project_payload(project):
     )
 
 
+def configuration_lines(payload):
+    features = payload.get('features', {})
+    names = {p['id']: p['name'] for p in checklist.load_profiles()['permissions']}
+    selected = payload.get('permSelected', [])
+    enabled = [label for key, label in [('hasAccountSystem', '账号系统'), ('hasAdjust', 'Adjust 广告归因'), ('hasAnalysisApi', 'AnalysisApi 自有统计'), ('hasPush', '推送'), ('hasFeedbackSystem', '反馈系统'), ('targetMinors', '面向未成年用户'), ('hasInitialization', '初始化流程核对')] if features.get(key) is True]
+    return ['平台：' + (payload['review'].get('release', {}).get('platform') or '未指定'),
+            '订阅商品：' + ('已启用' if features.get('hasSubscriptions') else '未启用'),
+            '功能：' + ('、'.join(enabled) or '未启用附加功能'),
+            '权限（' + str(len(selected)) + '）：' + ('、'.join(names.get(id, id) for id in selected) or '未选择')]
+
+
 def create_app(overrides=None):
     app = Flask(__name__, static_folder='static', template_folder='templates')
     production = os.getenv('APP_ENV', 'production') == 'production'
@@ -184,6 +195,11 @@ def create_app(overrides=None):
     def join_page():
         return render_template('join.html')
 
+    @app.get('/api/profiles')
+    def profiles():
+        require_user()
+        return jsonify(checklist.load_profiles())
+
     @app.get('/api/me')
     def me():
         require_user()
@@ -244,7 +260,7 @@ def create_app(overrides=None):
         for row in rows:
             payload = project_payload(row)
             result.append({k: row[k] for k in ('id', 'name', 'role', 'updated_at', 'version')})
-            result[-1].update(total=payload['total'], done=payload['done'], skipped=payload['skipped'], release=payload['review'].get('release', {}))
+            result[-1].update(total=payload['total'], done=payload['done'], skipped=payload['skipped'], release=payload['review'].get('release', {}), features=payload['features'], configuration=configuration_lines(payload))
         return jsonify(projects=result)
 
     @app.post('/api/projects')
@@ -268,6 +284,22 @@ def create_app(overrides=None):
         if data.get('assets'):
             abort(400, '此项目包含浏览器证据附件，请在 Pages 个人版导入完整 JSON，在线版不会丢弃附件后继续导入')
         review = data.get('review', {'release': {}, 'items': {}, 'history': []})
+        setup = data.get('setup')
+        if setup is not None:
+            if not isinstance(setup, dict) or data.get('document') is not None or setup.get('platform') not in ('iOS', 'Android', 'iOS / Android'):
+                abort(400, '新建项目配置无效')
+            features = setup.get('features')
+            keys = ('hasAccountSystem', 'hasSubscriptions', 'hasPush', 'hasFeedbackSystem', 'targetMinors', 'hasAdjust', 'hasAnalysisApi')
+            if not isinstance(features, dict) or any(type(features.get(key)) is not bool for key in keys):
+                abort(400, '项目特征无效')
+            document = checklist.configure_document_features(document, features)
+            selected = setup.get('selected', [])
+            if not isinstance(selected, list):
+                abort(400, '权限配置无效')
+            if features['hasAdjust'] and 'tracking' not in selected:
+                selected = [*selected, 'tracking']
+            permissions = {'selected': selected, 'descs': {}, 'descsEn': {}}
+            review = {'release': {'app': name, 'platform': setup['platform'], 'strictValidation': 'on', 'timeZone': 'Asia/Shanghai'}, 'items': {}, 'history': []}
         validate_permissions(permissions)
         validate_review(review)
         project_id, now = uuid.uuid4().hex, int(time.time())
@@ -532,23 +564,13 @@ def create_app(overrides=None):
 
 
 def validate_review(value):
-    if not isinstance(value, dict) or not isinstance(value.get('release', {}), dict) or not isinstance(value.get('items', {}), dict) or not isinstance(value.get('history', []), list):
-        abort(400, '发布记录无效')
+    from release_policy import validate_review_record
     try:
-        calendar_date(time_zone=value.get('release', {}).get('timeZone'))
+        validate_review_record(value)
     except ValueError as error:
         abort(400, str(error))
-    preflight = value.get('preflight')
-    if preflight is not None and (not isinstance(preflight, dict) or not isinstance(preflight.get('findings'), list) or type(preflight.get('errors')) is not int or preflight['errors'] < 0):
-        abort(400, '配置预检报告格式无效')
-    subscriptions = value.get('subscriptions', [])
-    if not isinstance(subscriptions, list) or len(subscriptions) > 100 or any(not isinstance(p, dict) or any(not isinstance(v, str) or len(v) > 4000 for v in p.values()) for p in subscriptions):
-        abort(400, '订阅商品配置无效')
     if len(encode(value).encode()) > 800_000:
         abort(400, '发布记录超过 800 KB，请先导出历史并整理')
-    for item in value.get('items', {}).values():
-        if not isinstance(item, dict) or any(not isinstance(v, str) for v in item.values()):
-            abort(400, '备注必须为文本')
 
 
 def validate_permissions(value):

@@ -5,7 +5,7 @@ function boardPendingDetails(){
  if(typeof permDirty!=='undefined'&&permDirty)pending.push('权限配置');
  if(typeof featureSnapshot!=='undefined'&&featureHasChanges())pending.push('项目设置');
  const subscriptions=document.getElementById('subscriptionDialog');
- if(subscriptions?.open&&typeof subscriptionBaseline!=='undefined'&&JSON.stringify(subscriptionRead())!==subscriptionBaseline)pending.push('订阅商品');
+ if(subscriptions?.open&&typeof subscriptionBaseline!=='undefined'&&subscriptionHasChanges())pending.push('订阅商品');
  if(releaseEditorDirty())pending.push('发布信息');
  if(itemReviewDirty())pending.push('备注与检查要求');
  return pending;
@@ -24,11 +24,12 @@ function openItemReview(item){
 function closeItemReview(){if(document.getElementById('itemReviewDialog').dataset.saving==='true')return;if(itemReviewDirty()&&!confirm('放弃尚未保存的备注与检查要求？'))return;document.getElementById('itemReviewDialog').close();updateSaveStatus();}
 function refreshReadiness(){
  const summary=document.getElementById('readinessSummary');if(!summary||!DATA)return;
+ window.BoardProductivity?.refresh();
  const result=ReleaseReadiness.assess(releaseSnapshot());
  summary.textContent=(result.ready?'发布就绪':'发布未就绪')+' · 完成 '+result.done+' / 跳过 '+result.skipped+' / 待检 '+result.pending+' · 阻塞 '+result.blockers+' · 缺少证据 '+result.missingEvidence;
  summary.parentElement.dataset.ready=String(result.ready);
  const list=document.getElementById('readinessIssues'),signature=JSON.stringify(result);if(list.dataset.signature===signature)return;list.dataset.signature=signature;list.replaceChildren();
- for(const issue of result.issues){const li=document.createElement('li'),button=document.createElement('button');button.type='button';button.className='btn';button.textContent=issue.reason+' · '+issue.text;button.onclick=()=>{if(issue.id==='__release'){openReleaseEditor();return;}if(issue.id==='__subscriptions'){document.getElementById('btnSubscriptions').click();return;}if(issue.id==='__preflight'){window.ReleaseWorkflows?.preflight();return;}sectionFilter='all';filter='all';query='';document.getElementById('q').value='';document.getElementById('sectionFilter').value='all';document.querySelectorAll('#seg button').forEach(b=>{b.classList.toggle('on',b.dataset.f==='all');b.setAttribute('aria-pressed',String(b.dataset.f==='all'));});applyFilter();const row=[...document.querySelectorAll('li.item')].find(el=>el.dataset.id===issue.id);window.BoardWorkspace?.reveal(row);row?.scrollIntoView({block:'center',behavior:'smooth'});row?.querySelector('.txt')?.animate([{background:'#ffe9b0'},{background:'transparent'}],{duration:1600});};li.append(button);list.append(li);}
+ for(const issue of result.issues){const li=document.createElement('li'),button=document.createElement('button');button.type='button';button.className='btn';button.textContent=issue.reason+' · '+issue.text;button.onclick=()=>{if(issue.id==='__release'){openReleaseEditor();return;}if(issue.id==='__subscriptions'){document.getElementById('btnSubscriptions').click();return;}if(issue.id==='__preflight'){window.ReleaseWorkflows?.preflight();return;}document.getElementById('viewMode').value='all';sectionFilter='all';filter='all';query='';document.getElementById('q').value='';document.getElementById('sectionFilter').value='all';document.querySelectorAll('#seg button').forEach(b=>{b.classList.toggle('on',b.dataset.f==='all');b.setAttribute('aria-pressed',String(b.dataset.f==='all'));});applyFilter();const row=[...document.querySelectorAll('li.item')].find(el=>el.dataset.id===issue.id);window.BoardWorkspace?.reveal(row);row?.scrollIntoView({block:'center',behavior:'smooth'});row?.querySelector('.txt')?.animate([{background:'#ffe9b0'},{background:'transparent'}],{duration:1600});};li.append(button);list.append(li);}
 }
 function installBoardExperience(){
  const dialog=document.getElementById('itemReviewDialog'),form=document.getElementById('itemReviewForm');

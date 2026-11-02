@@ -17,11 +17,13 @@ function releaseSnapshot(){
 }
 document.getElementById("releaseArchive").onclick = async () => {
   if(!online || dirty || featureHasChanges() || permDirty || savingOperations>0 || boardPendingDetails().length){ toast("请先保存检查进度、项目设置和权限配置，再归档"); return; }
-  const readiness=ReleaseReadiness.assess(releaseSnapshot());
-  if(!confirm((readiness.ready?'发布就绪：无阻塞项。':'尚有 '+readiness.blockers+' 个发布阻塞项（缺少证据 '+readiness.missingEvidence+' 项）。归档会标记为未就绪。')+'\n归档当前发布信息和检查结果？')) return;
-  const next = JSON.parse(JSON.stringify(reviewData));
-  next.history = next.history || [];
-  next.history.push(releaseSnapshot());
+  const snapshot=releaseSnapshot();
+  const confirmation=await BoardProductivity.confirmArchive(snapshot,reviewData.history?.at(-1));
+  if(!confirmation)return;
+  const next=JSON.parse(JSON.stringify(reviewData));
+  next.history=next.history||[];
+  snapshot.conclusion=ReleaseAnalysis.decision(snapshot,next.history.at(-1),confirmation);
+  next.history.push(snapshot);
   await persistReview(next);
 };
 function releaseMetrics(snapshot){
@@ -53,6 +55,7 @@ document.getElementById("releaseSummary").onclick = () => {
   const lines = ["# 发布检查摘要", "", "导出版本："+(snapshot.release?.version||snapshot.version||"未填写版本"), ...Object.entries(snapshot.release||{}).filter(([key])=>key!=="version").map(([k,v])=>k+"："+v), "", "生成时间："+new Date().toLocaleString(), pendingExport?"注意：包含尚未全部保存的当前页面内容。":"", "", "## 各版本进度对比", "", "完成率按适用检查项计算；不适用项不计入分母。", "", "| 版本 | 日期 | 已完成 | 已跳过 | 待处理 | 完成率 |", "| --- | --- | ---: | ---: | ---: | ---: |"];
   versions.forEach(({snapshot:version,label})=>{const m=releaseMetrics(version);lines.push("| "+String(label).replace(/[|\n]/g," ")+" | "+(version.date?new Date(version.date).toLocaleDateString():"—")+" | "+m.done+" / "+m.total+" | "+m.skipped+" | "+m.pending+" | "+m.percent+"% |");});
   const readiness=snapshot.readiness||ReleaseReadiness.assess(snapshot);lines.push('', '## 发布就绪检查', '', '策略版本：'+readiness.policyVersion, '发布状态：'+(readiness.ready?'已就绪':'未就绪'), '阻塞项：'+readiness.blockers+'；缺少必需证据：'+readiness.missingEvidence,...readiness.issues.map(i=>'- '+i.reason+'：'+i.text));
+  lines.push("", ...ReleaseAnalysis.decisionLines(snapshot,selection.startsWith("history:")?history[Number(selection.split(":")[1])-1]:history.at(-1)));
   lines.push("", "## 订阅商品配置", "", "```json", JSON.stringify(snapshot.subscriptions||[],null,2), "```", "", "## 所选版本检查项");
   for(const item of (Array.isArray(snapshot.items)?snapshot.items:[])){
     lines.push("- [" + ({done:"x",skip:"-",todo:" "}[item.state]) + "] " + item.text + (item.applicable===false ? "（不适用）" : ""));

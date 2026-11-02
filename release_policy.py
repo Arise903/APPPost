@@ -138,3 +138,27 @@ def assess(snapshot, now=None):
     result['missingEvidence'] = sum(i['reason'] == '缺少必需证据' for i in result['issues'])
     result['ready'] = bool(items) and not result['issues']
     return result
+
+
+def validate_review_record(value):
+    """Shared file/cloud contract; transport wrappers translate ValueError."""
+    if not isinstance(value, dict) or not isinstance(value.get('release', {}), dict) or not isinstance(value.get('items', {}), dict) or not isinstance(value.get('history', []), list):
+        raise ValueError('发布记录无效')
+    calendar_date(time_zone=value.get('release', {}).get('timeZone'))
+    report = value.get('preflight')
+    if report is not None and (not isinstance(report, dict) or not isinstance(report.get('findings'), list) or type(report.get('errors')) is not int or report['errors'] < 0):
+        raise ValueError('配置预检报告格式无效')
+    products = value.get('subscriptions', [])
+    if not isinstance(products, list) or len(products) > 100 or any(not isinstance(p, dict) or any(not isinstance(v, str) or len(v) > 4000 for v in p.values()) for p in products):
+        raise ValueError('订阅商品配置无效')
+    for item in value.get('items', {}).values():
+        if not isinstance(item, dict) or any(not isinstance(v, str) for v in item.values()):
+            raise ValueError('备注和证据必须为文本')
+        for key in ('reviewDue', 'approvalDate', 'reviewedAt', 'evidenceExpiresAt'):
+            if item.get(key):
+                try:
+                    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', item[key]):
+                        raise ValueError('date')
+                    datetime.date.fromisoformat(item[key])
+                except ValueError:
+                    raise ValueError('日期应为有效的 YYYY-MM-DD') from None

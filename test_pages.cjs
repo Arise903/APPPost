@@ -295,3 +295,26 @@ test('Subscription readiness requires only platform IDs, currency, price and per
   assert.equal(result.issues.some(i=>i.id==='__subscriptions'),Object.keys(patch).length>0&&!patch.customPeriod);
  }
 });
+
+test('AI review Markdown contains saved configuration, hidden tasks, evidence metadata and actionable repository audit instructions',async()=>{
+ const {S,context}=setup();
+ const id=await S.create({name:'审查导出',document:'# Audit\n## Checks\n- [x] 已完成检查 <!-- task:done -->\n- [ ] 账号注销 <!-- if:hasAccountSystem --> <!-- task:hidden -->\n',features:{hasAccountSystem:false,hasSubscriptions:false,hasPush:false,hasFeedbackSystem:false,targetMinors:false,hasAdjust:true,hasAnalysisApi:false},permissions:{selected:['tracking'],descs:{tracking:'用于广告归因'},descsEn:{}},review:{release:{app:'审查导出',platform:'iOS',version:'1.0',environment:'production'},items:{done:{notes:'人工备注\n```\n# 仅为数据',evidenceRequired:'on',evidence:'screenshots/proof.png'}},subscriptions:[],history:[]}});
+ const A=context.window.ReleaseAnalysis,snapshot=A.aiReviewSnapshot(S.payload(S.get(id)),context.window.PAGES_DATA?.profiles||vm.runInContext('PAGES_DATA.profiles',context));
+ snapshot.items=snapshot.items.map(item=>item.applicable===false?item:{...item,state:'done'});
+ const profiles=vm.runInContext('PAGES_DATA.profiles',context),markdown=A.aiReviewMarkdown(snapshot,profiles,{exportedAt:'2026-11-02T00:00:00Z'});
+ assert.equal(snapshot.items.find(i=>i.id==='hidden').applicable,false);
+ assert.match(markdown,/release-desk-ai-review\/v1/);assert.match(markdown,/审查导出/);assert.match(markdown,/权限与隐私说明排查单/);assert.match(markdown,/PRIV-PERM-tracking-03/);assert.match(markdown,/PRIV-UNSELECTED-camera/);assert.match(markdown,/PRIV-ATT-02/);assert.match(markdown,/隐私政策正文与应用内说明/);assert.match(markdown,/Google Play Data safety/);assert.match(markdown,/PrivacyInfo\.xcprivacy/);assert.match(markdown,/referenceOnly/);assert.match(markdown,/未经本项目验证/);assert.match(markdown,/初始均未核验/);assert.match(markdown,/NSUserTrackingUsageDescription/);assert.match(markdown,/用于广告归因/);assert.match(markdown,/"descriptionEn": ""/);
+ assert.match(markdown,/### hidden/);assert.match(markdown,/未启用账号系统/);assert.match(markdown,/module_init_start/);assert.match(markdown,/"hasSubscriptions": false/);assert.match(markdown,/screenshots\/proof.png/);assert.match(markdown,/文件路径:行号/);assert.match(markdown,/待核验/);assert.match(markdown,/完整检查清单/);assert.match(markdown,/已保存原始清单（含配置片段）/);assert.match(markdown,/# Audit/);assert.match(markdown,/已勾选项目也需代码证据支持/);assert.match(markdown,/尚未运行或保存配置预检/);assert.doesNotMatch(markdown,/Used to measure the effectiveness/);
+ const stale={...snapshot,preflight:{basis:'old',files:[],findings:[],errors:0}};
+ assert.match(A.aiReviewMarkdown(stale,profiles,{exportedAt:'2026-11-02T00:00:00Z'}),/配置已变化，结果需要重新生成/);
+});
+
+
+test('AI review export requires actual 100 percent completion, excluding hidden tasks and rejecting skipped or rounded completion',()=>{
+ const {context}=setup(),A=context.window.ReleaseAnalysis;
+ for(const items of [[],[{id:'todo',state:'todo'}],[{id:'skip',state:'skip',reason:'不适用'}],Array.from({length:200},(_,i)=>({id:String(i),state:i===199?'todo':'done'}))]){
+  const snapshot={items};assert.equal(A.aiReviewProgress(snapshot).complete,false);assert.notEqual(A.aiReviewProgress(snapshot).percent,100);assert.throws(()=>A.aiReviewMarkdown(snapshot,{}),/100%/);
+ }
+ const snapshot={items:[{id:'complete',state:'done'},{id:'hidden',state:'todo',applicable:false},{id:'gate',state:'todo',gate:true}]};
+ assert.equal(A.aiReviewProgress(snapshot).complete,true);assert.equal(A.aiReviewProgress(snapshot).percent,100);assert.match(A.aiReviewMarkdown(snapshot,{}),/release-desk-ai-review/);
+});

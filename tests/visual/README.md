@@ -20,3 +20,9 @@ The font is used only by screenshot tests and is not shipped with the app.
 It was subset with fontTools from the characters in board/pages sources and
 this test fixture, retaining the variable weight axis. Refresh the subset
 when a fixture introduces characters that are not covered.
+
+Current workflow update: the priority overview, project configuration summary,
+save-all actions and command labels have reviewed macOS and Linux references.
+Linux references were captured from the release PR CI on Ubuntu 26 using the
+pinned Playwright browser. Native controls and whole-page heights differ, so
+references remain separate for each operating system.
