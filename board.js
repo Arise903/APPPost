@@ -908,7 +908,8 @@ async function saveProgress(options={}){
     for(const k of Object.keys(serverBaseline)) if(state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k];
     const d = await api("/api/write", {states: changes, revision: baseRevision});
     const savedBaseline=baselineFromData(d);
-    const unapplied=Object.entries(changes).filter(([id,value])=>id===d.gateId?Boolean(d.gateDone)!==(value==="done"):(savedBaseline[id]||"todo")!==value);
+    const responseIds=new Set((d.items||[]).map(item=>item.id));
+    const unapplied=Object.entries(changes).filter(([id,value])=>responseIds.has(id)&&(savedBaseline[id]||"todo")!==value);
     if(unapplied.length){
       dirty=true;saveFailure="服务端返回的检查状态与本次修改不一致";updateSaveStatus();
       toast("服务端未确认保存这些检查项，修改已留在当前页面；请刷新前先导出草稿");
