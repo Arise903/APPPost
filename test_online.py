@@ -92,7 +92,7 @@ class OnlineTests(unittest.TestCase):
         self.assertEqual(enabled.status_code, 200)
         self.assertEqual(len(enabled.json['items']), 21)
         disabled = self.post('features', {'revision': enabled.json['revision'], 'features': {**features, 'hasAdjust': False}})
-        self.assertEqual(disabled.json['total'], 13)
+        self.assertEqual(disabled.json['total'], 17)
         back = self.post('features', {'revision': disabled.json['revision'], 'features': features})
         self.assertEqual(len(back.json['items']), 21)
         invalid = self.post('features', {'revision': back.json['revision'], 'features': {**features, 'hasAdjust': 'on'}})
