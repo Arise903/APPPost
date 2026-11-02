@@ -112,7 +112,9 @@ def configure_document_features(text, features):
     for module in load_checklist_modules():
         if current.get(module['feature']) and not any(('task:' + task_id) in text for task_id in [module['legacyTaskId'], *[item[0] for item in module['items']]]):
             text = text.rstrip() + '\n\n## ' + module['title'] + ' <!-- section:module_' + module['id'] + ' -->\n'
-            text += '\n'.join('- [ ] ' + title + ' <!-- if:' + module['feature'] + ' --> <!-- task:' + task_id + ' -->' for task_id, title in module['items']) + '\n'
+            if module.get('intro'):
+                text += '\n' + module['intro'].strip() + '\n\n'
+            text += '\n'.join('- [ ] ' + item[1] + ' <!-- if:' + (item[2] if len(item) > 2 else module['feature']) + ' --> <!-- task:' + item[0] + ' -->' for item in module['items']) + '\n'
     keys = ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush', 'hasAdjust', 'hasAnalysisApi')
     if any(type(current.get(k)) is not bool for k in keys):
         raise ValueError('项目特征无效')

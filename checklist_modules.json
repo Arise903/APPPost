@@ -54,21 +54,63 @@
   {
     "id": "initialization",
     "feature": "hasInitialization",
-    "title": "初始化流程核对",
+    "title": "二、初始化流程核对",
     "legacyTaskId": "t_98829c38",
     "items": [
       [
         "module_init_start",
-        "已启用的 Adjust / AnalysisApi 按约定时序启动，初始化等待与重试不阻塞应用主流程"
+        "runApp() 在基础配置完成后调用，首帧完成才启动适用的统计或归因流程"
       ],
       [
         "module_init_consent",
-        "初始化遵循前台状态及适用的隐私同意结果；未启用的链路不初始化、不触发授权请求"
+        "Adjust 链路等待 ATT 明确结束后才初始化 Adjust",
+        "hasAdjust"
+      ],
+      [
+        "module_init_att_retry",
+        "ATT 未决定或请求失败时继续等待并有限重试，不阻塞启动，也不提前初始化 Adjust",
+        "hasAdjust"
+      ],
+      [
+        "module_init_idempotent",
+        "Adjust 初始化有幂等保护，重复触发只执行一次",
+        "hasAdjust"
+      ],
+      [
+        "module_init_att_result",
+        "ATT 允许、拒绝、受限三种结果均能正常推进",
+        "hasAdjust"
+      ],
+      [
+        "module_init_parallel",
+        "AnalysisApi 自有统计不等待 ATT 或 Adjust 初始化",
+        "hasAnalysisApi"
+      ],
+      [
+        "module_init_token_timeout",
+        "AttributionToken 获取有明确超时，超时走无 token 分支",
+        "hasAnalysisApi"
+      ],
+      [
+        "module_init_token_later",
+        "无 token 时先上报用户，后续单独补传 token",
+        "hasAnalysisApi"
+      ],
+      [
+        "module_init_retry",
+        "上报失败后按有限间隔重试，避免无限挂起",
+        "hasAnalysisApi"
       ],
       [
         "module_init_lifecycle",
-        "重复启动、网络失败、超时及前后台切换已验证，重试有上限且初始化保持幂等"
+        "进入后台暂停重试，回到前台可继续；重复启动保持幂等"
+      ],
+      [
+        "module_init_subscription",
+        "如启用订阅，确认基础配置与商品加载独立进行；未启用时确认没有订阅初始化阻塞统计链路",
+        "hasInitialization"
       ]
-    ]
+    ],
+    "intro": "### 目标时序\n\n```text\nApp 启动 → 初始化应用基础服务 → runApp()\n首帧渲染完成 → 启动已启用的统计与归因链路\nAdjust：等待前台、界面就绪及 ATT 明确结果 → 关联用户标识 → 幂等初始化\nAnalysisApi（启用时）：读取/生成用户标识 → 加载队列 → 上报用户与行为；不等待 Adjust\n失败、超时或进入后台：有限重试或降级，不阻塞应用启动\n```\n\n### 逐条验收\n"
   }
 ]
