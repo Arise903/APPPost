@@ -582,5 +582,6 @@ li.item.gateitem>.item-evidence-summary{grid-column:1 / -1}
 @media(max-width:600px){.priority-metrics{display:grid;grid-template-columns:1fr 1fr}.priority-metrics .btn{width:100%}.release-priorities{padding:12px}.primary-actions{gap:6px}}
 .archive-decision{width:min(680px,calc(100vw - 24px))}.archive-decision pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;font-size:12px;line-height:1.7}.archive-decision label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px}.archive-decision input[type=checkbox]{width:auto;flex-shrink:0}
 .project-configuration{margin-top:14px;padding:12px;background:var(--surface-2);border-radius:8px;font-size:12px;line-height:1.7;overflow-wrap:anywhere}.project-configuration summary{cursor:pointer;color:var(--text-2)}.project-configuration p{margin:6px 0}
+.project-configuration-card{overflow-wrap:anywhere}.project-configuration-table{width:100%;border-collapse:collapse;font-size:12px;line-height:1.6}.project-configuration-table th,.project-configuration-table td{padding:8px 10px;border:1px solid var(--border);text-align:left;vertical-align:top}.project-configuration-table th{width:145px;background:var(--surface-2);font-weight:500}.project-configuration-table td{min-width:0;word-break:break-word}
 
 .ai-export-hint{margin:0 10px 8px;font-size:11px;color:var(--text-2);line-height:1.6}

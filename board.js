@@ -362,7 +362,17 @@ function build(){
 
   const isGateSection = sec => (sec.blocks || []).some(b => b.type === "item" && b.gate);
   const orderedSections = [...DATA.sections.filter(isGateSection), ...DATA.sections.filter(sec => !isGateSection(sec))];
+  let configurationPlaced = false;
   for(const sec of orderedSections){
+    // Older imported checklists may contain a one-time branch analysis table.
+    // Keep its source document intact, but show the saved project configuration here.
+    if(/从分支提取的配置信息/.test(sec.title) && !(sec.blocks||[]).some(block=>block.type==='item'))continue;
+    if(!configurationPlaced && !isGateSection(sec) && !sec.guide_only){
+      const card=document.createElement('section');card.className='card project-configuration-card';card.id='projectConfiguration';
+      const heading=document.createElement('h2');heading.textContent='项目配置信息';card.append(heading);
+      const content=document.createElement('div');content.id='projectConfigurationLines';card.append(content);list.append(card);
+      configurationPlaced=true;
+    }
     // 「怎么用」这一节只作独立说明页的内容源，不在看板首页重复展示
     if(sec.guide_only) continue;
     if(/^附录[：:]\s*权限与隐私配置/.test(sec.title.trim()) && !(DATA.permSelected || []).length) continue;
@@ -422,6 +432,7 @@ function build(){
     }
     list.appendChild(el);
   }
+  if(!configurationPlaced){const card=document.createElement('section');card.className='card project-configuration-card';card.id='projectConfiguration';const heading=document.createElement('h2');heading.textContent='项目配置信息';card.append(heading);const content=document.createElement('div');content.id='projectConfigurationLines';card.append(content);list.append(card);}
 
   // 按 DOM 顺序建立全局执行顺序
   ORDER = [...document.querySelectorAll("li.item")].map(li => li.dataset.id);

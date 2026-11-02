@@ -6,7 +6,7 @@ function ensureFeatureModules(){
  for(const module of OPTIONAL_MODULES){
   if(DATA.features[module.feature]===undefined)DATA.features[module.feature]=[module.legacyTaskId,...module.items.map(item=>item[0])].some(id=>ids.has(id));
   if(!DATA.features[module.feature]||[module.legacyTaskId,...module.items.map(item=>item[0])].some(id=>ids.has(id)))continue;
-  DATA.sections.push({id:'module_'+module.id,title:module.title,blocks:module.items.map(([id,text])=>({type:'item',id,text,level:0,state:st(id),checked:st(id)==='done',cond:module.feature}))});
+  DATA.sections.push({id:'module_'+module.id,title:module.title,blocks:module.items.map(([id,text,condition])=>({type:'item',id,text,level:0,state:st(id),checked:st(id)==='done',cond:condition||module.feature}))});
  }
 }
 

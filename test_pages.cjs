@@ -266,7 +266,7 @@ test('Optional Adjust and AnalysisApi modules work in every template without dup
  for(const template of S.listTemplates()){
   const features={...template.features,hasAdjust:true,hasAnalysisApi:true};
   const id=await S.create({name:template.name,document:template.document,features});
-  let d=S.payload(S.get(id));const moduleIds=d.items.filter(i=>i.cond==='hasAdjust'||i.cond==='hasAnalysisApi').map(i=>i.id);assert.equal(moduleIds.length,9);
+  let d=S.payload(S.get(id));const moduleIds=d.items.filter(i=>/^module_(adjust|analysis)_/.test(i.id)).map(i=>i.id);assert.equal(moduleIds.length,9);
   const task=moduleIds[0];await S.mutate(id,1,'done',p=>{p.document=S.apply(p.document,{[task]:'done'});p.review.items[task]={notes:'保留'};});
   await S.mutate(id,2,'off',p=>p.document=S.configureDocument(p.document,{...features,hasAdjust:false,hasAnalysisApi:false}));
   d=S.payload(S.get(id));assert.equal(d.features.hasAdjust,false);assert.equal(d.total,template.document.match(/^- \[ /gm).length);
@@ -282,6 +282,7 @@ test('Initialization chapter uses OR for Adjust and AnalysisApi in original and 
   const text=S.configureDocument(source,{hasAdjust,hasAnalysisApi}),d=S.payload({name:'test',document:text,permissions:{selected:[],descs:{},descsEn:{}},review:{release:{},items:{},history:[]}}),items=d.items.filter(i=>i.cond==='hasInitialization');
   assert.ok(items.length>0||!hasAdjust&&!hasAnalysisApi);assert.equal(d.features.hasInitialization,hasAdjust||hasAnalysisApi);
   const visible=items.filter(i=>d.features[i.cond]!==false);assert.equal(visible.length>0,hasAdjust||hasAnalysisApi);
+  if(hasAdjust&&source!==original){assert.match(text,/## 二、初始化流程核对/);assert.match(text,/### 目标时序/);assert.match(text,/module_init_att_retry/);assert.match(text,/module_init_idempotent/);assert.match(text,/module_init_att_result/);assert.equal(d.items.some(i=>i.id==='module_init_consent'&&i.cond==='hasAdjust'),true);}
  }
 });
 
