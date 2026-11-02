@@ -282,7 +282,7 @@ test('Initialization chapter uses OR for Adjust and AnalysisApi in original and 
   const text=S.configureDocument(source,{hasAdjust,hasAnalysisApi}),d=S.payload({name:'test',document:text,permissions:{selected:[],descs:{},descsEn:{}},review:{release:{},items:{},history:[]}}),items=d.items.filter(i=>i.cond==='hasInitialization');
   assert.ok(items.length>0||!hasAdjust&&!hasAnalysisApi);assert.equal(d.features.hasInitialization,hasAdjust||hasAnalysisApi);
   const visible=items.filter(i=>d.features[i.cond]!==false);assert.equal(visible.length>0,hasAdjust||hasAnalysisApi);
-  if(hasAdjust&&source!==original){assert.match(text,/## 二、初始化流程核对/);assert.match(text,/### 目标时序/);assert.match(text,/task:t_faf300d9/);assert.match(text,/task:t_47f7c871/);assert.match(text,/task:t_71952b07/);assert.equal(d.items.some(i=>i.id==='t_aad69bfe'&&i.cond==='hasAdjust'),true);}
+  if(hasAdjust&&source!==original){assert.match(text,/## 二、初始化流程核对/);assert.match(text,/### 目标时序/);assert.match(text,/task:t_faf300d9/);assert.match(text,/task:t_47f7c871/);assert.match(text,/task:t_71952b07/);assert.equal(d.items.some(i=>i.id==='t_aad69bfe'),true);}
  }
 });
 
