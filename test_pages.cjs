@@ -282,7 +282,7 @@ test('Initialization chapter uses OR for Adjust and AnalysisApi in original and 
   const text=S.configureDocument(source,{hasAdjust,hasAnalysisApi}),d=S.payload({name:'test',document:text,permissions:{selected:[],descs:{},descsEn:{}},review:{release:{},items:{},history:[]}}),items=d.items.filter(i=>i.cond==='hasInitialization');
   assert.ok(items.length>0||!hasAdjust&&!hasAnalysisApi);assert.equal(d.features.hasInitialization,hasAdjust||hasAnalysisApi);
   const visible=items.filter(i=>d.features[i.cond]!==false);assert.equal(visible.length>0,hasAdjust||hasAnalysisApi);
-  if(hasAdjust&&source!==original){assert.match(text,/## 二、初始化流程核对/);assert.match(text,/### 目标时序/);assert.match(text,/module_init_att_retry/);assert.match(text,/module_init_idempotent/);assert.match(text,/module_init_att_result/);assert.equal(d.items.some(i=>i.id==='module_init_consent'&&i.cond==='hasAdjust'),true);}
+  if(hasAdjust&&source!==original){assert.match(text,/## 二、初始化流程核对/);assert.match(text,/### 目标时序/);assert.match(text,/task:t_faf300d9/);assert.match(text,/task:t_47f7c871/);assert.match(text,/task:t_71952b07/);assert.equal(d.items.some(i=>i.id==='t_aad69bfe'&&i.cond==='hasAdjust'),true);}
  }
 });
 
@@ -306,7 +306,7 @@ test('AI review Markdown contains saved configuration, hidden tasks, evidence me
  const profiles=vm.runInContext('PAGES_DATA.profiles',context),markdown=A.aiReviewMarkdown(snapshot,profiles,{exportedAt:'2026-11-02T00:00:00Z'});
  assert.equal(snapshot.items.find(i=>i.id==='hidden').applicable,false);
  assert.match(markdown,/release-desk-ai-review\/v1/);assert.match(markdown,/审查导出/);assert.match(markdown,/权限与隐私说明排查单/);assert.match(markdown,/PRIV-PERM-tracking-03/);assert.match(markdown,/PRIV-UNSELECTED-camera/);assert.match(markdown,/PRIV-ATT-02/);assert.match(markdown,/隐私政策正文与应用内说明/);assert.match(markdown,/Google Play Data safety/);assert.match(markdown,/PrivacyInfo\.xcprivacy/);assert.match(markdown,/referenceOnly/);assert.match(markdown,/未经本项目验证/);assert.match(markdown,/初始均未核验/);assert.match(markdown,/NSUserTrackingUsageDescription/);assert.match(markdown,/用于广告归因/);assert.match(markdown,/"descriptionEn": ""/);
- assert.match(markdown,/### hidden/);assert.match(markdown,/未启用账号系统/);assert.match(markdown,/module_init_start/);assert.match(markdown,/"hasSubscriptions": false/);assert.match(markdown,/screenshots\/proof.png/);assert.match(markdown,/文件路径:行号/);assert.match(markdown,/待核验/);assert.match(markdown,/完整检查清单/);assert.match(markdown,/已保存原始清单（含配置片段）/);assert.match(markdown,/# Audit/);assert.match(markdown,/已勾选项目也需代码证据支持/);assert.match(markdown,/尚未运行或保存配置预检/);assert.doesNotMatch(markdown,/Used to measure the effectiveness/);
+ assert.match(markdown,/### hidden/);assert.match(markdown,/未启用账号系统/);assert.match(markdown,/t_98829c38/);assert.match(markdown,/"hasSubscriptions": false/);assert.match(markdown,/screenshots\/proof.png/);assert.match(markdown,/文件路径:行号/);assert.match(markdown,/待核验/);assert.match(markdown,/完整检查清单/);assert.match(markdown,/已保存原始清单（含配置片段）/);assert.match(markdown,/# Audit/);assert.match(markdown,/已勾选项目也需代码证据支持/);assert.match(markdown,/尚未运行或保存配置预检/);assert.doesNotMatch(markdown,/Used to measure the effectiveness/);
  for(const id of ['CFG-001','CFG-002','CFG-003','CFG-004','INIT-001','INIT-002','INIT-003'])assert.match(markdown,new RegExp(id));
  assert.match(markdown,/验证证据应填写项目实际值及文件路径或地址/);
  const stale={...snapshot,preflight:{basis:'old',files:[],findings:[],errors:0}};
