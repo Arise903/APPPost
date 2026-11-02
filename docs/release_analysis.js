@@ -131,6 +131,15 @@ function privacyAuditLines(snapshot,profiles={}){
  '- [ ] [PRIV-013] 对照真实数据流和第三方 SDK 行为核验 App Store 隐私标签、追踪声明、Google Play Data safety 与其他适用问卷；记录披露值及证据，未提供商店记录时标为待核验。',
  '- [ ] [PRIV-014] 根据实际目标地区、目标用户和平台版本核验适用要求；面向未成年人时补查相关模式、数据处理、归因/广告及家长入口，不把通用模板当作合规结论。',
  '- [ ] [PRIV-015] 提供真实设备授权路径、拒绝/撤回路径、网络抓包/日志和政策/商店截图；将缺失、过期或无法打开的证据单独列出。',
+ '', '### 项目配置值与地址','',
+ '- [ ] [CFG-001] 逐项盘点此文档中的发布信息、功能开关、权限用途文案、订阅商品、检查项证据以及源码中的其他必需配置；列出实际值、来源位置、运行环境和验证结果。空值、占位符、示例值及互相矛盾的值均标为问题或待核验。',
+ '- [ ] [CFG-002] 核验 API、隐私政策、服务条款、账号注销、反馈、推送、归因、深度链接和商店页面等适用地址：与项目代码、运行配置、正式环境及商店记录逐项比对，并实际检查可访问性与目标内容。',
+ '- [ ] [CFG-003] 核验应用标识、版本、构建号、SDK 标识、商品 ID、环境变量及服务端对应关系；密钥只报告变量名、配置来源及是否验证，不输出密钥明文。',
+ '- [ ] [CFG-004] 对每个已完成检查项的“验证证据”核实是否为本项目真实使用的值、文件路径:行号或可访问地址；模板示例、失效链接、没有来源的断言及证据与配置不一致均需单独列出。',
+ '', '### 初始化流程核对','',
+ '- [ ] [INIT-001] 无论清单章节当前是否隐藏，检查实际项目中 Adjust、AnalysisApi 和其他需要初始化的 SDK；对启用的模块逐项核对启动入口、配置值来源、环境切换和初始化顺序。',
+ '- [ ] [INIT-002] 核对 ATT/隐私同意前后、拒绝及授权变化时的初始化和数据上报；检查重复启动、前后台切换、超时重试、失败降级、日志和真实设备验证证据。',
+ '- [ ] [INIT-003] 将“二、初始化流程核对”中每个适用检查项与源码路径、实际配置值及验证证据对应；未启用模块也检查残留依赖或自动初始化。',
  '', '### 已选权限逐项排查',''];
  for(const p of permissions.filter(p=>selected.has(p.id))){
   lines.push('#### '+p.id+' · '+p.name,'',
@@ -171,6 +180,7 @@ function aiReviewMarkdown(snapshot,profiles={},metadata={}){
  '7. 核对应用标识、版本、构建号、生产环境地址、账号注销、推送、反馈及目标用户等适用功能；识别检查清单本身没有覆盖的风险。',
  '8. 必须逐项完成下方权限与隐私说明排查单，输出每个 PRIV 编号的结论及证据，不得仅返回笼统的隐私合规结论。',
  '9. 已勾选项目也需代码证据支持。缺少源码、构建配置、商店截图或附件正文时标注“待核验”，说明还需要什么材料，不推断为通过。',
+ '10. 逐项完成 CFG 与 INIT 排查单；所有需要配置的值和地址都应与真实项目及正式环境对应。检查项的验证证据必须指向实际值与来源，不能把模板示例当作证据；不要输出密钥明文。',
  '', '### 请按此格式输出','', '| 优先级 | 问题及影响 | 证据（文件路径:行号） | 对应检查项 ID / 新增遗漏 | 建议 | 验证方式 |','| --- | --- | --- | --- | --- | --- |','| P0 / P1 / P2 | 填写实际发现 | 没有证据时写待核验 | 填写 ID 或新增遗漏 | 可执行修改建议 | 测试或人工核验步骤 |',
  '', '最后分别列出：已验证内容、发现的问题、仍待核验内容，以及建议新增到清单的检查项。',
  '', '## 发布信息（预期值）','',...json({app:'',platform:'',version:'',build:'',owner:'',appIdIOS:'',appIdAndroid:'',environment:'',apiBaseUrl:'',targetDate:'',timeZone:'',...release}),
@@ -183,7 +193,7 @@ function aiReviewMarkdown(snapshot,profiles={},metadata={}){
  lines.push('', '未选中的权限（仍需对照实际实现）：',quote(known.filter(p=>!selected.has(p.id)).map(p=>p.name+' ['+p.id+']').join('、')||'无'),
  '', '## 订阅商品配置','',...json(snapshot.subscriptions||[]),
  '', '## 当前发布阻塞与证据缺口','', '检查结论：'+(readiness.ready?'清单已就绪（仍需代码核验）':'未就绪')+'；阻塞 '+readiness.blockers+' 项。',...readiness.issues.flatMap(i=>[quote(i.reason+' · '+i.id+' · '+i.text)]),
- '', '## 完整检查清单（含不适用项）','', '完成状态来自人工记录；隐藏或不适用项同样导出，供 AI 识别错误配置及遗漏。');
+ '', '## 完整检查清单（含不适用项）','', '完成状态来自人工记录；隐藏或不适用项同样导出，供 AI 识别错误配置及遗漏。尤其逐项核对“二、初始化流程核对”的真实实现与证据。验证证据应填写项目实际值及文件路径或地址，模板示例不能作为通过依据。');
  for(const item of items){lines.push('', '### '+item.id,quote(item.section||'通用检查'),quote(item.text),...json({state:item.state||'todo',applicable:item.applicable!==false,hiddenReason:item.hiddenReason||'',required:item.required!=='off',evidenceRequired:item.evidenceRequired==='on',notes:item.notes||'',evidence:item.evidence||'',evidenceExpiresAt:item.evidenceExpiresAt||'',attachmentIds:item.attachmentIds||'[]',reason:item.reason||'',exceptionType:item.exceptionType||'',exceptionOwner:item.exceptionOwner||'',reviewDue:item.reviewDue||'',reviewStatus:item.reviewStatus||'',reviewedAt:item.reviewedAt||'',approvalStatus:item.approvalStatus||'',approvalBy:item.approvalBy||'',approvalDate:item.approvalDate||''}));}
  lines.push('', '## 证据附件索引','', '仅包含附件元信息，不嵌入附件内容；核验实际文件时请另行提供。',...json(snapshot.evidenceFiles||{}),
  '', '## 已保存的配置预检','');

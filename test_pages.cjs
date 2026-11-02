@@ -306,6 +306,8 @@ test('AI review Markdown contains saved configuration, hidden tasks, evidence me
  assert.equal(snapshot.items.find(i=>i.id==='hidden').applicable,false);
  assert.match(markdown,/release-desk-ai-review\/v1/);assert.match(markdown,/审查导出/);assert.match(markdown,/权限与隐私说明排查单/);assert.match(markdown,/PRIV-PERM-tracking-03/);assert.match(markdown,/PRIV-UNSELECTED-camera/);assert.match(markdown,/PRIV-ATT-02/);assert.match(markdown,/隐私政策正文与应用内说明/);assert.match(markdown,/Google Play Data safety/);assert.match(markdown,/PrivacyInfo\.xcprivacy/);assert.match(markdown,/referenceOnly/);assert.match(markdown,/未经本项目验证/);assert.match(markdown,/初始均未核验/);assert.match(markdown,/NSUserTrackingUsageDescription/);assert.match(markdown,/用于广告归因/);assert.match(markdown,/"descriptionEn": ""/);
  assert.match(markdown,/### hidden/);assert.match(markdown,/未启用账号系统/);assert.match(markdown,/module_init_start/);assert.match(markdown,/"hasSubscriptions": false/);assert.match(markdown,/screenshots\/proof.png/);assert.match(markdown,/文件路径:行号/);assert.match(markdown,/待核验/);assert.match(markdown,/完整检查清单/);assert.match(markdown,/已保存原始清单（含配置片段）/);assert.match(markdown,/# Audit/);assert.match(markdown,/已勾选项目也需代码证据支持/);assert.match(markdown,/尚未运行或保存配置预检/);assert.doesNotMatch(markdown,/Used to measure the effectiveness/);
+ for(const id of ['CFG-001','CFG-002','CFG-003','CFG-004','INIT-001','INIT-002','INIT-003'])assert.match(markdown,new RegExp(id));
+ assert.match(markdown,/验证证据应填写项目实际值及文件路径或地址/);
  const stale={...snapshot,preflight:{basis:'old',files:[],findings:[],errors:0}};
  assert.match(A.aiReviewMarkdown(stale,profiles,{exportedAt:'2026-11-02T00:00:00Z'}),/配置已变化，结果需要重新生成/);
 });
