@@ -733,7 +733,8 @@ async function loadFromServer(){
   try{
     const d = await api("/api/list");
     const changes = {};
-    if(dirty) for(const k in state){ if(state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k]; }
+    const validIds=new Set(Object.keys(baselineFromData(d)));
+    if(dirty) for(const k in state){ if(validIds.has(k)&&state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k]; }
     if(dirty && baseRevision !== d.revision) throw new Error("服务端已变化，请先导出未保存进度");
     baseRevision = d.revision;
     gen = d.generation;
@@ -904,7 +905,7 @@ async function saveProgress(options={}){
   if(!ok) return;
   try{
     const changes = {};
-    for(const k in state) if(state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k];
+    for(const k of Object.keys(serverBaseline)) if(state[k] !== (serverBaseline[k] || "todo")) changes[k] = state[k];
     const d = await api("/api/write", {states: changes, revision: baseRevision});
     baseRevision = d.revision;
     gen = d.generation;
@@ -1137,6 +1138,8 @@ serverBaseline = baselineFromData(EMBEDDED);
 gen = EMBEDDED.generation || 1;
 state = normalizeState(loadState(gen));
 // md 里已有的标记同步进来（离线模式尤其重要）
+const initialBaselineIds=new Set(Object.keys(serverBaseline));
+state=Object.fromEntries(Object.entries(state).filter(([id])=>initialBaselineIds.has(id)));
 state = Object.assign(seedFromData(EMBEDDED), state);
 dirty = Object.keys(state).some(k => state[k] !== (serverBaseline[k] || "todo"));
 if(dirty) markDirty();
