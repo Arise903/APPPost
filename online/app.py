@@ -2,15 +2,12 @@
 import hashlib
 import html
 import json
-import logging
 import os
 import secrets
 import tempfile
 import time
 import uuid
-from datetime import timedelta
 from pathlib import Path
-from urllib.parse import urlsplit
 
 import click
 from flask import Flask, abort, g, jsonify, redirect, render_template, request
@@ -18,8 +15,9 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import checklist_tool as checklist
-from release_policy import assess as assess_release, calendar_date
-from .db import Database, project_state, snapshot
+from release_policy import assess as assess_release
+from .db import Database, snapshot
+from .strings import CLOUD_STRINGS
 
 ROOT = Path(__file__).resolve().parent
 SESSION_SECONDS = 7 * 24 * 3600
@@ -88,11 +86,27 @@ def create_app(overrides=None):
         if not conn.one('SELECT id FROM users LIMIT 1') and not app.config['TESTING']:
             raise RuntimeError('First launch requires ADMIN_EMAIL and ADMIN_PASSWORD')
 
+    cleanup_state = {'at': 0.0}
+
+    def purge_expired():
+        """Drop expired sessions and stale login attempts at most every 10 minutes."""
+        now = time.time()
+        if now - cleanup_state['at'] < 600:
+            return
+        cleanup_state['at'] = now
+        try:
+            with db.connect(write=True) as conn:
+                conn.execute('DELETE FROM sessions WHERE expires_at<?', (int(now),))
+                conn.execute('DELETE FROM login_attempts WHERE created_at<?', (int(now) - 900,))
+        except Exception:
+            app.logger.exception('清理过期会话失败')
+
     @app.before_request
     def authenticate_and_protect():
         g.nonce = secrets.token_urlsafe(18)
         g.user = None
         g.session = None
+        purge_expired()
         token = request.cookies.get('release_session', '')
         if token:
             with db.connect() as conn:
@@ -324,12 +338,11 @@ def create_app(overrides=None):
         payload['built'] = time.strftime('%Y-%m-%d %H:%M')
         page = checklist.TEMPLATE.read_text(encoding='utf-8')
         cloud = {'projectId': project_id, 'userId': g.user['id'], 'csrf': g.session['csrf'], 'role': project['role']}
-        script = 'window.RELEASE_CLOUD=' + encode(cloud).replace('</', '<\\/') + ';'
+        script = ('window.BOARD_STRINGS=' + encode(CLOUD_STRINGS).replace('</', '<\\/') + ';'
+                  'window.RELEASE_CLOUD=' + encode(cloud).replace('</', '<\\/') + ';')
         js = checklist.load_board_js()
-        js = js.replace('将恢复 Markdown 清单，当前文件会先备份。权限面板和发布记录保留当前值。未保存勾选将丢弃，是否继续？', '将恢复完整项目快照，包含清单、权限配置和发布记录；当前项目会先备份。未保存勾选将丢弃，是否继续？')
-        js = js.replace('已连接 · 可写回文件', '云端已连接 · 修改可同步').replace('本地服务', '在线服务').replace('仅本机保存', '草稿仅保存在当前浏览器')
         if project['role'] == 'viewer':
-            js += '\nconst lockViewer=()=>document.querySelectorAll("li.item input,li.item button,#btnSave,#releaseEdit,#releaseArchive,#backupRestore,#featSave,#permSave").forEach(el=>el.disabled=true); const viewerObserver=new MutationObserver(lockViewer); viewerObserver.observe(document.getElementById("list"),{childList:true,subtree:true}); lockViewer(); setTimeout(lockViewer,500);' 
+            js += '\nconst lockViewer=()=>document.querySelectorAll("li.item input,li.item button,#btnSave,#releaseEdit,#releaseArchive,#backupRestore,#featSave,#permSave").forEach(el=>el.disabled=true); const viewerObserver=new MutationObserver(lockViewer); viewerObserver.observe(document.getElementById("list"),{childList:true,subtree:true}); lockViewer(); setTimeout(lockViewer,500);'
         page = (page.replace('__PERMISSION_RULES__', (checklist.HERE / 'permission_rules.json').read_text(encoding='utf-8')).replace('__PERMISSION_VISIBILITY__', (checklist.HERE / 'permission_visibility.js').read_text(encoding='utf-8')).replace('__BOARD_CSS__', (checklist.HERE / 'board.css').read_text(encoding='utf-8'))
                 .replace('__BOARD_JS__', script + '\n' + js)
                 .replace('__TITLE__', html.escape(project['name']))
@@ -353,7 +366,7 @@ def create_app(overrides=None):
         prefix = '/api/projects/' + project_id
         page = page.replace('"/api/', '"' + prefix + '/').replace('online ? "/" :', 'online ? "/projects/' + project_id + '" :')
         page = page.replace('app-guide-ack', 'app-guide-ack:' + g.user['id'] + ':' + project_id)
-        bootstrap = '<script nonce="' + g.nonce + '">let guideRevision=' + encode(str(project['version'])) + ';const nativeFetch=window.fetch;window.fetch=async(url,opt={})=>{if(opt.method==="POST"){opt={...opt,body:JSON.stringify({...JSON.parse(opt.body||"{}"),revision:guideRevision})};}const response=await nativeFetch(url,{...opt,headers:{...opt.headers,"X-CSRF-Token":' + encode(g.session['csrf']) + '}});const data=await response.clone().json().catch(()=>({}));if(data.revision)guideRevision=data.revision;return response;};</script>' 
+        bootstrap = '<script nonce="' + g.nonce + '">let guideRevision=' + encode(str(project['version'])) + ';const nativeFetch=window.fetch;window.fetch=async(url,opt={})=>{if(opt.method==="POST"){opt={...opt,body:JSON.stringify({...JSON.parse(opt.body||"{}"),revision:guideRevision})};}const response=await nativeFetch(url,{...opt,headers:{...opt.headers,"X-CSRF-Token":' + encode(g.session['csrf']) + '}});const data=await response.clone().json().catch(()=>({}));if(data.revision)guideRevision=data.revision;return response;};</script>'
         return page.replace('<script>', '<script nonce="' + g.nonce + '">').replace('</head>', bootstrap + '</head>')
 
     @app.get('/api/projects/<project_id>/export')
@@ -435,11 +448,11 @@ def create_app(overrides=None):
                 project['review'] = encode(review)
             elif operation == 'features':
                 features = data.get('features')
-                if isinstance(features, dict):
-                    features = {'hasFeedbackSystem': False, 'hasSubscriptions': True, 'hasPush': False, **features}
-                if not isinstance(features, dict) or any(type(features.get(k)) is not bool for k in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush')):
+                if not isinstance(features, dict):
                     abort(400, '项目特征无效')
-                if any(k in features and type(features[k]) is not bool for k in ('hasAdjust', 'hasAnalysisApi')):
+                # 与本地文件版一致：未提交的特征沿用清单当前值，而不是重置为默认。
+                features = {**checklist.parse_md(project['document'])['features'], **features}
+                if any(type(features.get(key)) is not bool for key in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush', 'hasAdjust', 'hasAnalysisApi')):
                     abort(400, '项目特征无效')
                 project['document'] = checklist.configure_document_features(project['document'], features)
             elif operation == 'review':
@@ -487,8 +500,20 @@ def create_app(overrides=None):
                 if not backup:
                     abort(404, '备份不存在')
                 state = json.loads(backup['state'])
-                project.update(state)
-                project['generation'] += 1
+                if not isinstance(state, dict) or not isinstance(state.get('document'), str) or not state['document'].strip():
+                    abort(400, '备份内容无效，无法恢复')
+                try:
+                    permissions, review = json.loads(state['permissions']), json.loads(state['review'])
+                except (KeyError, ValueError):
+                    abort(400, '备份内容无效，无法恢复')
+                validate_permissions(permissions)
+                validate_review(review)
+                # 恢复内容与配置，但保留当前项目名称：快照不应改写项目身份。
+                project['document'] = checklist.stabilize_document(state['document'])
+                project['permissions'] = encode(permissions)
+                project['review'] = encode(review)
+                generation = state.get('generation')
+                project['generation'] = (generation if type(generation) is int and generation > 0 else project['generation']) + 1
             else:
                 abort(404)
             project['version'] += 1

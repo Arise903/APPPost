@@ -100,11 +100,22 @@ class PersistenceTests(unittest.TestCase):
         self.assertNotIn('[x]', self.path.read_text())
 
 class PagesBuildContractTests(unittest.TestCase):
-    def test_missing_or_duplicate_integration_point_fails(self):
-        from scripts.build_pages import replace_required
-        self.assertEqual(replace_required('before HOOK after', 'HOOK', 'value'), 'before value after')
-        for text in ('missing', 'HOOK HOOK'):
-            with self.assertRaises(ValueError):
-                replace_required(text, 'HOOK', 'value')
+    def test_edition_override_keys_exist_in_shared_board(self):
+        from scripts.build_pages import PAGES_STRINGS
+        from online.strings import CLOUD_STRINGS
+        source = c.load_board_js()
+        self.assertIn('const EDITION_STRINGS = Object.assign({', source)
+        for key in (*PAGES_STRINGS, *CLOUD_STRINGS):
+            self.assertIn(key + ':', source, 'unknown edition string key: ' + key)
+
+    def test_edition_overrides_only_change_displayed_copy(self):
+        from scripts.build_pages import PAGES_STRINGS
+        from online.app import CLOUD_STRINGS
+        self.assertTrue(PAGES_STRINGS and CLOUD_STRINGS)
+        for mapping in (PAGES_STRINGS, CLOUD_STRINGS):
+            for value in mapping.values():
+                self.assertIsInstance(value, str)
+                self.assertTrue(value.strip())
+        self.assertNotIn('{gen}', PAGES_STRINGS.get('connectedBadge', ''))
 
 if __name__ == '__main__': unittest.main()

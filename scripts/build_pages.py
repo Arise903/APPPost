@@ -10,12 +10,18 @@ import checklist_tool as c
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'docs'
 
-def replace_required(text, old, new):
-    """Fail loudly when a shared-board integration point changes."""
-    count = text.count(old)
-    if count != 1:
-        raise ValueError(f'Pages integration point expected once, found {count}: {old}')
-    return text.replace(old, new)
+# 与 board/edition.js 的默认文案对应；只覆盖 Pages 版本需要不同的条目。
+PAGES_STRINGS={
+    'connectedBadge':'Pages 个人版 · 保存到当前浏览器',
+    'connectedStatus':'已连接本机存储 · 世代 {gen} · 勾选可直接写回 md',
+    'connectedToast':'本机存储已就绪；请定期导出完整记录',
+    'saveTitle':'保存检查进度到当前浏览器？',
+    'saveKeepNote':'项目保存在当前浏览器，不会上传 GitHub。',
+    'saveDetail':'保存前保留本机项目快照；请定期从工作台导出完整记录。',
+    'savedToast':'已保存到当前浏览器',
+    'clearRewrite':'浏览器中的项目记录会更新',
+    'clearDetail':'操作前保留完整本机快照。清理网站数据会删除项目和快照，请先导出备份。',
+}
 
 
 def build():
@@ -32,26 +38,14 @@ def build():
     shutil.copyfile(ROOT/'permission_visibility.js',OUT/'permission_visibility.js')
     shutil.copyfile(ROOT/'release_readiness.js',OUT/'release_readiness.js')
     shutil.copyfile(ROOT/'release_analysis.js',OUT/'release_analysis.js')
-    data={'modules':c.load_checklist_modules(),'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles(),'rules':json.loads((ROOT/'permission_rules.json').read_text(encoding='utf-8')),'version':version,'templateVersion':template_version,'permissionsVersion':hashlib.sha256((ROOT/'permission_profiles.json').read_bytes()).hexdigest()[:10],'dataVersion':2}
+    data={'modules':c.load_checklist_modules(),'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles(),'rules':json.loads((ROOT/'permission_rules.json').read_text(encoding='utf-8')),'version':version,'templateVersion':template_version,'permissionsVersion':hashlib.sha256((ROOT/'permission_profiles.json').read_bytes()).hexdigest()[:10]}
     (OUT/'data.js').write_text('const PAGES_DATA = '+json.dumps(data,ensure_ascii=False).replace('</','<\\/')+';\n',encoding='utf-8')
     page=(ROOT/'board_template.html').read_text(encoding='utf-8')
-    js='document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;\n'+c.load_board_js()
-    js=replace_required(js,'"app-guide-ack" + (window.RELEASE_CLOUD', '"app-guide-ack:pages:" + PagesStore.projectId() + (window.RELEASE_CLOUD')
-    js=replace_required(js,'EMBEDDED.mdName);','"pages:" + PagesStore.projectId());')
-    js=replace_required(js,'window.open(online ? (window.RELEASE_CLOUD', 'if(window.RELEASE_PAGES){ window.open("guide.html?id=" + encodeURIComponent(PagesStore.projectId()), "_blank"); return; }\n  window.open(online ? (window.RELEASE_CLOUD')
-    js=replace_required(js,'if(window.RELEASE_CLOUD){ const link', 'if(window.RELEASE_CLOUD || window.RELEASE_PAGES){ const link')
-    js=replace_required(js,'toast("已清空 " + d.cleared', 'toast("已清空 " + (d.cleared || 0)')
-    replacements={
-        '已连接 · 可写回文件':'Pages 个人版 · 保存到当前浏览器',
-        '本地服务':'本机存储', '在线模式':'本机模式', '云端':'本机',
-        '保存勾选状态到 md 文件？':'保存检查进度到当前浏览器？',
-        '文件中原有的其他内容与格式保持不变。':'项目保存在当前浏览器，不会上传 GitHub。',
-        '写回前会自动生成一份带时间戳的 .bak 备份文件。':'保存前保留本机项目快照；请定期从工作台导出完整记录。',
-        '将恢复 Markdown 清单，当前文件会先备份。权限面板和发布记录保留当前值。未保存勾选将丢弃，是否继续？':'将恢复完整本机快照，包括检查、权限和发布记录。当前状态会先备份；未保存勾选将丢弃，是否继续？',
-        '已写回文件':'已保存到当前浏览器', '已连接本机存储，可直接保存到 md':'本机存储已就绪；请定期导出完整记录',
-        '文件会被直接改写':'浏览器中的项目记录会更新', '原始文件会先自动备份为 带时间戳的 .bak 文件，误操作可从备份恢复。':'操作前保留完整本机快照。清理网站数据会删除项目和快照，请先导出备份。',
-    }
-    for old,new in replacements.items():js=js.replace(old,new)
+    # 版本差异走运行时开关：文案与存储作用域都在源码内，构建只做注入。
+    js=('const PAGES_STRINGS = '+json.dumps(PAGES_STRINGS,ensure_ascii=False)+';\n'
+        'window.BOARD_STRINGS = PAGES_STRINGS;\n'
+        'document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;\n'
+        +c.load_board_js())
     page=page.replace('__PERMISSION_RULES__',(ROOT/'permission_rules.json').read_text(encoding='utf-8')).replace('__PERMISSION_VISIBILITY__',(ROOT/'permission_visibility.js').read_text(encoding='utf-8')).replace('__BOARD_CSS__',(ROOT/'board.css').read_text(encoding='utf-8')).replace('__BOARD_JS__',js)
     page=page.replace('const EMBEDDED = __DATA__;','const EMBEDDED = PagesStore.openProject();').replace('const EMBEDDED_PROFILES = __PROFILES__;','const EMBEDDED_PROFILES = PAGES_DATA.profiles;').replace('__TITLE__','检查项目 · Pages 个人版')
     page=page.replace('<script>\nconst PERMISSION_RULES', '<script type="text/plain" id="pagesBoardSource">\nconst PERMISSION_RULES').replace('</body>', '<script defer src="bootstrap.js"></script></body>')

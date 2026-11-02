@@ -14,6 +14,7 @@ __shot*.html
 *.sqlite3-wal
 __pycache__/
 *.pyc
+.ruff_cache/
 .DS_Store
 *.permstate.json
 *.review.json*

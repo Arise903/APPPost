@@ -348,7 +348,7 @@ document.getElementById("permEn").addEventListener("click", async () => {
   if(!online){ toast("离线模式无法写入文件，请启动本地服务"); return; }
   try{
     const d = await api("/api/perm-write-en", {selected: permSelected, descsEn: permDescsEn});
-    if(window.RELEASE_CLOUD){ const link = document.createElement("a"); const url = URL.createObjectURL(new Blob([d.doc], {type:"text/markdown;charset=utf-8"})); link.href=url; link.download=d.path; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    if(window.RELEASE_CLOUD || window.RELEASE_PAGES){ const link = document.createElement("a"); const url = URL.createObjectURL(new Blob([d.doc], {type:"text/markdown;charset=utf-8"})); link.href=url; link.download=d.path; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
     toast("已生成 " + d.path + "（" + d.lines + " 行）");
   }catch(e){
     toast("生成失败：" + e.message);

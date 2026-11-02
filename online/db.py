@@ -1,9 +1,17 @@
 """Transactional storage for SQLite previews and PostgreSQL production."""
 import json
+import re
 import sqlite3
 import time
 import uuid
 from contextlib import contextmanager
+
+# 只替换占位符，跳过单引号字符串字面量（值里可能出现 '?'）
+_PLACEHOLDER = re.compile(r"'(?:[^']|'')*'|\?")
+
+
+def to_postgres(sql):
+    return _PLACEHOLDER.sub(lambda match: "%s" if match.group(0) == "?" else match.group(0), sql)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -100,7 +108,7 @@ class Connection:
         self.conn, self.postgres = conn, postgres
 
     def execute(self, sql, params=()):
-        return self.conn.execute(sql.replace('?', '%s') if self.postgres else sql, params)
+        return self.conn.execute(to_postgres(sql) if self.postgres else sql, params)
 
     def one(self, sql, params=()):
         row = self.execute(sql, params).fetchone()

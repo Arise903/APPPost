@@ -332,3 +332,43 @@ test('Every new or imported project requires its own durable guide confirmation'
  const imported=await S.create({...S.export(id),name:'Imported'});assert.equal(S.payload(S.get(imported)).gateDone,false);
  const cancelled=await (await send('unack',{})).json();assert.equal(cancelled.gateDone,false);assert.equal(cancelled.items[0].state,'done');assert.equal((await send('write',{states:{[task]:'todo'}})).status,403);
 });
+
+test('Permission configuration output matches the Python implementation',()=>{
+ const {context}=setup(),S=context.window.PagesStore,ids=vm.runInContext('PAGES_DATA.profiles.permissions.map(p=>p.id)',context);
+ const cases=[
+  {selected:ids,descs:{},descsEn:{},lang:'zh'},
+  {selected:ids,descs:{},descsEn:{},lang:'en'},
+  {selected:['camera'],descs:{camera:'A & B < C "quoted" \'apostrophe\''},descsEn:{camera:'Cam <x> & co'},lang:'zh'},
+  {selected:['camera','photos'],descs:{camera:''},descsEn:{camera:''},lang:'zh'},
+  {selected:['camera','photos'],descs:{camera:''},descsEn:{camera:''},lang:'en'},
+  {selected:[],descs:{},descsEn:{},lang:'zh'}
+ ];
+ const script=`import json,sys,checklist_tool as c
+profiles=c.load_profiles()
+print(json.dumps([c.generate_config(profiles,x['selected'],x['descs'],x['descsEn'],lang=x['lang']) for x in json.loads(sys.argv[1])]))`;
+ const expected=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',script,JSON.stringify(cases)],{encoding:'utf8'}));
+ cases.forEach((input,index)=>assert.deepEqual(JSON.parse(JSON.stringify(S.config(input))),expected[index],'case '+index));
+});
+
+test('Permission and platform visibility rules match the Python implementation',()=>{
+ const {context}=setup();
+ const sets=[[],['camera'],['photos','notifications'],['tracking'],['location_background','health','bluetooth'],['camera','tracking','notifications','photos']];
+ const script=`import json,sys,checklist_tool as c,permission_visibility as v
+parsed=c.parse_md(open('online/default_checklist.md',encoding='utf-8').read())
+v.annotate(parsed['sections'])
+rules={}
+for s in parsed['sections']:
+    for b in s['blocks']:
+        rule=b.get('permissionRule')
+        if isinstance(rule,(str,list)):
+            rules[json.dumps(rule,ensure_ascii=False)]=rule
+profiles=c.load_profiles()
+sets=json.loads(sys.argv[1])
+print(json.dumps([[rule,[bool(v.visible(rule,selected,profiles)) for selected in sets]] for rule in rules.values()]))`;
+ const expected=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',script,JSON.stringify(sets)],{encoding:'utf8'}));
+ const PV=context.window.PermissionVisibility,profiles=vm.runInContext('PAGES_DATA.profiles',context);
+ assert.ok(expected.length>0);
+ for(const [rule,flags] of expected)assert.deepEqual(sets.map(selected=>!!PV.visible(rule,selected,profiles)),flags,'rule '+JSON.stringify(rule));
+ for(const platform of ['iOS','Android','iOS / Android','',undefined])for(const platformItem of ['ios','android'])
+  assert.equal(PV.platformVisible({platform:platformItem},platform),JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,sys;from permission_visibility import platform_visible;print(json.dumps(platform_visible({'platform':sys.argv[1]},None if sys.argv[2]=='null' else sys.argv[2])))",platformItem,platform===undefined?'null':platform],{encoding:'utf8'})));
+});

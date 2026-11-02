@@ -1,0 +1,3 @@
+# Mark generated Pages output and screenshot baselines as generated in reviews.
+docs/** linguist-generated=true
+tests/visual/reference/** linguist-generated=true

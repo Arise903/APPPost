@@ -2,7 +2,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from online.db import Database, SCHEMA
+from online.db import Database, SCHEMA, to_postgres
 from release_policy import validate_review_record
 
 
@@ -28,6 +28,12 @@ class MigrationTests(unittest.TestCase):
                 db.initialize()
             with db.connect() as conn:
                 self.assertIsNotNone(conn.one('SELECT * FROM users WHERE id=?', ('existing',)))
+
+    def test_placeholder_conversion_skips_string_literals(self):
+        self.assertEqual(to_postgres("SELECT * FROM sessions WHERE token_hash=? AND expires_at>?"),
+                         "SELECT * FROM sessions WHERE token_hash=%s AND expires_at>%s")
+        self.assertEqual(to_postgres("SELECT 'a?b', 'it''s ?' FROM t WHERE x=?"),
+                         "SELECT 'a?b', 'it''s ?' FROM t WHERE x=%s")
 
     def test_file_and_cloud_contract_rejects_invalid_records(self):
         for value in ({'history': {}}, {'items': {'task': {'notes': 123}}}, {'items': {'task': {'reviewDue': '2026-02-30'}}}, {'subscriptions': [{'price': 1}]}):

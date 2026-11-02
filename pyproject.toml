@@ -1,0 +1,14 @@
+# Lint configuration only; this repository ships no installable Python package.
+[tool.ruff]
+target-version = "py38"
+line-length = 200
+extend-exclude = ["docs", ".venv-online", "artifacts", "tests/visual"]
+
+[tool.ruff.lint]
+# 只保留真问题：未使用/未定义名称、语法错误、多余导入与行尾空白。
+# E701/E702/E501（压缩写法与行宽）暂不纳入，避免大规模重排既有代码。
+select = ["F", "E401", "E402", "E9", "W291", "W293"]
+ignore = ["E402"]
+
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["F401"]

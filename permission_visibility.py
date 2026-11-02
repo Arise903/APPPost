@@ -4,8 +4,23 @@ import re
 from pathlib import Path
 
 
+def _rules():
+    """Load permission rules once per file version; they are read-only."""
+    path = Path(__file__).with_name('permission_rules.json')
+    stat = path.stat()
+    key = (str(path), stat.st_mtime_ns, stat.st_size)
+    if _rules.key != key:
+        _rules.value = json.loads(path.read_text(encoding='utf-8'))
+        _rules.key = key
+    return _rules.value
+
+
+_rules.key = None
+_rules.value = {}
+
+
 def annotate(sections):
-    rules=json.loads(Path(__file__).with_name('permission_rules.json').read_text(encoding='utf-8'))
+    rules=_rules()
     for section in sections:
         group=None
         feature=None

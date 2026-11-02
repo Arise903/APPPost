@@ -32,13 +32,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pip install -r requirements-online.txt
+      - run: pip install -r requirements-online.txt ruff==0.17.3
+      - name: Lint
+        run: ruff check .
       - name: Local and cloud regression tests
-        run: python -m unittest -v test_checklist test_online test_migrations
+        run: python -m unittest -v test_checklist test_online test_migrations test_operations
       - name: PostgreSQL integration tests
         env:
           TEST_DATABASE_URL: postgresql://release_test:test-only-password@localhost:5432/release_test
-        run: python -m unittest -v test_online
+        run: python -m unittest -v test_online test_operations
       - run: python test_http_integration.py
       - name: Check assembled shared board modules
         run: |

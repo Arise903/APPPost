@@ -112,11 +112,21 @@ async function mutate(id,version,label,action){return repository.projectTransact
  });}
 
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* 与 Python html.escape 输出一致（撇号用 &#x27;），保证各版本导出同一份配置。 */
+const xml=s=>escape(s).replace(/&#39;/g,'&#x27;');
 function keys(p){const ios=p.ios||{};return ios.infoplist_keys|| (ios.infoplist_key?[{key:ios.infoplist_key,desc:ios.desc||'',desc_en:ios.desc_en||''}]:[]);}
+/* 与 checklist_tool._desc_for 相同优先级：本语言自定义 > 本语言默认 > 另一语言自定义 > 另一语言默认。 */
+function descFor(id,en,descs,descsEn,cnDefault,enDefault){
+ const custom=en?descsEn?.[id]:descs?.[id],builtin=en?enDefault:cnDefault,altCustom=en?descs?.[id]:descsEn?.[id],altBuiltin=en?cnDefault:enDefault;
+ if(custom!==undefined&&custom!==null&&custom!=='')return custom;
+ if(builtin)return builtin;
+ if(altCustom)return altCustom;
+ return altBuiltin||'';
+}
 function config(data){const profiles=PAGES_DATA.profiles,en=data.lang==='en',ios=[],android=[],appstore=[],policy=[],checks=[],missing=[];
  for(const id of data.selected||[]){const p=profiles.permissions.find(p=>p.id===id);if(!p)continue;const i=p.ios||{},a=p.android||{};const name=en?(p.name_en||p.name):p.name;
- for(const k of keys(p)){const primary=en?data.descsEn:data.descs,secondary=en?data.descs:data.descsEn;const desc=(primary?.[id]??(en?k.desc_en:k.desc))||secondary?.[id]||'';if(!desc.trim())missing.push(p.name+'：缺少用途描述');ios.push('<key>'+escape(k.key)+'</key>\n<string>'+escape(desc)+'</string>');}
- if(a.manifest){android.push('<uses-permission android:name="'+escape(a.manifest)+'" />');checks.push('〔'+name+'〕Android '+(a.runtime?'运行时权限，需动态申请':'普通权限'));}else if(a.manifest_note)checks.push('〔'+name+'〕'+a.manifest_note);
+ const permissionKeys=keys(p);if(!permissionKeys.length&&i.note)checks.push('〔'+p.name+'〕'+i.note);for(const k of permissionKeys){const desc=descFor(id,en,data.descs||{},data.descsEn||{},k.desc||'',k.desc_en||'');if(!desc.trim())missing.push(p.name+'：缺少 iOS 用途描述（'+k.key+'）');ios.push('<key>'+xml(k.key)+'</key>\n<string>'+xml(desc)+'</string>');}
+ if(a.manifest){android.push('<uses-permission android:name="'+xml(a.manifest)+'" />');checks.push('〔'+p.name+'〕'+(a.runtime?'Android 为运行时权限，需在 Activity 中动态申请'+(a.manifest_note?'；'+a.manifest_note:''):'Android 为普通权限，安装时自动授予'));}else if(a.manifest_note)checks.push('〔'+p.name+'〕'+a.manifest_note);
  for(const label of i.appstore_labels||[]){const cn=profiles.appstore_data_types.find(x=>x.en===label)?.name||label;const entry=cn+'（'+label+'）';if(!appstore.includes(entry))appstore.push(entry);}
  const text=en?(p.policy_text_en||p.policy_text):p.policy_text;if(text)policy.push('- **'+name+'**：'+text);for(const note of (en?p.review_notes_en||p.review_notes:p.review_notes)||[])checks.push('〔'+name+'〕'+note);
  }return {iosPlist:ios.join('\n'),androidManifest:android.join('\n'),appstore,privacyPolicy:policy.join('\n'),checks,missing};

@@ -26,7 +26,6 @@ const server=http.createServer((req,res)=>{
   const blocked=await page.evaluate(async()=>{const p=PagesStore.get(PagesStore.projectId()),d=PagesStore.payload(p),task=d.items.find(i=>!i.gate);const r=await fetch('/api/write',{method:'POST',body:JSON.stringify({revision:String(p.version),states:{[task.id]:'done'}})});return {status:r.status,task:task.id,old:task.state};});assert.equal(blocked.status,403);
   assert.equal(await page.locator('#list li.item:not(.gateitem)').evaluateAll(rows=>rows.every(row=>row.dataset.gateLocked==='1')),true);
   await page.goto(url+'guide.html?id='+id);await page.locator('#ack').click();await page.waitForURL(/board.html/);await page.waitForFunction(()=>typeof online!=='undefined'&&online&&gateDone);assert.equal(await page.locator('#gateBar').isVisible(),false);
-  const beforeCancel=await page.evaluate(()=>PagesStore.get(PagesStore.projectId()).document);
   await page.goto(url+'guide.html?id='+id);page.once('dialog',d=>d.accept());await page.locator('#unack').click();await page.waitForURL(/board.html/);await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.equal(await page.evaluate(()=>gateDone),false);assert.equal(await page.locator('#gateBar').isVisible(),true);assert.equal(await page.evaluate(task=>PagesStore.payload(PagesStore.get(PagesStore.projectId())).items.find(i=>i.id===task).state,blocked.task),blocked.old);
   await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);assert.equal(await page.evaluate(()=>gateDone),false);
  }

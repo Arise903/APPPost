@@ -22,6 +22,8 @@
 """
 
 from storage_utils import atomic_write, revision, load_review, save_review
+import copy
+import functools
 import logging
 import permission_visibility
 import argparse
@@ -43,7 +45,6 @@ from urllib.parse import urlparse
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_MD = HERE / "上架前App配置清单.md"
-DEFAULT_HTML = HERE / "上架前App配置清单.html"
 TEMPLATE = HERE / "board_template.html"
 STATE_FILE = HERE / ".checklist_generation.json"
 PERM_FILE = HERE / "permission_profiles.json"
@@ -52,7 +53,6 @@ EN_DOC_FILE = HERE / "Privacy-and-Permissions-EN.md"
 APPENDIX_HEADING = "附录：权限与隐私配置"
 APPENDIX_END = "<!-- PERMISSION_APPENDIX_END -->"
 APPENDIX_MARK = "<!-- PERMISSION_APPENDIX -->"
-EN_DOC_MARK = "<!-- PERMISSION_APPENDIX_EN -->"
 
 RE_FENCE = re.compile(r"^\s*```")
 RE_H1 = re.compile(r"^#\s+(.*)$")
@@ -71,6 +71,25 @@ RE_FEATURES = re.compile(r"<!--\s*FEATURES\s+(.*?)-->", re.S)
 RE_FEATURE_KV = re.compile(r"([A-Za-z0-9_]+)\s*=\s*([01])")
 # 条目行尾的条件标记：<!-- if:hasAccountSystem -->
 RE_ITEM_COND = re.compile(r"\s*<!--\s*if:([A-Za-z0-9_]+)\s*-->\s*$")
+
+
+# --------------------------------------------------------------------------- #
+# 资源缓存：按 (路径, mtime, 大小) 失效，避免每次请求重复读盘与重复解析
+# --------------------------------------------------------------------------- #
+
+@functools.lru_cache(maxsize=16)
+def _read_json_file(path: str, _mtime_ns: int, _size: int) -> dict:
+    """``_mtime_ns``/``_size`` 只参与缓存键，文件改动后自动失效。"""
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def read_json_shared(path) -> dict:
+    """读取 JSON 资源，返回可安全修改的副本；文件未变时命中缓存。"""
+    path = Path(path)
+    if not path.exists():
+        return {}
+    stat = path.stat()
+    return copy.deepcopy(_read_json_file(str(path), stat.st_mtime_ns, stat.st_size))
 
 
 # --------------------------------------------------------------------------- #
@@ -102,7 +121,7 @@ def _make_id(path_parts, text, counter) -> str:
 
 
 def load_checklist_modules():
-    return json.loads((HERE / 'checklist_modules.json').read_text(encoding='utf-8'))
+    return read_json_shared(HERE / 'checklist_modules.json')
 
 
 def configure_document_features(text, features):
@@ -122,7 +141,7 @@ def configure_document_features(text, features):
     return RE_FEATURES.sub(line, text) if RE_FEATURES.search(text) else line + '\n' + text
 
 
-def parse_md(text: str) -> dict:
+def _parse_md(text: str) -> dict:
     """解析清单 markdown。
 
     返回结构：
@@ -153,7 +172,6 @@ def parse_md(text: str) -> dict:
     in_fence = False
     fence_lang = ""
     fence_lines = []
-    fence_start = 0
     pending_flags = []          # 累积的 HTML 注释标记，作用于下一个 section
     i = 0
 
@@ -176,7 +194,6 @@ def parse_md(text: str) -> dict:
                 in_fence = True
                 fence_lang = stripped[3:].strip()
                 fence_lines = []
-                fence_start = i
             i += 1
             continue
         if in_fence:
@@ -347,6 +364,24 @@ def parse_md(text: str) -> dict:
     }
 
 
+@functools.lru_cache(maxsize=32)
+def _parse_md_cached(text: str) -> dict:
+    return _parse_md(text)
+
+
+def parse_md(text: str) -> dict:
+    """解析清单 markdown。
+
+    返回结构：
+      title / preamble / sections / items
+    每个 item 带 ``line``（源文件行号，0 基）与 ``span``（该行内 ``[ ]`` 标记的
+    起止下标），用于精确写回而不破坏其他格式。
+
+    结果按原文缓存；返回值是副本，调用方可自由写入 ``seq`` / ``gate`` 等派生字段。
+    """
+    return copy.deepcopy(_parse_md_cached(text))
+
+
 # --------------------------------------------------------------------------- #
 # 权限 / 隐私配置
 # --------------------------------------------------------------------------- #
@@ -369,9 +404,7 @@ def stabilize_document(text):
 
 
 def load_profiles() -> dict:
-    if not PERM_FILE.exists():
-        return {"scenarios": [], "permissions": [], "groups": [], "appstore_data_types": []}
-    return json.loads(PERM_FILE.read_text(encoding="utf-8"))
+    return read_json_shared(PERM_FILE) or {"scenarios": [], "permissions": [], "groups": [], "appstore_data_types": []}
 
 
 def _perm_by_id(profiles: dict) -> dict:
@@ -541,7 +574,6 @@ def build_appendix(profiles: dict, selected: list, descs: dict, descs_en: dict =
     """生成 md 附录（权限与隐私配置）。"""
     pm = _perm_by_id(profiles)
     cfg = generate_config(profiles, selected, descs, descs_en, lang="zh")
-    groups = {g["id"]: g["name"] for g in profiles.get("groups", [])}
 
     out = [APPENDIX_MARK, f"## {APPENDIX_HEADING}", ""]
     out.append("> 本附录由看板的「权限与隐私配置」面板自动生成，请勿手工编辑。")
@@ -757,7 +789,7 @@ def perm_state_file(md_path: Path) -> Path:
 
 def write_perm_state(md_path: Path, selected: list, descs: dict, descs_en: dict = None):
     """把权限面板的完整状态落盘，供再次打开面板时回填。"""
-    atomic_write(perm_state_file(md_path), 
+    atomic_write(perm_state_file(md_path),
         json.dumps({
             "selected": list(selected or []),
             "descs": dict(descs or {}),
@@ -1255,8 +1287,6 @@ def write_english_doc(path: Path, selected: list, descs_en: dict = None) -> str:
 # 独立使用说明页面
 # --------------------------------------------------------------------------- #
 
-GUIDE_FILE = HERE / "使用说明.html"
-
 GUIDE_CSS = """
   :root{
     --bg:#F7F7F5; --surface:#FFFFFF; --surface-2:#FBFBFA;
@@ -1600,7 +1630,7 @@ def read_generation() -> int:
 
 def bump_generation() -> int:
     gen = read_generation() + 1
-    atomic_write(STATE_FILE, 
+    atomic_write(STATE_FILE,
         json.dumps(
             {
                 "generation": gen,
@@ -1687,7 +1717,7 @@ def reset_md(md_path: Path, backup: bool = False) -> int:
         return 0
     if backup:
         backup_md(md_path)
-    atomic_write(md_path, 
+    atomic_write(md_path,
         apply_states(text, parsed, {it["id"]: "todo" for it in targets}),
         encoding="utf-8",
     )
@@ -1768,11 +1798,17 @@ def build_html(md_path: Path, out_path: Path) -> Path:
 # 本地服务
 # --------------------------------------------------------------------------- #
 
-class BoardServer(ThreadingHTTPServer):
-    daemon_threads = True
-    md_path: Path = DEFAULT_MD
-    html_path: Path = DEFAULT_HTML
-    lock = None
+class BoardError(Exception):
+    """Expected client-visible failure; carries the HTTP status to return."""
+
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+        self.message = message
+
+
+# 只读预览操作不需要文件锁
+UNLOCKED_OPERATIONS = ("/api/perm-config", "/api/perm-en-preview")
 
 
 def _board_payload(md_path: Path) -> dict:
@@ -1789,10 +1825,6 @@ def document_payload(text, md_name, generation, permissions, review, version):
     perm_sel, perm_descs, perm_descs_en = permissions
     permission_visibility.annotate(parsed["sections"])
     permission_profiles = load_profiles()
-    # 序号 = 在全文条目中的出现顺序，前端据此强制按序完成
-    seq_map = {}
-    for n, it in enumerate(parsed["items"], 1):
-        seq_map[it["id"]] = n
 
     # 先标记门禁项，再构造数据（保证 gate 字段能被带出去）
     gate = find_gate_item(parsed)
@@ -1945,7 +1977,9 @@ def make_handler():
                 try:
                     root = self.server.md_path.parent.resolve()
                     target = (root / path.lstrip("/")).resolve()
-                    if root == target or root in target.parents:
+                    # 隐藏文件（.review.json / .permstate.json 等）含备注与证据，不对外提供
+                    hidden = any(part.startswith(".") for part in target.relative_to(root).parts) if root in (target, *target.parents) else True
+                    if not hidden and (root == target or root in target.parents):
                         if target.is_file() and target.suffix.lower() in (".html", ".htm", ".css", ".js", ".json", ".md", ".txt", ".png", ".jpg", ".svg"):
                             ctype = {
                                 ".html": "text/html; charset=utf-8",
@@ -1990,228 +2024,167 @@ def make_handler():
             if not isinstance(payload, dict):
                 self._json({"error": "请求必须为对象"}, 400)
                 return
-            if path in ("/api/backups", "/api/restore", "/api/review"):
-                with lock:
-                    try:
-                        md_path = self.server.md_path
-                        if path == "/api/backups":
-                            names = sorted((x.name for x in md_path.parent.glob(md_path.name + ".bak-*")), reverse=True)
-                            self._json({"backups": names})
-                            return
-                        if payload.get("revision") != revision(md_path):
-                            self._json({"error": "文件已变化，请刷新后重试"}, 409)
-                            return
-                        if path == "/api/restore":
-                            name = payload.get("name", "")
-                            allowed = {x.name: x for x in md_path.parent.glob(md_path.name + ".bak-*")}
-                            if name not in allowed:
-                                self._json({"error": "备份不存在"}, 400)
-                                return
-                            content = allowed[name].read_text(encoding="utf-8")
-                            backup_md(md_path)
-                            atomic_write(md_path, content)
-                            bump_generation()
-                        else:
-                            save_review(md_path, payload.get("review"))
-                        self._json(_board_payload(md_path))
-                    except Exception as e:
-                        logging.exception("Review operation failed")
-                        self._json({"error": str(e)}, 500)
+            handler = self.operations.get(path)
+            if handler is None:
+                self._json({"error": "not found"}, 404)
                 return
-            if path == "/api/write":
-                with lock:
-                    try:
-                        md_path = self.server.md_path
-                        text = md_path.read_text(encoding="utf-8")
-                        parsed = parse_md(text)
-                        if payload.get("revision") != revision(md_path):
-                            self._json({"error": "文件已被其他页面或程序修改，请导出当前进度后刷新再保存"}, 409)
-                            return
-                        states = payload.get("states") or {}
-                        if not isinstance(states, dict) or any(v not in ("done", "skip", "todo") for v in states.values()):
-                            self._json({"error": "状态格式无效"}, 400)
-                            return
-                        gate = find_gate_item(parsed)
-                        acknowledged = gate['state'] == 'done' if gate else load_review(md_path).get('guideAcknowledged') == 'on'
-                        if not acknowledged and not (gate and states.get(gate['id']) == 'done'):
-                            self._json({"error": "请先阅读并确认使用说明"}, 403)
-                            return
-                        new_text = apply_states(text, parsed, states)
-                        if new_text != text:
-                            backup_md(md_path)
-                            atomic_write(md_path, new_text, encoding="utf-8")
-                            try:
-                                build_html(md_path, self.server.html_path)
-                            except Exception:
-                                logging.exception("静态看板重建失败")
-                        out = _board_payload(md_path)
-                        out["saved"] = True
-                        self._json(out)
-                    except Exception as e:
-                        logging.exception("看板操作失败：%s", path)
-                        self._json({"error": str(e)}, 500)
-                return
+            status, body = self._dispatch(path, handler, payload)
+            self._json(body, status)
 
-            if path == "/api/clear":
+        def _dispatch(self, path, handler, payload):
+            """统一处理加锁、预期错误与未知异常，操作本身只返回 (status, body)。"""
+            error_status = 400 if path == "/api/subscriptions" else 500
+            try:
+                if path in UNLOCKED_OPERATIONS:
+                    return handler(self, payload)
                 with lock:
-                    try:
-                        md_path = self.server.md_path
-                        if payload.get("revision") != revision(md_path):
-                            self._json({"error": "文件已变化，请刷新后重试"}, 409)
-                            return
-                        n = reset_md(md_path, backup=True)
-                        gen = bump_generation()
-                        out = _board_payload(md_path)
-                        out["cleared"] = n
-                        out["generation"] = gen
-                        self._json(out)
-                    except Exception as e:
-                        logging.exception("看板操作失败：%s", path)
-                        self._json({"error": str(e)}, 500)
-                return
+                    return handler(self, payload)
+            except BoardError as error:
+                return error.status, {"error": error.message}
+            except Exception as error:
+                if error_status == 500:
+                    logging.exception("看板操作失败：%s", path)
+                return error_status, {"error": str(error)}
 
-            if path == "/api/reload":
-                with lock:
-                    try:
-                        self._json(_board_payload(self.server.md_path))
-                    except Exception as e:
-                        logging.exception("看板操作失败：%s", path)
-                        self._json({"error": str(e)}, 500)
-                return
+        def _require_revision(self, payload, message="文件已变化，请刷新后重试"):
+            if payload.get("revision") != revision(self.server.md_path):
+                raise BoardError(409, message)
 
-            if path == "/api/subscriptions":
-                with lock:
-                    try:
-                        md_path = self.server.md_path
-                        if payload.get('revision') != revision(md_path):
-                            self._json({'error': '文件已变化，请刷新后重试'}, 409)
-                            return
-                        save_subscription_settings(md_path, payload.get('enabled'), payload.get('products'))
-                        self._json(_board_payload(md_path))
-                    except Exception as error:
-                        self._json({'error': str(error)}, 400)
-                return
-            if path == "/api/features":
-                # 保存项目特征（决定哪些条目显示）
-                with lock:
-                    try:
-                        md_path = self.server.md_path
-                        if payload.get("revision") != revision(md_path):
-                            self._json({"error": "文件已变化，请刷新后重试"}, 409)
-                            return
-                        feats = payload.get("features") or {}
-                        changed = write_features(md_path, feats)
-                        out = _board_payload(md_path)
-                        out["changed"] = changed
-                        self._json(out)
-                    except Exception as e:
-                        logging.exception("看板操作失败：%s", path)
-                        self._json({"error": str(e)}, 500)
-                return
+        def _rebuild_quietly(self, md_path):
+            try:
+                build_html(md_path, self.server.html_path)
+            except Exception:
+                logging.exception("静态看板重建失败")
 
-            if path == "/api/ack":
-                # 确认已阅读使用说明（门禁）
-                with lock:
-                    try:
-                        md_path = self.server.md_path
-                        changed = set_gate(md_path, True)
-                        out = _board_payload(md_path)
-                        out["changed"] = changed
-                        out["acked"] = out["gateDone"]
-                        self._json(out)
-                    except Exception as e:
-                        logging.exception("看板操作失败：%s", path)
-                        self._json({"error": str(e)}, 500)
-                return
+        def _op_backups(self, payload):
+            md_path = self.server.md_path
+            names = sorted((x.name for x in md_path.parent.glob(md_path.name + ".bak-*")), reverse=True)
+            return 200, {"backups": names}
 
-            if path == "/api/unack":
-                # 取消确认（用于重置流程）
-                with lock:
-                    try:
-                        md_path = self.server.md_path
-                        changed = set_gate(md_path, False)
-                        out = _board_payload(md_path)
-                        out["changed"] = changed
-                        out["acked"] = out["gateDone"]
-                        self._json(out)
-                    except Exception as e:
-                        logging.exception("看板操作失败：%s", path)
-                        self._json({"error": str(e)}, 500)
-                return
+        def _op_restore(self, payload):
+            md_path = self.server.md_path
+            self._require_revision(payload)
+            allowed = {x.name: x for x in md_path.parent.glob(md_path.name + ".bak-*")}
+            name = payload.get("name", "")
+            if name not in allowed:
+                raise BoardError(400, "备份不存在")
+            content = allowed[name].read_text(encoding="utf-8")
+            backup_md(md_path)
+            atomic_write(md_path, content)
+            bump_generation()
+            return 200, _board_payload(md_path)
 
-            if path == "/api/perm-config":
-                # 只生成不落盘，供面板实时预览
-                try:
-                    profiles = load_profiles()
-                    selected = payload.get("selected") or []
-                    descs = payload.get("descs") or {}
-                    descs_en = payload.get("descsEn") or {}
-                    lang = payload.get("lang") or "zh"
-                    cfg = generate_config(profiles, selected, descs, descs_en, lang=lang)
-                    cfg["appendix"] = build_appendix(profiles, selected, descs, descs_en)
-                    self._json(cfg)
-                except Exception as e:
-                    self._json({"error": str(e)}, 500)
-                return
+        def _op_review(self, payload):
+            self._require_revision(payload)
+            save_review(self.server.md_path, payload.get("review"))
+            return 200, _board_payload(self.server.md_path)
+        def _op_write(self, payload):
+            md_path = self.server.md_path
+            text = md_path.read_text(encoding="utf-8")
+            parsed = parse_md(text)
+            self._require_revision(payload, "文件已被其他页面或程序修改，请导出当前进度后刷新再保存")
+            states = payload.get("states") or {}
+            if not isinstance(states, dict) or any(v not in ("done", "skip", "todo") for v in states.values()):
+                raise BoardError(400, "状态格式无效")
+            gate = find_gate_item(parsed)
+            acknowledged = gate["state"] == "done" if gate else load_review(md_path).get("guideAcknowledged") == "on"
+            if not acknowledged and not (gate and states.get(gate["id"]) == "done"):
+                raise BoardError(403, "请先阅读并确认使用说明")
+            new_text = apply_states(text, parsed, states)
+            if new_text != text:
+                backup_md(md_path)
+                atomic_write(md_path, new_text, encoding="utf-8")
+                self._rebuild_quietly(md_path)
+            out = _board_payload(md_path)
+            out["saved"] = True
+            return 200, out
 
-            if path == "/api/perm-write":
-                # 写入 md 附录
-                with lock:
-                    try:
-                        md_path = self.server.md_path
-                        if payload.get("revision") != revision(md_path):
-                            self._json({"error": "文件已变化，请刷新后重试"}, 409)
-                            return
-                        selected = payload.get("selected") or []
-                        descs = payload.get("descs") or {}
-                        descs_en = payload.get("descsEn") or {}
-                        backup_md(md_path)
-                        appendix = write_appendix(md_path, selected, descs, descs_en)
-                        # 静态看板同步重建：刷新页面或直接打开 html 也是最新附录
-                        try:
-                            build_html(md_path, self.server.html_path)
-                        except Exception:
-                            logging.exception("静态看板重建失败")
-                        out = _board_payload(md_path)
-                        out["appendix"] = appendix
-                        out["saved"] = True
-                        self._json(out)
-                    except Exception as e:
-                        logging.exception("看板操作失败：%s", path)
-                        self._json({"error": str(e)}, 500)
-                return
+        def _op_clear(self, payload):
+            md_path = self.server.md_path
+            self._require_revision(payload)
+            cleared = reset_md(md_path, backup=True)
+            generation = bump_generation()
+            out = _board_payload(md_path)
+            out["cleared"] = cleared
+            out["generation"] = generation
+            return 200, out
 
-            if path == "/api/perm-write-en":
-                # 生成英文文档（独立文件，不动清单 md）
-                with lock:
-                    try:
-                        selected = payload.get("selected") or []
-                        descs = payload.get("descsEn") or {}
-                        doc = write_english_doc(EN_DOC_FILE, selected, descs)
-                        out = {
-                            "saved": True,
-                            "path": EN_DOC_FILE.name,
-                            "lines": len(doc.splitlines()),
-                            "doc": doc,
-                        }
-                        self._json(out)
-                    except Exception as e:
-                        logging.exception("看板操作失败：%s", path)
-                        self._json({"error": str(e)}, 500)
-                return
+        def _op_reload(self, payload):
+            return 200, _board_payload(self.server.md_path)
 
-            if path == "/api/perm-en-preview":
-                # 只预览英文文档，不落盘
-                try:
-                    profiles = load_profiles()
-                    selected = payload.get("selected") or []
-                    descs = payload.get("descsEn") or {}
-                    self._json({"doc": build_english_doc(profiles, selected, descs)})
-                except Exception as e:
-                    self._json({"error": str(e)}, 500)
-                return
+        def _op_subscriptions(self, payload):
+            md_path = self.server.md_path
+            self._require_revision(payload)
+            save_subscription_settings(md_path, payload.get("enabled"), payload.get("products"))
+            return 200, _board_payload(md_path)
 
-            self._json({"error": "not found"}, 404)
+        def _op_features(self, payload):
+            md_path = self.server.md_path
+            self._require_revision(payload)
+            changed = write_features(md_path, payload.get("features") or {})
+            out = _board_payload(md_path)
+            out["changed"] = changed
+            return 200, out
+
+        def _op_ack(self, payload):
+            return self._set_gate(True)
+
+        def _op_unack(self, payload):
+            return self._set_gate(False)
+
+        def _set_gate(self, done):
+            md_path = self.server.md_path
+            changed = set_gate(md_path, done)
+            out = _board_payload(md_path)
+            out["changed"] = changed
+            out["acked"] = out["gateDone"]
+            return 200, out
+
+        def _op_perm_config(self, payload):
+            """只生成不落盘，供面板实时预览。"""
+            profiles = load_profiles()
+            selected = payload.get("selected") or []
+            descs = payload.get("descs") or {}
+            descs_en = payload.get("descsEn") or {}
+            config = generate_config(profiles, selected, descs, descs_en, lang=payload.get("lang") or "zh")
+            config["appendix"] = build_appendix(profiles, selected, descs, descs_en)
+            return 200, config
+
+        def _op_perm_write(self, payload):
+            md_path = self.server.md_path
+            self._require_revision(payload)
+            backup_md(md_path)
+            appendix = write_appendix(md_path, payload.get("selected") or [], payload.get("descs") or {}, payload.get("descsEn") or {})
+            self._rebuild_quietly(md_path)
+            out = _board_payload(md_path)
+            out["appendix"] = appendix
+            out["saved"] = True
+            return 200, out
+
+        def _op_perm_write_en(self, payload):
+            doc = write_english_doc(EN_DOC_FILE, payload.get("selected") or [], payload.get("descsEn") or {})
+            return 200, {"saved": True, "path": EN_DOC_FILE.name, "lines": len(doc.splitlines()), "doc": doc}
+
+        def _op_perm_en_preview(self, payload):
+            profiles = load_profiles()
+            return 200, {"doc": build_english_doc(profiles, payload.get("selected") or [], payload.get("descsEn") or {})}
+
+    Handler.operations = {
+        "/api/backups": Handler._op_backups,
+        "/api/restore": Handler._op_restore,
+        "/api/review": Handler._op_review,
+        "/api/write": Handler._op_write,
+        "/api/clear": Handler._op_clear,
+        "/api/reload": Handler._op_reload,
+        "/api/subscriptions": Handler._op_subscriptions,
+        "/api/features": Handler._op_features,
+        "/api/ack": Handler._op_ack,
+        "/api/unack": Handler._op_unack,
+        "/api/perm-config": Handler._op_perm_config,
+        "/api/perm-write": Handler._op_perm_write,
+        "/api/perm-write-en": Handler._op_perm_write_en,
+        "/api/perm-en-preview": Handler._op_perm_en_preview,
+    }
 
     return Handler
 
@@ -2248,7 +2221,7 @@ def cmd_serve(args):
     print("  " + "-" * 46)
     print(f"  地址    {url}")
     print(f"  清单    {md_path}")
-    print(f"  停止    在本窗口按 Ctrl + C")
+    print("  停止    在本窗口按 Ctrl + C")
     print("  " + "-" * 46)
     print("  所有操作都在页面上点，命令行只负责开着服务。\n")
 

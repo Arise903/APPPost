@@ -1,5 +1,6 @@
 // @include release_analysis.js
 // @include release_readiness.js
+// @include board/edition.js
 // @include board/modules.js
 // @include board/details.js
 // @include board/experience.js
@@ -43,8 +44,13 @@ let dirty = false;        // 有未保存的改动
 let online = false;       // 是否连上本地服务
 let gen = 0;              // 世代号
 let ORDER = [];           // 按全文顺序排列的条目 id
-const GUIDE_KEY = "app-guide-ack" + (window.RELEASE_CLOUD ? ":" + window.RELEASE_CLOUD.userId + ":" + window.RELEASE_CLOUD.projectId : "");
-const LS_KEY = "app-release-checklist-state-v2:" + (window.RELEASE_CLOUD ? window.RELEASE_CLOUD.userId + ":" + window.RELEASE_CLOUD.projectId : EMBEDDED.mdName);
+// Storage scopes: cloud isolates per user+project, Pages per project, local per file.
+const STORAGE_SCOPE = window.RELEASE_PAGES ? "pages:" + PagesStore.projectId()
+  : window.RELEASE_CLOUD ? window.RELEASE_CLOUD.userId + ":" + window.RELEASE_CLOUD.projectId
+  : EMBEDDED.mdName;
+// 本地版沿用不带作用域的旧键，避免升级后要求重新确认使用说明。
+const GUIDE_KEY = EDITION === "local" ? "app-guide-ack" : "app-guide-ack:" + STORAGE_SCOPE;
+const LS_KEY = "app-release-checklist-state-v2:" + STORAGE_SCOPE;
 
 function st(id){ return state[id] || "todo"; }
 function isResolved(id){ const s = st(id); return s === "done" || s === "skip"; }
@@ -720,7 +726,7 @@ function setMode(live){
   online = live;
   const m = document.getElementById("mode");
   m.classList.toggle("live", live);
-  document.getElementById("modeTxt").textContent = live ? "已连接 · 可写回文件" : "离线模式 · 仅本机保存";
+  document.getElementById("modeTxt").textContent = live ? EDITION_STRINGS.connectedBadge : EDITION_STRINGS.offlineBadge;
   document.getElementById("btnSave").disabled = !live;
 }
 
@@ -892,13 +898,13 @@ async function saveProgress(options={}){
   const doneCount = Object.values(state).filter(v => v === "done").length;
   const skipCount = Object.values(state).filter(v => v === "skip").length;
   const ok = options.all===true || window.RELEASE_PAGES || window.RELEASE_CLOUD ? true : await askConfirm({
-    title:"保存勾选状态到 md 文件？",
+    title:EDITION_STRINGS.saveTitle,
     icon:"info",
     body:`将把当前看板上的 <strong>${doneCount}</strong> 项完成、
           <strong>${skipCount}</strong> 项跳过写回
           <strong>${DATA.mdName || "清单文件"}</strong>。<br>
-          文件中原有的其他内容与格式保持不变。`,
-    detail:"写回前会自动生成一份带时间戳的 .bak 备份文件。",
+          ${EDITION_STRINGS.saveKeepNote}`,
+    detail:EDITION_STRINGS.saveDetail,
     confirmText:"保存",
     cancelText:"取消"
   });
@@ -924,7 +930,7 @@ async function saveProgress(options={}){
     dirty = false;
     document.getElementById("btnSave").textContent = "保存进度";
     render();
-    toast("已写回文件");
+    toast(EDITION_STRINGS.savedToast);
     return true;
   }catch(e){
     toast("保存失败：" + e.message);
@@ -993,8 +999,8 @@ document.getElementById("mClear").addEventListener("click", async () => {
           标记还原成 <strong>[ ]</strong>，用于开始下一轮发布自查。<br><br>
           共 <strong>${total}</strong> 项，其中 <strong>${doneNow}</strong> 项已完成、
           <strong>${skipNow}</strong> 项已跳过。
-          ${online ? "文件会被直接改写" : "离线模式下仅清空本机记录"}。`,
-    detail:"原始文件会先自动备份为 带时间戳的 .bak 文件，误操作可从备份恢复。",
+          ${online ? EDITION_STRINGS.clearRewrite : "离线模式下仅清空本机记录"}。`,
+    detail:EDITION_STRINGS.clearDetail,
     confirmText:"继续",
     cancelText:"取消",
     needCheck:true,
@@ -1025,7 +1031,7 @@ document.getElementById("mClear").addEventListener("click", async () => {
     dirty = false;
     document.getElementById("btnSave").textContent = "保存进度";
     render();
-    toast("已清空 " + d.cleared + " 处状态，并已备份原文件");
+    toast("已清空 " + (d.cleared || 0) + " 处状态，并已备份原文件");
   }catch(e){
     toast("清空失败：" + e.message);
   }
@@ -1076,6 +1082,7 @@ document.getElementById("seqline").addEventListener("click", jumpToCurrent);
 /* ---- 使用说明入口 ---- */
 function openGuide(){
   // 服务端模式走 /guide（内容总是最新的），离线模式走同目录 html
+  if(window.RELEASE_PAGES){ window.open("guide.html?id=" + encodeURIComponent(PagesStore.projectId()), "_blank"); return; }
   window.open(online ? (window.RELEASE_CLOUD ? "/projects/" + window.RELEASE_CLOUD.projectId + "/guide" : "/guide") : "使用说明.html", "_blank");
 }
 document.getElementById("btnGuide").addEventListener("click", openGuide);
@@ -1164,8 +1171,8 @@ document.getElementById("built").textContent =
 loadFromServer().then(ok => {
   if(ok){
     document.getElementById("built").textContent =
-      "已连接本地服务 · 世代 " + gen + " · 勾选可直接写回 md";
-    toast("已连接本地服务，可直接保存到 md");
+      EDITION_STRINGS.connectedStatus.replace("{gen}", gen);
+    toast(EDITION_STRINGS.connectedToast);
   }
 });
 

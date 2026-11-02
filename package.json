@@ -1,0 +1,16 @@
+{
+  "name": "release-desk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App 上架前检查看板：本地文件版、在线版与 GitHub Pages 个人版",
+  "scripts": {
+    "build": "python3 scripts/build_pages.py",
+    "test": "node --test test_pages.cjs",
+    "check": "python3 -c \"from pathlib import Path; import checklist_tool as c; Path('/tmp/release-board.js').write_text(c.load_board_js())\" && node --check /tmp/release-board.js",
+    "test:browser": "node scripts/test_pages_render.cjs && node scripts/test_workflows.cjs && node scripts/test_checklist_layout.cjs && node scripts/test_workspace.cjs && node scripts/test_release_flow.cjs && node scripts/test_github_sync.cjs && node scripts/test_guide_gate.cjs",
+    "test:visual": "node scripts/test_visual.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

@@ -1,5 +1,4 @@
 """Cloud data isolation, transaction, authentication and migration tests."""
-import json
 import os
 import tempfile
 import unittest
@@ -139,12 +138,14 @@ class OnlineTests(unittest.TestCase):
         self.assertEqual(conflict.status_code,409)
         review = {'release':{'version':'2'},'items':{},'history':[]}
         result = self.post('review',{'revision':saved.json['revision'],'review':review})
-        backups = self.post('backups',{}).json['backups']
         before_write = next(row['id'] for row in self.post('backups',{}).json['entries'] if row['label']=='write')
         restored = self.post('restore',{'revision':result.json['revision'],'name':before_write})
         self.assertEqual(restored.status_code,200)
         self.assertEqual(restored.json['review']['release'],{})
         self.assertEqual(next(x for x in restored.json['items'] if x['id']==item)['state'],'todo')
+        listed = next(p for p in self.client.get('/api/projects').json['projects'] if p['id']==self.project)
+        self.assertEqual(listed['name'],'Test App')
+        self.assertEqual(self.post('restore',{'revision':restored.json['revision'],'name':'missing'}).status_code,404)
 
     def test_invite_viewer_editor_and_revocation(self):
         viewer, headers, token = self.invite_member('viewer')

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=63966b64f768"></script><script src="release_analysis.js?v=63966b64f768"></script><script src="storage.js?v=63966b64f768"></script><script src="store.js?v=63966b64f768"></script><script>PagesStore.install();</script><script defer src="experience.js?v=63966b64f768"></script><link rel="stylesheet" href="history.css?v=63966b64f768"><script defer src="history.js?v=63966b64f768"></script><link rel="stylesheet" href="workflows.css?v=63966b64f768"><script defer src="workflows.js?v=63966b64f768"></script>
+<script src="data.js?v=bef4efe7694e"></script><script src="release_analysis.js?v=bef4efe7694e"></script><script src="storage.js?v=bef4efe7694e"></script><script src="store.js?v=bef4efe7694e"></script><script>PagesStore.install();</script><script defer src="experience.js?v=bef4efe7694e"></script><link rel="stylesheet" href="history.css?v=bef4efe7694e"><script defer src="history.js?v=bef4efe7694e"></script><link rel="stylesheet" href="workflows.css?v=bef4efe7694e"><script defer src="workflows.js?v=bef4efe7694e"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -1142,6 +1142,8 @@ const EMBEDDED = PagesStore.openProject();
 const EMBEDDED_PROFILES = PAGES_DATA.profiles;
 
 
+const PAGES_STRINGS = {"connectedBadge": "Pages 个人版 · 保存到当前浏览器", "connectedStatus": "已连接本机存储 · 世代 {gen} · 勾选可直接写回 md", "connectedToast": "本机存储已就绪；请定期导出完整记录", "saveTitle": "保存检查进度到当前浏览器？", "saveKeepNote": "项目保存在当前浏览器，不会上传 GitHub。", "saveDetail": "保存前保留本机项目快照；请定期从工作台导出完整记录。", "savedToast": "已保存到当前浏览器", "clearRewrite": "浏览器中的项目记录会更新", "clearDetail": "操作前保留完整本机快照。清理网站数据会删除项目和快照，请先导出备份。"};
+window.BOARD_STRINGS = PAGES_STRINGS;
 document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;
 /* Pure configuration checks and release comparison. Raw input files are never persisted. */
 (function(root){
@@ -1397,6 +1399,22 @@ function assess(snapshot,now=new Date()){
 root.ReleaseReadiness={assess,calendarDate,DEFAULT_TIME_ZONE};
 })(typeof window==='undefined'?globalThis:window);
 
+/* Edition-specific copy. Defaults describe the local file edition; the Pages and
+   cloud builds overlay `window.BOARD_STRINGS` before this module runs. */
+const EDITION = window.RELEASE_PAGES ? "pages" : window.RELEASE_CLOUD ? "cloud" : "local";
+const EDITION_STRINGS = Object.assign({
+  connectedBadge: "已连接 · 可写回文件",
+  offlineBadge: "离线模式 · 仅本机保存",
+  connectedStatus: "已连接本地服务 · 世代 {gen} · 勾选可直接写回 md",
+  connectedToast: "已连接本地服务，可直接保存到 md",
+  saveTitle: "保存勾选状态到 md 文件？",
+  saveKeepNote: "文件中原有的其他内容与格式保持不变。",
+  saveDetail: "写回前会自动生成一份带时间戳的 .bak 备份文件。",
+  savedToast: "已写回文件",
+  clearRewrite: "文件会被直接改写",
+  clearDetail: "原始文件会先自动备份为 带时间戳的 .bak 文件，误操作可从备份恢复。"
+}, window.BOARD_STRINGS || {});
+
 /* Optional SDK checklists share stable task identities across templates and editions. */
 const OPTIONAL_MODULES=[{"id": "adjust", "feature": "hasAdjust", "title": "Adjust（广告归因）", "legacyTaskId": "t_8867619d", "items": [["module_adjust_tokens", "Adjust 的 iOS / Android 正式 appToken、运行环境和生产开关已核对"], ["module_adjust_consent", "Adjust 初始化遵循用户同意及 ATT 结果，关闭归因时不初始化 SDK，也不触发无用授权弹窗"], ["module_adjust_init", "Adjust 初始化有幂等保护，授权等待和重试不阻塞应用主流程"], ["module_adjust_links", "Adjust 深度链接、归因回调和安装事件已在真机及后台验证"]]}, {"id": "analysis_api", "feature": "hasAnalysisApi", "title": "AnalysisApi（自有统计）", "legacyTaskId": "t_69393d68", "items": [["module_analysis_environment", "AnalysisApi 的 _baseUrl、projectId 与生产环境一致，Release 包不会指向测试环境"], ["module_analysis_identity", "AnalysisApi 的 UUID 生成、读取及重装策略已验证，并符合隐私披露"], ["module_analysis_reports", "AnalysisApi 用户、token、行为队列三条上报路径及离线重试已验证"], ["module_analysis_fallback", "AnalysisApi token 失效、超时及上报失败会降级，不影响应用主流程"], ["module_analysis_parallel", "AnalysisApi 与 Adjust 归因链路独立，按适用的隐私同意策略启动，不等待 Adjust 初始化"]]}, {"id": "initialization", "feature": "hasInitialization", "title": "二、初始化流程核对", "legacyTaskId": "t_98829c38", "items": [["t_98829c38", "`runApp()` 在订阅基础配置完成后调用，**首帧渲染完成**才启动统计流程", "hasInitialization"], ["t_aad69bfe", "Adjust 链路**必须等 ATT 明确结束**才能初始化 Adjust", "hasAdjust"], ["t_faf300d9", "ATT 未决定 / 请求失败 → 继续等待并重试，**不阻塞**启动，也不擅自初始化 Adjust", "hasAdjust"], ["t_47f7c871", "Adjust 初始化有**幂等保护**，无论重试多少次只执行一次", "hasAdjust"], ["t_71952b07", "ATT 结果为「允许 / 拒绝 / 受限」三种之一时都能正常推进，不卡死在某一种分支", "hasAdjust"], ["t_da6459c0", "自有统计链路**不等 ATT、不等 Adjust 初始化**，与 Adjust 链路真正并行", "hasAnalysisApi"], ["t_61bf77e2", "AttributionToken 获取最多等 3 秒，超时后走「无 token」分支，不无限挂起", "hasAnalysisApi"], ["t_89061d31", "无 token 时：用户先上报，token 后续单独补传（不丢数据）", "hasAnalysisApi"], ["t_80f8d8c0", "上报失败后按前台 **5 → 15 → 60 秒**间隔有限重试", "hasAnalysisApi"], ["t_4ae23e58", "进入后台时**暂停重试**，回到前台可继续（定时器生命周期正确）", "hasInitialization"], ["t_333df253", "订阅初始化与商品加载**独立进行**，不阻塞统计链路", "hasInitialization"]], "intro": "### 目标时序\n\n```text\nApp 启动\n  ↓\n初始化 Flutter\n  ↓\n初始化 AnalysisApi：读取/生成 UUID，加载用户、token、行为队列状态\n  ↓\n完成订阅基础配置 → runApp()\n  ↓\n首帧渲染完成 → 独立启动统计流程\n  ↓\n并行执行两条链路：\n  ├─ Adjust 链路（阻塞等待 ATT）\n  │    等待 App 前台 + 界面就绪\n  │      ↓\n  │    检查并按需请求 ATT\n  │      ↓\n  │    等待明确结果：允许 / 拒绝 / 受限\n  │      ↓\n  │    关联 UUID → 初始化 Adjust（只执行一次）\n  │\n  └─ 自有统计链路（不等待 ATT、不等待 Adjust）\n       尝试获取 AttributionToken（最多等待 3 秒）\n         ↓\n       上报用户\n         ├─ 有有效 token：随用户一起提交\n         └─ 无 token：先上报用户，后续单独补传\n```\n\n### 逐条验收"}];
 function ensureFeatureModules(){
@@ -1523,11 +1541,16 @@ let filter = "all";
 let query = "";
 let sectionFilter = "all";
 let dirty = false;        // 有未保存的改动
-let online = false;       // 是否连上本机存储
+let online = false;       // 是否连上本地服务
 let gen = 0;              // 世代号
 let ORDER = [];           // 按全文顺序排列的条目 id
-const GUIDE_KEY = "app-guide-ack:pages:" + PagesStore.projectId() + (window.RELEASE_CLOUD ? ":" + window.RELEASE_CLOUD.userId + ":" + window.RELEASE_CLOUD.projectId : "");
-const LS_KEY = "app-release-checklist-state-v2:" + (window.RELEASE_CLOUD ? window.RELEASE_CLOUD.userId + ":" + window.RELEASE_CLOUD.projectId : "pages:" + PagesStore.projectId());
+// Storage scopes: cloud isolates per user+project, Pages per project, local per file.
+const STORAGE_SCOPE = window.RELEASE_PAGES ? "pages:" + PagesStore.projectId()
+  : window.RELEASE_CLOUD ? window.RELEASE_CLOUD.userId + ":" + window.RELEASE_CLOUD.projectId
+  : EMBEDDED.mdName;
+// 本地版沿用不带作用域的旧键，避免升级后要求重新确认使用说明。
+const GUIDE_KEY = EDITION === "local" ? "app-guide-ack" : "app-guide-ack:" + STORAGE_SCOPE;
+const LS_KEY = "app-release-checklist-state-v2:" + STORAGE_SCOPE;
 
 function st(id){ return state[id] || "todo"; }
 function isResolved(id){ const s = st(id); return s === "done" || s === "skip"; }
@@ -2203,12 +2226,12 @@ function setMode(live){
   online = live;
   const m = document.getElementById("mode");
   m.classList.toggle("live", live);
-  document.getElementById("modeTxt").textContent = live ? "Pages 个人版 · 保存到当前浏览器" : "离线模式 · 仅本机保存";
+  document.getElementById("modeTxt").textContent = live ? EDITION_STRINGS.connectedBadge : EDITION_STRINGS.offlineBadge;
   document.getElementById("btnSave").disabled = !live;
 }
 
 /* ------------------------------------------------------------------ *
- * 与本机存储通信
+ * 与本地服务通信
  * ------------------------------------------------------------------ */
 let saveQueue=Promise.resolve(), queuedWrites=0;
 function api(path,body){
@@ -2402,13 +2425,13 @@ async function saveProgress(options={}){
   const doneCount = Object.values(state).filter(v => v === "done").length;
   const skipCount = Object.values(state).filter(v => v === "skip").length;
   const ok = options.all===true || window.RELEASE_PAGES || window.RELEASE_CLOUD ? true : await askConfirm({
-    title:"保存检查进度到当前浏览器？",
+    title:EDITION_STRINGS.saveTitle,
     icon:"info",
     body:`将把当前看板上的 <strong>${doneCount}</strong> 项完成、
           <strong>${skipCount}</strong> 项跳过写回
           <strong>${DATA.mdName || "清单文件"}</strong>。<br>
-          项目保存在当前浏览器，不会上传 GitHub。`,
-    detail:"保存前保留本机项目快照；请定期从工作台导出完整记录。",
+          ${EDITION_STRINGS.saveKeepNote}`,
+    detail:EDITION_STRINGS.saveDetail,
     confirmText:"保存",
     cancelText:"取消"
   });
@@ -2434,7 +2457,7 @@ async function saveProgress(options={}){
     dirty = false;
     document.getElementById("btnSave").textContent = "保存进度";
     render();
-    toast("已保存到当前浏览器");
+    toast(EDITION_STRINGS.savedToast);
     return true;
   }catch(e){
     toast("保存失败：" + e.message);
@@ -2503,8 +2526,8 @@ document.getElementById("mClear").addEventListener("click", async () => {
           标记还原成 <strong>[ ]</strong>，用于开始下一轮发布自查。<br><br>
           共 <strong>${total}</strong> 项，其中 <strong>${doneNow}</strong> 项已完成、
           <strong>${skipNow}</strong> 项已跳过。
-          ${online ? "浏览器中的项目记录会更新" : "离线模式下仅清空本机记录"}。`,
-    detail:"操作前保留完整本机快照。清理网站数据会删除项目和快照，请先导出备份。",
+          ${online ? EDITION_STRINGS.clearRewrite : "离线模式下仅清空本机记录"}。`,
+    detail:EDITION_STRINGS.clearDetail,
     confirmText:"继续",
     cancelText:"取消",
     needCheck:true,
@@ -2893,7 +2916,7 @@ document.getElementById("langTabs").addEventListener("click", e => {
 
 /* 导出英文文档 */
 document.getElementById("permEn").addEventListener("click", async () => {
-  if(!online){ toast("离线模式无法写入文件，请启动本机存储"); return; }
+  if(!online){ toast("离线模式无法写入文件，请启动本地服务"); return; }
   try{
     const d = await api("/api/perm-write-en", {selected: permSelected, descsEn: permDescsEn});
     if(window.RELEASE_CLOUD || window.RELEASE_PAGES){ const link = document.createElement("a"); const url = URL.createObjectURL(new Blob([d.doc], {type:"text/markdown;charset=utf-8"})); link.href=url; link.download=d.path; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
@@ -2968,7 +2991,7 @@ function schedulePermSave(){
 }
 
 document.getElementById("permSave").addEventListener("click", async () => {
-  if(!online){ toast("离线模式无法写入文件，请启动本机存储"); return; }
+  if(!online){ toast("离线模式无法写入文件，请启动本地服务"); return; }
   if(!permSelected.length){
     const ok = await askConfirm({
       title:"清空权限配置？",
@@ -3121,7 +3144,7 @@ featMinor.addEventListener("change", onFeatToggle);
 document.getElementById("featSave").addEventListener("click", async () => {
   const f = {hasAdjust:featAdjust.checked,hasAnalysisApi:featAnalysisApi.checked,hasAccountSystem: featAcc.checked, targetMinors: featMinor.checked, hasPush: featPush.checked, hasSubscriptions: DATA?.features?.hasSubscriptions !== false, hasFeedbackSystem: featFeedback.checked};
   if(!online){
-    toast("离线模式无法写入文件，请启动本机存储");
+    toast("离线模式无法写入文件，请启动本地服务");
     return;
   }
   try{
@@ -3254,7 +3277,7 @@ document.getElementById("releaseSummary").onclick = () => {
   const a = document.createElement("a"); a.href=url; a.download="发布检查摘要-"+String(snapshot.release?.version||snapshot.version||"版本").replace(/[^\w.-]+/g,"_")+".md"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 document.getElementById("backupRestore").onclick = async () => {
-  if(!online){ toast("请先连接本机存储"); return; }
+  if(!online){ toast("请先连接本地服务"); return; }
   try{
     const d = await api("/api/backups", {});
     if(!d.backups.length){ toast("暂无备份"); return; }
@@ -3322,8 +3345,8 @@ document.getElementById("built").textContent =
 loadFromServer().then(ok => {
   if(ok){
     document.getElementById("built").textContent =
-      "已连接本机存储 · 世代 " + gen + " · 勾选可直接写回 md";
-    toast("本机存储已就绪；请定期导出完整记录");
+      EDITION_STRINGS.connectedStatus.replace("{gen}", gen);
+    toast(EDITION_STRINGS.connectedToast);
   }
 });
 
@@ -3668,5 +3691,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=63966b64f768"></script></body>
+<script defer src="bootstrap.js?v=bef4efe7694e"></script></body>
 </html>
