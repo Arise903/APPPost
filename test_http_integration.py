@@ -18,6 +18,9 @@ def main():
             return response.status,json.loads(raw) if path.startswith('/api/') else raw
         try:
             status,data=req('/api/list'); assert status==200
+            assert not data['gateDone']
+            assert req('/api/write',{'revision':data['revision'],'states':{data['items'][0]['id']:'done'}})[0]==403
+            status,data=req('/api/ack',{});assert status==200 and data['gateDone']
             rev=data['revision']; item=data['items'][0]['id']
             status,saved=req('/api/write',{'revision':rev,'states':{item:'done'}});assert status==200
             assert req('/api/write',{'revision':rev,'states':{item:'todo'}})[0]==409

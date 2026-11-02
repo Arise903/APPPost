@@ -300,6 +300,12 @@ def create_app(overrides=None):
                 selected = [*selected, 'tracking']
             permissions = {'selected': selected, 'descs': {}, 'descsEn': {}}
             review = {'release': {'app': name, 'platform': setup['platform'], 'strictValidation': 'on', 'timeZone': 'Asia/Shanghai'}, 'items': {}, 'history': []}
+        gate = checklist.find_gate_item(checklist.parse_md(document))
+        if gate:
+            document = checklist.apply_states(document, checklist.parse_md(document), {gate['id']: 'todo'})
+        review = dict(review) if isinstance(review, dict) else review
+        if isinstance(review, dict) and review.get('guideAcknowledged'):
+            review['guideAcknowledged'] = 'off'
         validate_permissions(permissions)
         validate_review(review)
         project_id, now = uuid.uuid4().hex, int(time.time())
@@ -397,6 +403,9 @@ def create_app(overrides=None):
                 allowed = {x['id'] for x in parsed['items']}
                 if not set(states).issubset(allowed):
                     abort(409, '清单结构已变化，请刷新')
+                gate = checklist.find_gate_item(parsed)
+                if not project_payload(project)['gateDone'] and not (gate and states.get(gate['id']) == 'done'):
+                    abort(403, '请先阅读并确认使用说明')
                 project['document'] = checklist.apply_states(project['document'], parsed, states)
                 extra['saved'] = True
             elif operation == 'clear':
@@ -411,6 +420,9 @@ def create_app(overrides=None):
                 gate = checklist.find_gate_item(parsed)
                 if gate:
                     project['document'] = checklist.apply_states(project['document'], parsed, {gate['id']: 'done' if operation == 'ack' else 'skip'})
+                review = json.loads(project['review'])
+                review['guideAcknowledged'] = 'on' if operation == 'ack' else 'off'
+                project['review'] = encode(review)
             elif operation == 'subscriptions':
                 if type(data.get('enabled')) is not bool or not isinstance(data.get('products'), list):
                     abort(400, '订阅设置无效')
@@ -432,7 +444,11 @@ def create_app(overrides=None):
                 project['document'] = checklist.configure_document_features(project['document'], features)
             elif operation == 'review':
                 validate_review(data.get('review'))
-                project['review'] = encode(data['review'])
+                review = dict(data['review'])
+                previous = json.loads(project['review'])
+                if 'guideAcknowledged' in previous:
+                    review['guideAcknowledged'] = previous['guideAcknowledged']
+                project['review'] = encode(review)
             elif operation == 'perm-write':
                 permissions = {k: data.get(k, [] if k == 'selected' else {}) for k in ('selected', 'descs', 'descsEn')}
                 validate_permissions(permissions)
@@ -443,6 +459,8 @@ def create_app(overrides=None):
                     project['document'] = path.read_text(encoding='utf-8')
                 project['permissions'] = encode(permissions)
             elif operation == 'new-release':
+                if not project_payload(project)['gateDone']:
+                    abort(403, '请先阅读并确认使用说明')
                 release = data.get('release')
                 if not isinstance(release, dict) or not isinstance(release.get('version'), str) or not release['version'].strip() or any(type(data.get(key)) is not bool for key in ('keepNotes', 'keepEvidence')):
                     abort(400, '请填写新版本号和保留选项')

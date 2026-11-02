@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=7c29da52f346"></script><script src="release_analysis.js?v=7c29da52f346"></script><script src="storage.js?v=7c29da52f346"></script><script src="store.js?v=7c29da52f346"></script><script>PagesStore.install();</script><script defer src="experience.js?v=7c29da52f346"></script><link rel="stylesheet" href="history.css?v=7c29da52f346"><script defer src="history.js?v=7c29da52f346"></script><link rel="stylesheet" href="workflows.css?v=7c29da52f346"><script defer src="workflows.js?v=7c29da52f346"></script>
+<script src="data.js?v=7531d7d6cf9f"></script><script src="release_analysis.js?v=7531d7d6cf9f"></script><script src="storage.js?v=7531d7d6cf9f"></script><script src="store.js?v=7531d7d6cf9f"></script><script>PagesStore.install();</script><script defer src="experience.js?v=7531d7d6cf9f"></script><link rel="stylesheet" href="history.css?v=7531d7d6cf9f"><script defer src="history.js?v=7531d7d6cf9f"></script><link rel="stylesheet" href="workflows.css?v=7531d7d6cf9f"><script defer src="workflows.js?v=7531d7d6cf9f"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -797,7 +797,7 @@ li.item.gateitem>.item-evidence-summary{grid-column:1 / -1}
 </div>
 
 <dialog id="releaseEditDialog" aria-labelledby="releaseEditTitle"><form id="releaseEditForm"><h2 id="releaseEditTitle">发布信息</h2><div class="subscription-grid"><label>App 名称<input name="app" maxlength="200"></label><label>平台<select name="platform"><option value="">未指定</option><option value="iOS / Android">iOS / Android</option><option value="iOS">iOS</option><option value="Android">Android</option></select></label><label>版本号<input name="version" maxlength="100"></label><label>构建号<input name="build" maxlength="100"></label><label>检查日期<input name="date" type="date"></label><label>负责人<input name="owner" maxlength="200"></label></div><div class="subscription-grid"><label>iOS 应用标识<input name="appIdIOS" maxlength="200"></label><label>Android 应用标识<input name="appIdAndroid" maxlength="200"></label><label>环境<select name="environment"><option value="production">production</option><option value="staging">staging</option><option value="development">development</option></select></label><label>API 基础地址<input name="apiBaseUrl" type="url" maxlength="1000"></label><label>目标发布日期<input name="targetDate" type="date"></label><label>发布时区<input name="timeZone" maxlength="100" placeholder="Asia/Shanghai"></label><label>发布状态<select name="status"><option value="planning">计划中</option><option value="review">待发布</option><option value="released">已发布</option></select></label><label>完整发布检查<select name="strictValidation"><option value="off">仅检查条目</option><option value="on">同时检查发布信息及商品完整性</option></select></label></div><p id="releaseEditError" role="alert"></p><p class="save-explanation">草稿 · 保存平台后会更新适用清单，已有进度保留。</p><button class="btn" type="button" id="releaseEditCancel">取消</button><button class="btn primary" type="submit">保存发布信息</button></form></dialog>
-<dialog id="itemReviewDialog" class="item-drawer" aria-labelledby="itemReviewTitle"><form id="itemReviewForm"><header class="form-heading"><div><span id="itemReviewMeta" class="detail-meta"></span><h2 id="itemReviewTitle">检查项详情</h2></div><button class="btn" type="button" id="itemReviewClose" aria-label="关闭条目详情">关闭</button></header><div class="form-body"><p id="itemReviewText" class="detail-title"></p><input type="hidden" name="attachmentIds"><section class="detail-section"><h3>检查记录</h3><label>检查备注<textarea name="notes" maxlength="4000" placeholder="记录验证过程和结果"></textarea></label></section><details class="detail-section" id="itemEvidenceSection"><summary>证据与附件 <span id="itemEvidenceCount"></span></summary><label>验证证据（路径或链接）<textarea name="evidence" maxlength="4000"></textarea></label><label>证据有效至<input name="evidenceExpiresAt" type="date"></label><div id="itemAttachments"></div><label id="itemAttachmentPicker">添加截图或文件<input id="itemAttachmentUpload" type="file" multiple></label><p class="form-hint">附件与本次详情一起保存。单文件最多 5 MiB。</p></details><section class="detail-section"><h3>例外与复查</h3><label>跳过原因<textarea name="reason" maxlength="4000"></textarea></label><details class="exception-fields"><summary>跳过分类、负责人和复查记录</summary><label>跳过类型<select name="exceptionType"><option value="legacy">普通跳过（兼容原记录）</option><option value="not-applicable">不适用</option><option value="deferred">暂缓处理</option><option value="risk-accepted">风险接受</option></select></label><label>负责人<input name="exceptionOwner" maxlength="200"></label><label>复查期限<input name="reviewDue" type="date"></label><label>复查状态<select name="reviewStatus"><option value="pending">待复查</option><option value="reviewed">已复查</option></select></label><label>复查日期<input name="reviewedAt" type="date"></label><p>审批记录由你手动登记，用于追溯；风险接受需填写已批准状态、批准人和日期。</p><label>审批状态<select name="approvalStatus"><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已拒绝</option></select></label><label>批准人<input name="approvalBy" maxlength="200"></label><label>批准日期<input name="approvalDate" type="date"></label></details></section><details class="detail-section"><summary>检查要求</summary><label class="inline-check"><input name="required" type="checkbox" checked>发布必需项</label><label class="inline-check"><input name="evidenceRequired" type="checkbox">完成时必须提供证据</label></details></div><footer class="form-footer"><p id="itemReviewError" role="alert"></p><button type="button" class="btn" id="itemReviewCancel">取消</button><button type="submit" class="btn primary">保存详情</button></footer></form></dialog>
+<dialog id="itemReviewDialog" class="item-drawer" aria-labelledby="itemReviewTitle"><form id="itemReviewForm"><header class="form-heading"><div><span id="itemReviewMeta" class="detail-meta"></span><h2 id="itemReviewTitle">检查项详情</h2></div><button class="btn" type="button" id="itemReviewClose" aria-label="关闭条目详情">关闭</button></header><div class="form-body"><p id="itemReviewText" class="detail-title"></p><input type="hidden" name="attachmentIds"><section class="detail-section"><h3>检查记录</h3><label>检查备注<textarea name="notes" maxlength="4000" placeholder="记录验证过程和结果"></textarea></label></section><details class="detail-section" id="itemEvidenceSection"><summary>证据与附件 <span id="itemEvidenceCount"></span></summary><label>验证证据（项目实际值及路径或链接）<textarea name="evidence" maxlength="4000" placeholder="填写本项目实际配置值、文件路径:行号或可访问地址、验证结果；不要填写模板示例或密钥明文。"></textarea></label><p class="form-hint">涉及地址、标识、SDK 或商店配置时，记录实际使用的值及其来源；密钥只记录变量名、存放位置和验证方式。</p><label>证据有效至<input name="evidenceExpiresAt" type="date"></label><div id="itemAttachments"></div><label id="itemAttachmentPicker">添加截图或文件<input id="itemAttachmentUpload" type="file" multiple></label><p class="form-hint">附件与本次详情一起保存。单文件最多 5 MiB。</p></details><section class="detail-section"><h3>例外与复查</h3><label>跳过原因<textarea name="reason" maxlength="4000"></textarea></label><details class="exception-fields"><summary>跳过分类、负责人和复查记录</summary><label>跳过类型<select name="exceptionType"><option value="legacy">普通跳过（兼容原记录）</option><option value="not-applicable">不适用</option><option value="deferred">暂缓处理</option><option value="risk-accepted">风险接受</option></select></label><label>负责人<input name="exceptionOwner" maxlength="200"></label><label>复查期限<input name="reviewDue" type="date"></label><label>复查状态<select name="reviewStatus"><option value="pending">待复查</option><option value="reviewed">已复查</option></select></label><label>复查日期<input name="reviewedAt" type="date"></label><p>审批记录由你手动登记，用于追溯；风险接受需填写已批准状态、批准人和日期。</p><label>审批状态<select name="approvalStatus"><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已拒绝</option></select></label><label>批准人<input name="approvalBy" maxlength="200"></label><label>批准日期<input name="approvalDate" type="date"></label></details></section><details class="detail-section"><summary>检查要求</summary><label class="inline-check"><input name="required" type="checkbox" checked>发布必需项</label><label class="inline-check"><input name="evidenceRequired" type="checkbox">完成时必须提供证据</label></details></div><footer class="form-footer"><p id="itemReviewError" role="alert"></p><button type="button" class="btn" id="itemReviewCancel">取消</button><button type="submit" class="btn primary">保存详情</button></footer></form></dialog>
 <dialog id="subscriptionDialog" aria-labelledby="subscriptionTitle">
 <form id="subscriptionForm">
 <div class="subscription-head"><div><h2 id="subscriptionTitle">订阅商品</h2><p>仅商品 ID、币种、价格和周期可编辑，其他信息为只读记录。星号 * 表示必填；保存于当前项目。</p></div><button class="btn" type="button" id="subscriptionClose" aria-label="关闭订阅商品">关闭</button></div>
@@ -1275,6 +1275,15 @@ function privacyAuditLines(snapshot,profiles={}){
  '- [ ] [PRIV-013] 对照真实数据流和第三方 SDK 行为核验 App Store 隐私标签、追踪声明、Google Play Data safety 与其他适用问卷；记录披露值及证据，未提供商店记录时标为待核验。',
  '- [ ] [PRIV-014] 根据实际目标地区、目标用户和平台版本核验适用要求；面向未成年人时补查相关模式、数据处理、归因/广告及家长入口，不把通用模板当作合规结论。',
  '- [ ] [PRIV-015] 提供真实设备授权路径、拒绝/撤回路径、网络抓包/日志和政策/商店截图；将缺失、过期或无法打开的证据单独列出。',
+ '', '### 项目配置值与地址','',
+ '- [ ] [CFG-001] 逐项盘点此文档中的发布信息、功能开关、权限用途文案、订阅商品、检查项证据以及源码中的其他必需配置；列出实际值、来源位置、运行环境和验证结果。空值、占位符、示例值及互相矛盾的值均标为问题或待核验。',
+ '- [ ] [CFG-002] 核验 API、隐私政策、服务条款、账号注销、反馈、推送、归因、深度链接和商店页面等适用地址：与项目代码、运行配置、正式环境及商店记录逐项比对，并实际检查可访问性与目标内容。',
+ '- [ ] [CFG-003] 核验应用标识、版本、构建号、SDK 标识、商品 ID、环境变量及服务端对应关系；密钥只报告变量名、配置来源及是否验证，不输出密钥明文。',
+ '- [ ] [CFG-004] 对每个已完成检查项的“验证证据”核实是否为本项目真实使用的值、文件路径:行号或可访问地址；模板示例、失效链接、没有来源的断言及证据与配置不一致均需单独列出。',
+ '', '### 初始化流程核对','',
+ '- [ ] [INIT-001] 无论清单章节当前是否隐藏，检查实际项目中 Adjust、AnalysisApi 和其他需要初始化的 SDK；对启用的模块逐项核对启动入口、配置值来源、环境切换和初始化顺序。',
+ '- [ ] [INIT-002] 核对 ATT/隐私同意前后、拒绝及授权变化时的初始化和数据上报；检查重复启动、前后台切换、超时重试、失败降级、日志和真实设备验证证据。',
+ '- [ ] [INIT-003] 将“二、初始化流程核对”中每个适用检查项与源码路径、实际配置值及验证证据对应；未启用模块也检查残留依赖或自动初始化。',
  '', '### 已选权限逐项排查',''];
  for(const p of permissions.filter(p=>selected.has(p.id))){
   lines.push('#### '+p.id+' · '+p.name,'',
@@ -1298,6 +1307,7 @@ function privacyAuditLines(snapshot,profiles={}){
 }
 function aiReviewMarkdown(snapshot,profiles={},metadata={}){
  const progress=aiReviewProgress(snapshot);if(!progress.complete)throw Error('检查进度达到 100% 后才能导出 AI 排查文档；还需完成 '+progress.remaining+' 项');
+ if(snapshot.guideDone!==true)throw Error('请先阅读并确认使用说明，再导出 AI 排查文档');
  const quote=value=>String(value??'').split(/\r?\n/).map(line=>'> '+line).join('\n');
  const block=(text,language)=>{const runs=text.match(/`+/g)||[],fence='`'.repeat(Math.max(3,...runs.map(r=>r.length+1)));return [fence+language,text,fence];};
  const json=value=>block(JSON.stringify(value,null,2),'json');
@@ -1314,6 +1324,7 @@ function aiReviewMarkdown(snapshot,profiles={},metadata={}){
  '7. 核对应用标识、版本、构建号、生产环境地址、账号注销、推送、反馈及目标用户等适用功能；识别检查清单本身没有覆盖的风险。',
  '8. 必须逐项完成下方权限与隐私说明排查单，输出每个 PRIV 编号的结论及证据，不得仅返回笼统的隐私合规结论。',
  '9. 已勾选项目也需代码证据支持。缺少源码、构建配置、商店截图或附件正文时标注“待核验”，说明还需要什么材料，不推断为通过。',
+ '10. 逐项完成 CFG 与 INIT 排查单；所有需要配置的值和地址都应与真实项目及正式环境对应。检查项的验证证据必须指向实际值与来源，不能把模板示例当作证据；不要输出密钥明文。',
  '', '### 请按此格式输出','', '| 优先级 | 问题及影响 | 证据（文件路径:行号） | 对应检查项 ID / 新增遗漏 | 建议 | 验证方式 |','| --- | --- | --- | --- | --- | --- |','| P0 / P1 / P2 | 填写实际发现 | 没有证据时写待核验 | 填写 ID 或新增遗漏 | 可执行修改建议 | 测试或人工核验步骤 |',
  '', '最后分别列出：已验证内容、发现的问题、仍待核验内容，以及建议新增到清单的检查项。',
  '', '## 发布信息（预期值）','',...json({app:'',platform:'',version:'',build:'',owner:'',appIdIOS:'',appIdAndroid:'',environment:'',apiBaseUrl:'',targetDate:'',timeZone:'',...release}),
@@ -1326,7 +1337,7 @@ function aiReviewMarkdown(snapshot,profiles={},metadata={}){
  lines.push('', '未选中的权限（仍需对照实际实现）：',quote(known.filter(p=>!selected.has(p.id)).map(p=>p.name+' ['+p.id+']').join('、')||'无'),
  '', '## 订阅商品配置','',...json(snapshot.subscriptions||[]),
  '', '## 当前发布阻塞与证据缺口','', '检查结论：'+(readiness.ready?'清单已就绪（仍需代码核验）':'未就绪')+'；阻塞 '+readiness.blockers+' 项。',...readiness.issues.flatMap(i=>[quote(i.reason+' · '+i.id+' · '+i.text)]),
- '', '## 完整检查清单（含不适用项）','', '完成状态来自人工记录；隐藏或不适用项同样导出，供 AI 识别错误配置及遗漏。');
+ '', '## 完整检查清单（含不适用项）','', '完成状态来自人工记录；隐藏或不适用项同样导出，供 AI 识别错误配置及遗漏。尤其逐项核对“二、初始化流程核对”的真实实现与证据。验证证据应填写项目实际值及文件路径或地址，模板示例不能作为通过依据。');
  for(const item of items){lines.push('', '### '+item.id,quote(item.section||'通用检查'),quote(item.text),...json({state:item.state||'todo',applicable:item.applicable!==false,hiddenReason:item.hiddenReason||'',required:item.required!=='off',evidenceRequired:item.evidenceRequired==='on',notes:item.notes||'',evidence:item.evidence||'',evidenceExpiresAt:item.evidenceExpiresAt||'',attachmentIds:item.attachmentIds||'[]',reason:item.reason||'',exceptionType:item.exceptionType||'',exceptionOwner:item.exceptionOwner||'',reviewDue:item.reviewDue||'',reviewStatus:item.reviewStatus||'',reviewedAt:item.reviewedAt||'',approvalStatus:item.approvalStatus||'',approvalBy:item.approvalBy||'',approvalDate:item.approvalDate||''}));}
  lines.push('', '## 证据附件索引','', '仅包含附件元信息，不嵌入附件内容；核验实际文件时请另行提供。',...json(snapshot.evidenceFiles||{}),
  '', '## 已保存的配置预检','');
@@ -1395,6 +1406,18 @@ function ensureFeatureModules(){
   if(!DATA.features[module.feature]||[module.legacyTaskId,...module.items.map(item=>item[0])].some(id=>ids.has(id)))continue;
   DATA.sections.push({id:'module_'+module.id,title:module.title,blocks:module.items.map(([id,text])=>({type:'item',id,text,level:0,state:st(id),checked:st(id)==='done',cond:module.feature}))});
  }
+}
+
+/* Newly enabled initialization checks must not remain hidden by an old view. */
+function revealInitializationChecks(){
+ if(!DATA?.features?.hasInitialization)return;
+ filter='all';query='';sectionFilter='all';
+ document.getElementById('q').value='';document.getElementById('sectionFilter').value='all';document.getElementById('viewMode').value='all';
+ document.querySelectorAll('#seg button').forEach(button=>{const active=button.dataset.f==='all';button.classList.toggle('on',active);button.setAttribute('aria-pressed',String(active));});
+ applyFilter();
+ const section=DATA.sections.find(s=>s.title.includes('初始化流程核对'));
+ const element=section&&[...document.querySelectorAll('#list section.card')].find(el=>el.dataset.sec===section.id);
+ window.BoardWorkspace?.reveal(element?.querySelector('li.item'));
 }
 
 /* Item evidence stays in the same draft and commit as notes and exceptions. */
@@ -2217,22 +2240,7 @@ async function loadFromServer(){
     reviewData = d.review || reviewData;
     updateSummaryReleaseOptions();
     DATA = mergeItems(d);
-    // 门禁状态：md 为准。
-    // 只有「从未确认过」（gateState=todo）才允许用本机的离线确认记录补写，
-    // 明确取消过（gateState=skip）的门禁不会被悄悄复活。
-    let localAck = false;
-    try{ localAck = localStorage.getItem(GUIDE_KEY) === "1"; }catch(e){}
-    if(!d.gateDone && localAck && (d.gateState === "todo" || d.gateState === undefined)){
-      try{
-        const ackRes = await api("/api/ack", {});
-        if(ackRes && ackRes.gateDone){
-          d.gateDone = true;
-          d.gateState = "done";
-          baseRevision = ackRes.revision;
-          DATA = mergeItems(ackRes);
-        }
-      }catch(e){}
-    }
+    // 使用当前项目的确认记录；浏览器全局标记不能自动解锁其他项目。
     gateDone = !!d.gateDone;
     if(d.gateId && changes[d.gateId]) gateDone = changes[d.gateId] === "done";
     if(gateDone){
@@ -2375,6 +2383,7 @@ document.getElementById("q").addEventListener("input", e => {
 
 /* ---- 保存到 md ---- */
 async function saveProgress(options={}){
+  if(!gateDone){toast("请先阅读并确认使用说明");return false;}
   if(!online){ toast("当前是离线模式，无法写回文件"); return; }
   const doneCount = Object.values(state).filter(v => v === "done").length;
   const skipCount = Object.values(state).filter(v => v === "skip").length;
@@ -3094,6 +3103,7 @@ document.getElementById("featSave").addEventListener("click", async () => {
     return;
   }
   try{
+    const revealInitialization=f.hasAdjust&&!featureSnapshot?.hasAdjust;
     const d = await api("/api/features", {features: f});
     baseRevision = d.revision;
     DATA = mergeItems(d);
@@ -3101,6 +3111,7 @@ document.getElementById("featSave").addEventListener("click", async () => {
     refreshFeatUI();
     featureSnapshot=null;
     closeFeatPanel();
+    if(revealInitialization)revealInitializationChecks();
     updateSaveStatus();
     toast("项目设置已保存到 md");
   }catch(e){
@@ -3171,6 +3182,7 @@ function releaseSnapshot(){
   snapshot.readiness=ReleaseReadiness.assess(snapshot);return snapshot;
 }
 document.getElementById("releaseArchive").onclick = async () => {
+  if(!gateDone){toast("请先阅读并确认使用说明");return;}
   if(!online || dirty || featureHasChanges() || permDirty || savingOperations>0 || boardPendingDetails().length){ toast("请先保存检查进度、项目设置和权限配置，再归档"); return; }
   const snapshot=releaseSnapshot();
   const confirmation=await BoardProductivity.confirmArchive(snapshot,reviewData.history?.at(-1));
@@ -3251,6 +3263,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElement
 const newReleaseButton=document.getElementById('newRelease');
 newReleaseButton.hidden=!(window.RELEASE_PAGES||window.RELEASE_CLOUD);
 newReleaseButton.onclick=()=>{
+ if(!gateDone){toast('请先阅读并确认使用说明');return;}
  if(dirty||permDirty||featureHasChanges()||savingOperations||boardPendingDetails().length){toast('请先保存所有改动，再开始新一轮发布');return;}
  document.getElementById('newReleaseForm').reset();document.getElementById('newReleaseError').textContent='';document.getElementById('newReleaseDialog').showModal();
 };
@@ -3273,12 +3286,6 @@ state = Object.assign(seedFromData(EMBEDDED), state);
 dirty = Object.keys(state).some(k => state[k] !== (serverBaseline[k] || "todo"));
 if(dirty) markDirty();
 gateDone = !!(EMBEDDED.gateDone);
-const embeddedGate = (EMBEDDED.sections || []).flatMap(sec => sec.blocks || []).find(block => block.type === "item" && block.gate);
-if(embeddedGate && st(embeddedGate.id) === "done") gateDone = true;
-// 离线兜底：本地记过一次确认
-if(!gateDone){
-  try{ gateDone = localStorage.getItem(GUIDE_KEY) === "1"; }catch(e){}
-}
 setMode(false);
 applyFeatures();
 build();
@@ -3554,7 +3561,7 @@ function refresh(){
   for(const [label,issues] of categories(result)){const button=document.createElement('button');button.type='button';button.className='btn';button.textContent=label+' '+issues.length;button.disabled=!issues.length;button.onclick=()=>{const index=result.issues.indexOf(issues[0]);$('readinessPanel').open=true;$('readinessIssues').children[index]?.querySelector('button')?.click();};group.append(button);}host.append(group);
   if(result.issues.length){const next=document.createElement('p');next.textContent='优先处理：'+result.issues[0].text+' · '+result.issues[0].reason;host.append(next);}
  }
- const progress=ReleaseAnalysis.aiReviewProgress(snapshot),exportButton=$('aiReviewExport'),exportHint=$('aiReviewExportHint');exportButton.disabled=!progress.complete||!online||aiExporting;exportButton.title=progress.complete?'导出已保存的 AI 排查文档':'进度达到 100% 后可导出';exportHint.textContent=progress.complete?'进度已达 100%，保存全部修改后可导出。':!progress.total?'暂无适用检查项，不能导出；请检查项目配置。':'进度 '+progress.percent+'% · 还需完成 '+progress.remaining+' 项，达到 100% 后可导出（跳过不计为完成）。';
+ const progress=ReleaseAnalysis.aiReviewProgress(snapshot),exportButton=$('aiReviewExport'),exportHint=$('aiReviewExportHint');exportButton.disabled=!gateDone||!progress.complete||!online||aiExporting;exportButton.title=progress.complete?'导出已保存的 AI 排查文档':'进度达到 100% 后可导出';exportHint.textContent=!gateDone?'请先阅读并确认使用说明。':progress.complete?'进度已达 100%，保存全部修改后可导出。':!progress.total?'暂无适用检查项，不能导出；请检查项目配置。':'进度 '+progress.percent+'% · 还需完成 '+progress.remaining+' 项，达到 100% 后可导出（跳过不计为完成）。';
  const save=$('saveAll');save.disabled=!online||window.RELEASE_CLOUD?.role==='viewer'||busy||savingOperations>0;save.textContent=busy?'正在保存全部…':'保存全部';
 }
 async function submitDraft(id,stillDirty){
@@ -3574,11 +3581,12 @@ async function saveAll(){
   await saveQueue.catch(()=>{});
   if(saveConflict)throw Error('存在版本冲突，请先查看冲突差异');
   const features=featureHasChanges()?{...DATA.features}:null;
+  const revealInitialization=features?.hasAdjust&&!featureSnapshot?.hasAdjust;
   const permissions=permDirty?{selected:[...permSelected],descs:{...permDescs},descsEn:{...permDescsEn}}:null;
   clearTimeout(permSaveTimer);
   if(itemReviewDirty())await submitDraft('itemReviewForm',itemReviewDirty);
   if(releaseEditorDirty())await submitDraft('releaseEditForm',releaseEditorDirty);
-  if(features){const d=await api('/api/features',{features});DATA=mergeItems(d);featureSnapshot=null;closeFeatPanel();render();refreshFeatUI();}
+  if(features){const d=await api('/api/features',{features});DATA=mergeItems(d);featureSnapshot=null;closeFeatPanel();render();refreshFeatUI();if(revealInitialization)revealInitializationChecks();}
   if(subscriptionHasChanges()){await submitDraft('subscriptionForm',subscriptionHasChanges);}
   if(permissions){const d=await api('/api/perm-write',permissions);DATA=mergeItems(d);permDirty=false;setPermSaveState('saved','✓ 已保存权限配置');render();}
   if(dirty&&!await saveProgress({all:true}))throw Error('检查进度未保存');
@@ -3633,5 +3641,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=7c29da52f346"></script></body>
+<script defer src="bootstrap.js?v=7531d7d6cf9f"></script></body>
 </html>

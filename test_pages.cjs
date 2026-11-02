@@ -6,7 +6,7 @@ test('Quota errors leave saved projects untouched',async()=>{const {S,block}=set
 test('Full export/import preserves notes and validates permissions',async()=>{const {S}=setup();const id=await S.create({name:'Original'});await S.mutate(id,1,'review',p=>p.review={release:{version:'2'},items:{note:{notes:'evidence'}},history:[{version:'1'}]});const exported=S.export(id);const imported=await S.create({...exported,name:'Imported'});assert.equal(S.get(imported).review.items.note.notes,'evidence');assert.equal(S.get(imported).review.history.length,1);await assert.rejects(S.create({name:'Bad',permissions:{selected:['unknown'],descs:{},descsEn:{}}}),/不支持/);});
 test('Permission XML escapes custom descriptions',()=>{const {S}=setup();const cfg=S.config({selected:['camera'],descs:{camera:'A & B < C'},descsEn:{}});assert.match(cfg.iosPlist,/A &amp; B &lt; C/);});
 
-test('Imported checklist without guide gate remains usable',async()=>{const {S}=setup();const id=await S.create({name:'Simple',document:'# Simple\n\n## Tasks\n- [ ] One\n'});assert.equal(S.payload(S.get(id)).gateDone,true);});
+test('Imported checklist without guide gate requires explicit guide confirmation',async()=>{const {S}=setup();const id=await S.create({name:'Simple',document:'# Simple\n\n## Tasks\n- [ ] One\n'});assert.equal(S.payload(S.get(id)).gateDone,false);});
 
 test('Permission appendix includes custom English copy and English policy',async()=>{
  const {S,context}=setup();const id=await S.create({name:'Bilingual'});
@@ -19,7 +19,7 @@ test('Permission appendix includes custom English copy and English policy',async
 
 test('Legacy guide confirmation keeps identity and does not consume checklist numbering',async()=>{
  const {S}=setup();const id=await S.create({name:'Legacy',document:'# Test\n\n## Tasks\n- [ ] One\n\n## 七、确认已了解使用说明\n- [x] 我已阅读《使用说明》\n'});
- const data=S.payload(S.get(id));assert.equal(data.gateDone,true);assert.equal(data.total,1);assert.equal(data.items[0].seq,1);assert.equal(data.items[1].seq,'');assert.equal(data.items[1].gate,true);
+ const data=S.payload(S.get(id));assert.equal(data.gateDone,false);assert.equal(data.total,1);assert.equal(data.items[0].seq,1);assert.equal(data.items[1].seq,'');assert.equal(data.items[1].gate,true);
 });
 
 test('Permission-specific checklist rows follow selected permissions',async()=>{
@@ -71,7 +71,7 @@ test('Unreadable browser drafts remain in backups and are reported instead of si
  const source=setup(),id=await source.S.create({name:'Damaged draft'});source.context.localStorage.setItem('app-release-checklist-state-v2:pages:'+id,'{broken');const bundle=source.S.exportAll();assert.equal(source.S.inspectImportAll(bundle).unreadableDrafts,1);const target=setup(),result=await target.S.importAll(bundle);assert.equal(result.draftError,true);assert.equal(target.S.list().length,1);
 });
 test('New release archives completed state, retains chosen notes, clears evidence and checks atomically',async()=>{
- const {S,context}=setup();const id=await S.create({name:'Release'});const item=S.payload(S.get(id)).items.find(i=>!i.gate);await S.mutate(id,1,'prepare',p=>{p.document=S.apply(p.document,{[item.id]:'done'});p.review={release:{version:'1'},items:{[item.id]:{notes:'keep',evidence:'remove.png'}},history:[]};});context.location.search='?id='+id;context.window.fetch=async()=>{};S.install();
+ const {S,context}=setup();const id=await S.create({name:'Release'});const item=S.payload(S.get(id)).items.find(i=>!i.gate);await S.mutate(id,1,'prepare',p=>{p.document=S.apply(p.document,{[item.id]:'done',[S.payload(p).gateId]:'done'});p.review={release:{version:'1'},items:{[item.id]:{notes:'keep',evidence:'remove.png'}},history:[]};});context.location.search='?id='+id;context.window.fetch=async()=>{};S.install();
  const response=await context.window.fetch('/api/new-release',{method:'POST',body:JSON.stringify({revision:'2',release:{version:'2'},keepNotes:true,keepEvidence:false})});assert.equal(response.status,200);const p=S.get(id);assert.equal(p.review.history[0].release.version,'1');assert.equal(p.review.history[0].items.find(x=>x.id===item.id).state,'done');assert.equal(p.review.release.version,'2');assert.equal(p.review.items[item.id].notes,'keep');assert.equal(p.review.items[item.id].evidence,undefined);assert.equal(S.payload(p).items.find(x=>x.id===item.id).state,'todo');assert.equal(p.generation,2);
 });
 test('Template update preserves modified built-in text, custom tasks and notes',async()=>{
@@ -131,7 +131,7 @@ test('Subscription setting persists, hides checks and retains progress and notes
 
 test('Subscription catalogue survives export, import, snapshots and release archive',async()=>{
  const {S,context}=setup();const id=await S.create({name:'Catalogue'});const products=[{id:'weekly',name:'周订阅',period:'week',price:'18.50',currency:'CNY',offerPrice:'6.00',offerCycles:'3'}];
- await S.mutate(id,1,'catalogue',p=>p.review.subscriptions=products);
+ await S.mutate(id,1,'catalogue',p=>{p.review.subscriptions=products;p.document=S.apply(p.document,{[S.payload(p).gateId]:'done'});});
  const imported=await S.create({...S.export(id),name:'Imported catalogue'});assert.deepEqual(JSON.parse(JSON.stringify(S.get(imported).review.subscriptions)),products);
  context.location.search='?id='+id;context.window.fetch=async()=>{throw Error('Unexpected network');};S.install();
  const response=await context.window.fetch('/api/new-release',{method:'POST',body:JSON.stringify({revision:'2',release:{version:'2'},keepNotes:true,keepEvidence:true})});assert.equal(response.status,200);
@@ -179,7 +179,7 @@ test('Creation configuration filters platforms and capabilities without changing
  const expected=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,sys,checklist_tool as c;p=json.loads(sys.argv[1]);print(c.document_payload(p['document'],p['name'],1,(p['permissions']['selected'],{},{}),p['review'],'1')['total'])",JSON.stringify(updated)],{encoding:'utf8'}));assert.equal(S.payload(updated).total,expected);
 });
 test('New release persists readiness and retains policy flags regardless of note retention',async()=>{
- const {S,context}=setup();const id=await S.create({name:'Policy',document:'# App\n## Tasks\n- [x] Proof <!-- task:proof -->\n'});await S.mutate(id,1,'review',p=>p.review.items.proof={required:'on',evidenceRequired:'on',evidence:'screenshot.png'});
+ const {S,context}=setup();const id=await S.create({name:'Policy',document:'# App\n## Tasks\n- [x] Proof <!-- task:proof -->\n'});await S.mutate(id,1,'review',p=>{p.review.guideAcknowledged='on';p.review.items.proof={required:'on',evidenceRequired:'on',evidence:'screenshot.png'};});
  context.location.search='?id='+id;context.window.fetch=async()=>{};S.install();const response=await context.window.fetch('/api/new-release',{method:'POST',body:JSON.stringify({revision:'2',release:{version:'2'},keepNotes:false,keepEvidence:false})});assert.equal(response.status,200);
  const p=S.get(id);assert.equal(p.review.history[0].readiness.ready,true);assert.equal(p.review.items.proof.evidenceRequired,'on');assert.equal(p.review.items.proof.required,'on');assert.equal(p.review.items.proof.evidence,undefined);assert.equal(S.readiness(p).ready,false);
 });
@@ -300,11 +300,14 @@ test('AI review Markdown contains saved configuration, hidden tasks, evidence me
  const {S,context}=setup();
  const id=await S.create({name:'审查导出',document:'# Audit\n## Checks\n- [x] 已完成检查 <!-- task:done -->\n- [ ] 账号注销 <!-- if:hasAccountSystem --> <!-- task:hidden -->\n',features:{hasAccountSystem:false,hasSubscriptions:false,hasPush:false,hasFeedbackSystem:false,targetMinors:false,hasAdjust:true,hasAnalysisApi:false},permissions:{selected:['tracking'],descs:{tracking:'用于广告归因'},descsEn:{}},review:{release:{app:'审查导出',platform:'iOS',version:'1.0',environment:'production'},items:{done:{notes:'人工备注\n```\n# 仅为数据',evidenceRequired:'on',evidence:'screenshots/proof.png'}},subscriptions:[],history:[]}});
  const A=context.window.ReleaseAnalysis,snapshot=A.aiReviewSnapshot(S.payload(S.get(id)),context.window.PAGES_DATA?.profiles||vm.runInContext('PAGES_DATA.profiles',context));
+ snapshot.guideDone=true;
  snapshot.items=snapshot.items.map(item=>item.applicable===false?item:{...item,state:'done'});
  const profiles=vm.runInContext('PAGES_DATA.profiles',context),markdown=A.aiReviewMarkdown(snapshot,profiles,{exportedAt:'2026-11-02T00:00:00Z'});
  assert.equal(snapshot.items.find(i=>i.id==='hidden').applicable,false);
  assert.match(markdown,/release-desk-ai-review\/v1/);assert.match(markdown,/审查导出/);assert.match(markdown,/权限与隐私说明排查单/);assert.match(markdown,/PRIV-PERM-tracking-03/);assert.match(markdown,/PRIV-UNSELECTED-camera/);assert.match(markdown,/PRIV-ATT-02/);assert.match(markdown,/隐私政策正文与应用内说明/);assert.match(markdown,/Google Play Data safety/);assert.match(markdown,/PrivacyInfo\.xcprivacy/);assert.match(markdown,/referenceOnly/);assert.match(markdown,/未经本项目验证/);assert.match(markdown,/初始均未核验/);assert.match(markdown,/NSUserTrackingUsageDescription/);assert.match(markdown,/用于广告归因/);assert.match(markdown,/"descriptionEn": ""/);
  assert.match(markdown,/### hidden/);assert.match(markdown,/未启用账号系统/);assert.match(markdown,/module_init_start/);assert.match(markdown,/"hasSubscriptions": false/);assert.match(markdown,/screenshots\/proof.png/);assert.match(markdown,/文件路径:行号/);assert.match(markdown,/待核验/);assert.match(markdown,/完整检查清单/);assert.match(markdown,/已保存原始清单（含配置片段）/);assert.match(markdown,/# Audit/);assert.match(markdown,/已勾选项目也需代码证据支持/);assert.match(markdown,/尚未运行或保存配置预检/);assert.doesNotMatch(markdown,/Used to measure the effectiveness/);
+ for(const id of ['CFG-001','CFG-002','CFG-003','CFG-004','INIT-001','INIT-002','INIT-003'])assert.match(markdown,new RegExp(id));
+ assert.match(markdown,/验证证据应填写项目实际值及文件路径或地址/);
  const stale={...snapshot,preflight:{basis:'old',files:[],findings:[],errors:0}};
  assert.match(A.aiReviewMarkdown(stale,profiles,{exportedAt:'2026-11-02T00:00:00Z'}),/配置已变化，结果需要重新生成/);
 });
@@ -315,6 +318,16 @@ test('AI review export requires actual 100 percent completion, excluding hidden 
  for(const items of [[],[{id:'todo',state:'todo'}],[{id:'skip',state:'skip',reason:'不适用'}],Array.from({length:200},(_,i)=>({id:String(i),state:i===199?'todo':'done'}))]){
   const snapshot={items};assert.equal(A.aiReviewProgress(snapshot).complete,false);assert.notEqual(A.aiReviewProgress(snapshot).percent,100);assert.throws(()=>A.aiReviewMarkdown(snapshot,{}),/100%/);
  }
- const snapshot={items:[{id:'complete',state:'done'},{id:'hidden',state:'todo',applicable:false},{id:'gate',state:'todo',gate:true}]};
+ const snapshot={guideDone:true,items:[{id:'complete',state:'done'},{id:'hidden',state:'todo',applicable:false},{id:'gate',state:'todo',gate:true}]};
  assert.equal(A.aiReviewProgress(snapshot).complete,true);assert.equal(A.aiReviewProgress(snapshot).percent,100);assert.match(A.aiReviewMarkdown(snapshot,{}),/release-desk-ai-review/);
+});
+
+test('Every new or imported project requires its own durable guide confirmation',async()=>{
+ const {S,context}=setup(),id=await S.create({name:'Gate',document:'# App\n## Tasks\n- [ ] One\n',review:{guideAcknowledged:'on',release:{},items:{},history:[]}});
+ assert.equal(S.payload(S.get(id)).gateDone,false);context.location.search='?id='+id;context.window.fetch=async()=>{throw Error('unexpected network');};S.install();
+ const send=async(path,data)=>context.window.fetch('/api/'+path,{method:'POST',body:JSON.stringify({revision:String(S.get(id).version),...data})});
+ const task=S.payload(S.get(id)).items[0].id;assert.equal((await send('write',{states:{[task]:'done'}})).status,403);
+ assert.equal((await (await send('ack',{})).json()).gateDone,true);assert.equal((await send('write',{states:{[task]:'done'}})).status,200);
+ const imported=await S.create({...S.export(id),name:'Imported'});assert.equal(S.payload(S.get(imported)).gateDone,false);
+ const cancelled=await (await send('unack',{})).json();assert.equal(cancelled.gateDone,false);assert.equal(cancelled.items[0].state,'done');assert.equal((await send('write',{states:{[task]:'todo'}})).status,403);
 });

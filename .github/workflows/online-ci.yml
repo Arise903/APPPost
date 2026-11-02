@@ -60,6 +60,8 @@ jobs:
           node scripts/test_checklist_layout.cjs
           node scripts/test_workspace.cjs
           node scripts/test_release_flow.cjs
+          node scripts/test_github_sync.cjs
+          node scripts/test_guide_gate.cjs
           pip install "Pillow>=11,<13"
           node scripts/test_visual.cjs
       - name: Upload visual comparison on failure

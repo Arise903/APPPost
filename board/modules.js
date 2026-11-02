@@ -9,3 +9,15 @@ function ensureFeatureModules(){
   DATA.sections.push({id:'module_'+module.id,title:module.title,blocks:module.items.map(([id,text])=>({type:'item',id,text,level:0,state:st(id),checked:st(id)==='done',cond:module.feature}))});
  }
 }
+
+/* Newly enabled initialization checks must not remain hidden by an old view. */
+function revealInitializationChecks(){
+ if(!DATA?.features?.hasInitialization)return;
+ filter='all';query='';sectionFilter='all';
+ document.getElementById('q').value='';document.getElementById('sectionFilter').value='all';document.getElementById('viewMode').value='all';
+ document.querySelectorAll('#seg button').forEach(button=>{const active=button.dataset.f==='all';button.classList.toggle('on',active);button.setAttribute('aria-pressed',String(active));});
+ applyFilter();
+ const section=DATA.sections.find(s=>s.title.includes('初始化流程核对'));
+ const element=section&&[...document.querySelectorAll('#list section.card')].find(el=>el.dataset.sec===section.id);
+ window.BoardWorkspace?.reveal(element?.querySelector('li.item'));
+}

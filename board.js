@@ -732,22 +732,7 @@ async function loadFromServer(){
     reviewData = d.review || reviewData;
     updateSummaryReleaseOptions();
     DATA = mergeItems(d);
-    // 门禁状态：md 为准。
-    // 只有「从未确认过」（gateState=todo）才允许用本机的离线确认记录补写，
-    // 明确取消过（gateState=skip）的门禁不会被悄悄复活。
-    let localAck = false;
-    try{ localAck = localStorage.getItem(GUIDE_KEY) === "1"; }catch(e){}
-    if(!d.gateDone && localAck && (d.gateState === "todo" || d.gateState === undefined)){
-      try{
-        const ackRes = await api("/api/ack", {});
-        if(ackRes && ackRes.gateDone){
-          d.gateDone = true;
-          d.gateState = "done";
-          baseRevision = ackRes.revision;
-          DATA = mergeItems(ackRes);
-        }
-      }catch(e){}
-    }
+    // 使用当前项目的确认记录；浏览器全局标记不能自动解锁其他项目。
     gateDone = !!d.gateDone;
     if(d.gateId && changes[d.gateId]) gateDone = changes[d.gateId] === "done";
     if(gateDone){
@@ -890,6 +875,7 @@ document.getElementById("q").addEventListener("input", e => {
 
 /* ---- 保存到 md ---- */
 async function saveProgress(options={}){
+  if(!gateDone){toast("请先阅读并确认使用说明");return false;}
   if(!online){ toast("当前是离线模式，无法写回文件"); return; }
   const doneCount = Object.values(state).filter(v => v === "done").length;
   const skipCount = Object.values(state).filter(v => v === "skip").length;
@@ -1121,6 +1107,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElement
 const newReleaseButton=document.getElementById('newRelease');
 newReleaseButton.hidden=!(window.RELEASE_PAGES||window.RELEASE_CLOUD);
 newReleaseButton.onclick=()=>{
+ if(!gateDone){toast('请先阅读并确认使用说明');return;}
  if(dirty||permDirty||featureHasChanges()||savingOperations||boardPendingDetails().length){toast('请先保存所有改动，再开始新一轮发布');return;}
  document.getElementById('newReleaseForm').reset();document.getElementById('newReleaseError').textContent='';document.getElementById('newReleaseDialog').showModal();
 };
@@ -1143,12 +1130,6 @@ state = Object.assign(seedFromData(EMBEDDED), state);
 dirty = Object.keys(state).some(k => state[k] !== (serverBaseline[k] || "todo"));
 if(dirty) markDirty();
 gateDone = !!(EMBEDDED.gateDone);
-const embeddedGate = (EMBEDDED.sections || []).flatMap(sec => sec.blocks || []).find(block => block.type === "item" && block.gate);
-if(embeddedGate && st(embeddedGate.id) === "done") gateDone = true;
-// 离线兜底：本地记过一次确认
-if(!gateDone){
-  try{ gateDone = localStorage.getItem(GUIDE_KEY) === "1"; }catch(e){}
-}
 setMode(false);
 applyFeatures();
 build();

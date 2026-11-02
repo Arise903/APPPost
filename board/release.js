@@ -16,6 +16,7 @@ function releaseSnapshot(){
   snapshot.readiness=ReleaseReadiness.assess(snapshot);return snapshot;
 }
 document.getElementById("releaseArchive").onclick = async () => {
+  if(!gateDone){toast("请先阅读并确认使用说明");return;}
   if(!online || dirty || featureHasChanges() || permDirty || savingOperations>0 || boardPendingDetails().length){ toast("请先保存检查进度、项目设置和权限配置，再归档"); return; }
   const snapshot=releaseSnapshot();
   const confirmation=await BoardProductivity.confirmArchive(snapshot,reviewData.history?.at(-1));

@@ -41,6 +41,11 @@ def load_review(path):
 
 
 def save_review(path, value):
+    value = dict(value) if isinstance(value, dict) else value
+    if isinstance(value, dict) and 'guideAcknowledged' not in value:
+        previous = load_review(path)
+        if 'guideAcknowledged' in previous:
+            value['guideAcknowledged'] = previous['guideAcknowledged']
     from release_policy import validate_review_record
     validate_review_record(value)
     target = review_path(path)
