@@ -106,6 +106,7 @@ class Config:
         self.release: dict[str, str] = {}
         self.notes: list[str] = []
         self.features: dict[str, bool] = {}
+        self.permissions: dict = {}
 
     def feature_line(self) -> str:
         if not self.features:
@@ -145,7 +146,63 @@ def detect_features(pubspec: str, lib: dict[str, str], ios: bool) -> dict[str, b
     }
 
 
-def extract(repo: Repo, platform: str) -> Config:
+PERMISSION_CN = {"camera": "用于在应用内拍照。", "photos": "用于从相册选择图片。", "microphone": "用于在应用内录制音频。",
+                 "notifications": "用于发送你主动开启的提醒与通知。", "tracking": "用于衡量广告投放效果。",
+                 "storage": "用于读取和保存应用内的文件。", "network": "用于访问网络以使用在线功能。",
+                 "location_foreground": "用于在使用期间获取位置。", "location_background": "用于在后台记录位置。",
+                 "contacts": "用于让你邀请好友。", "motion": "用于识别设备动作。", "health": "用于读取健康与运动数据。"}
+PERMISSION_EN = {"camera": "Used to take photos inside the app.", "photos": "Used to let you pick images from your photo library.",
+                 "microphone": "Used to record audio inside the app.", "notifications": "Used to send reminders and updates you opt in to.",
+                 "tracking": "Used to measure advertising effectiveness.", "storage": "Used to read and save files on your device.",
+                 "network": "Used to access the internet for online features.",
+                 "location_foreground": "Used to show nearby content while you use the app.",
+                 "location_background": "Used to keep location-based features running in the background.",
+                 "contacts": "Used to let you invite friends.", "motion": "Used to detect device motion.",
+                 "health": "Used to read your health and workout data."}
+DEFAULT_CATALOGUE = Path(__file__).resolve().parent.parent / "permission_profiles.json"
+
+
+def load_catalogue(path: Path | str | None) -> list[dict]:
+    target = Path(path or DEFAULT_CATALOGUE)
+    if not target.is_file():
+        return []
+    data = json.loads(target.read_text(encoding="utf-8"))
+    if isinstance(data, dict):
+        data = data.get("permissions", [])
+    return [item for item in data if isinstance(item, dict) and item.get("id")]
+
+
+def detect_permissions(catalogue: list[dict], manifest: str, plist: dict[str, str]) -> tuple[list[dict], list[str]]:
+    """Map declared Android/iOS permissions onto the board's permission catalogue."""
+    declared = set(re.findall(r'"(android\.permission\.[A-Z_]+)"', manifest))
+    declared_names = {name.split(".")[-1] for name in declared}
+    extra = set(re.findall(r'"(com\.google\.android\.gms\.permission\.[A-Z_]+)"', manifest))
+    matched, matched_names = [], set()
+    for profile in catalogue:
+        android = profile.get("android") or {}
+        ios_profile = profile.get("ios") or {}
+        hit = False
+        manifest_name = str(android.get("manifest") or "")
+        if manifest_name and (manifest_name in declared or manifest_name in extra
+                              or manifest_name.split(".")[-1] in declared_names):
+            hit = True
+            matched_names.add(manifest_name.split(".")[-1])
+        if not hit and profile["id"] == "storage":
+            storage_names = {"READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"} & declared_names
+            if storage_names:
+                hit = True
+                matched_names |= storage_names
+        keys = [ios_profile.get("infoplist_key")] + [item.get("key") for item in ios_profile.get("infoplist_keys") or []]
+        if not hit and any(key and key in plist for key in keys):
+            hit = True
+        if hit:
+            matched.append(profile)
+    return matched, sorted(declared_names - matched_names)
+
+
+def extract(repo: Repo, platform: str, catalogue: list[dict] | None = None) -> Config:
+    if catalogue is None:
+        catalogue = load_catalogue(None)
     cfg = Config()
     ios = platform.lower().startswith("ios")
     pubspec = repo.read("pubspec.yaml") or ""
@@ -200,6 +257,20 @@ def extract(repo: Repo, platform: str) -> Config:
     permissions = re.findall(r'android:name="android\.permission\.([A-Z_]+)"', manifest)
     if permissions:
         cfg.add("代码显式权限", "、".join(sorted(set(permissions))))
+    matched_permissions, unmatched_permissions = detect_permissions(catalogue or [], manifest, plist)
+    if matched_permissions:
+        cfg.permissions = {"selected": [profile["id"] for profile in matched_permissions], "descs": {}, "descsEn": {}}
+        for profile in matched_permissions:
+            ios_profile = profile.get("ios") or {}
+            source = plist.get(ios_profile.get("infoplist_key") or "") or next(
+                (plist.get(item.get("key") or "") for item in ios_profile.get("infoplist_keys") or [] if plist.get(item.get("key") or "")), "")
+            chinese = bool(re.search(r"[\u4e00-\u9fff]", source))
+            cfg.permissions["descs"][profile["id"]] = (source if chinese else "") or PERMISSION_CN.get(profile["id"], "")
+            cfg.permissions["descsEn"][profile["id"]] = (source if source and not chinese else "") or PERMISSION_EN.get(profile["id"], "")
+        cfg.add("权限清单（写入项目）", "、".join(f'{profile.get("name") or profile["id"]}（{profile["id"]}）' for profile in matched_permissions))
+        cfg.note("权限按源码声明自动勾选；中文说明优先取项目 Info.plist，英文为通用模板，需按实际功能复核")
+    if unmatched_permissions:
+        cfg.note("以下 Android 权限未纳入看板权限清单，请确认是否保留：" + "、".join(unmatched_permissions))
     cleartext = first_match(r'usesCleartextTraffic="(\w+)"', manifest)
     if cleartext:
         cfg.add("HTTP 明文开关", f"usesCleartextTraffic={cleartext}；正式包是否确需开放待复核")
@@ -427,7 +498,7 @@ def project_json(cfg: Config, document: str, name: str) -> str:
         "format": "release-desk/v1",
         "name": name,
         "document": document,
-        "permissions": {"selected": [], "descs": {}, "descsEn": {}},
+        "permissions": cfg.permissions or {"selected": [], "descs": {}, "descsEn": {}},
         "review": {"release": cfg.release, "items": {}, "history": []},
     }
     if cfg.features:
@@ -443,13 +514,14 @@ def main(argv=None) -> int:
     parser.add_argument("--title", default="从分支提取的配置信息", help="markdown section title")
     parser.add_argument("--out", help="write the markdown to this file")
     parser.add_argument("--project", help="write an importable project JSON (release fields prefilled)")
+    parser.add_argument("--permissions", help="path to permission_profiles.json (defaults to this repository's list)")
     parser.add_argument("--no-checklist", action="store_true", help="do not append the verification checklist")
     args = parser.parse_args(argv)
     root = Path(args.repo).expanduser().resolve()
     if not root.is_dir():
         print("项目路径不存在：" + str(root), file=sys.stderr)
         return 1
-    config = extract(Repo(root, args.branch), args.platform)
+    config = extract(Repo(root, args.branch), args.platform, load_catalogue(args.permissions))
     text = markdown(config, args.title, not args.no_checklist)
     if args.out:
         out = Path(args.out).expanduser().resolve()

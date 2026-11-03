@@ -103,7 +103,7 @@ python3 scripts/extract_flutter_config.py <项目路径> --branch android --plat
 python3 scripts/extract_flutter_config.py <项目路径> --branch feature-iOS --platform iOS --out exported/app-ios.md
 ```
 
-生成的 Markdown 可直接导入看板：新建项目时选择该 `.md`，或把「从分支提取的配置信息」表格并入现有清单，项目配置信息会回退显示这些已提取的值。
+生成的 Markdown 可直接导入看板：新建项目时选择该 `.md`，或把「从分支提取的配置信息」表格并入现有清单，项目配置信息会回退显示这些已提取的值。加 `--project out.json` 会额外生成可直接导入的项目 JSON（发布信息、功能开关、权限勾选与中英文权限说明都已按源码预填）；`--permissions` 可指定权限清单，默认用本仓库的 `permission_profiles.json`。
 
 `test_operations.py` 让本地文件版与在线版执行同一串操作（确认、保存、备注、特征、订阅、权限写回、清空、取消确认），逐项比对检查项状态、项目特征与发布信息；`test_pages.cjs` 另有一致性用例，用同一份输入比对 JS 与 Python 的权限配置生成和可见性规则。
 

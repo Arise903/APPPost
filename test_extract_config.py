@@ -138,6 +138,11 @@ class FlutterConfigExtractionTests(unittest.TestCase):
         self.assertEqual(config.features["hasFeedbackSystem"], True)
         self.assertEqual(config.features["hasAdjust"], False, "Adjust 只在 iOS 初始化")
         self.assertIn("hasAdjust=0 hasAnalysisApi=1", config.feature_line())
+        self.assertIn("camera", config.permissions["selected"])
+        self.assertIn("microphone", config.permissions["selected"])
+        self.assertTrue(config.permissions["descs"]["camera"])
+        self.assertTrue(config.permissions["descsEn"]["camera"])
+        self.assertIn("权限清单（写入项目）", rows)
 
     def test_output_is_importable(self):
         config = extractor.extract(extractor.Repo(self.root, None), "Android")
@@ -149,6 +154,8 @@ class FlutterConfigExtractionTests(unittest.TestCase):
         self.assertEqual(exported["format"], "release-desk/v1")
         self.assertEqual(exported["features"]["hasAnalysisApi"], True)
         self.assertEqual(exported["features"]["hasAdjust"], False)
+        self.assertEqual(exported["permissions"]["selected"], ["camera", "microphone"])
+        self.assertTrue(exported["permissions"]["descsEn"]["camera"])
         project = json.loads(extractor.project_json(config, document, "Demo · Android"))
         self.assertEqual(project["format"], "release-desk/v1")
         self.assertEqual(project["review"]["release"]["adjustAppToken"], "tokenvalue")
