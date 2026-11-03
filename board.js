@@ -19,7 +19,7 @@ function boardFetch(path, options){
  * ------------------------------------------------------------------ */
 let saveConflict=false;
 let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=EMBEDDED.updatedAt||null;
-function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush','hasAdjust','hasAnalysisApi'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
+function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush','hasAdjust','hasAnalysisApi','hasFirebase'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
  if(historyView){
@@ -62,6 +62,17 @@ const GUIDE_KEY = EDITION === "local" ? "app-guide-ack" : "app-guide-ack:" + STO
 const LS_KEY = "app-release-checklist-state-v2:" + STORAGE_SCOPE;
 
 function st(id){ return state[id] || "todo"; }
+/* 统一导出入口：导出前要求再次输入加密密钥（Pages 版），取消则不产生任何文件。 */
+async function saveFile(name,blob,type){
+ if(window.ReleaseVaultUI){
+  try{ await window.ReleaseVaultUI.authorize("导出 "+name); }
+  catch(error){ if(typeof toast==="function")toast(error.message); return false; }
+ }
+ const url=URL.createObjectURL(blob),link=document.createElement("a");
+ link.href=url;link.download=name;link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ return true;
+}
 function isResolved(id){ const s = st(id); return s === "done" || s === "skip"; }
 
 function loadState(g){
@@ -536,7 +547,7 @@ function hiddenItems(){
 }
 
 function featureHiddenItems(){
-  const keys = ["hasAccountSystem", "hasFeedbackSystem", "targetMinors", "hasSubscriptions", "hasPush", "hasAdjust", "hasAnalysisApi"];
+  const keys = ["hasAccountSystem", "hasFeedbackSystem", "targetMinors", "hasSubscriptions", "hasPush", "hasAdjust", "hasAnalysisApi", "hasFirebase"];
   return hiddenItems().filter(it => keys.includes(it.cond) && !condOk(it.cond));
 }
 
@@ -988,12 +999,8 @@ document.getElementById("mExport").addEventListener("click", () => {
     lines.push("## " + sec.title); lines.push(""); walk(sec.blocks); lines.push("");
   }
   const blob = new Blob([lines.join("\n")], {type:"text/markdown;charset=utf-8"});
-  const a = document.createElement("a");
   const d = new Date(); const pad = n => String(n).padStart(2,"0");
-  a.href = URL.createObjectURL(blob);
-  a.download = "上架前App配置清单-" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".md";
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  saveFile("上架前App配置清单-" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".md", blob);
   toast("已导出副本（未修改原文件）");
 });
 

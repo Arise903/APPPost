@@ -3,7 +3,7 @@
 'use strict';
 const S=PagesStore;
 function pending(){return !!document.querySelector('.workflow-dialog[data-dirty="true"]')||(typeof subscriptionDialog!=='undefined'&&subscriptionHasChanges())|| (typeof dirty!=='undefined'&&dirty)||(typeof permDirty!=='undefined'&&permDirty)||(typeof featureHasChanges==='function'&&featureHasChanges())||(typeof releaseEditorDirty==='function'&&releaseEditorDirty())||(typeof itemReviewDirty==='function'&&itemReviewDirty())||(typeof savingOperations!=='undefined'&&savingOperations>0);}
-async function backup(){S.download('release-workspace-'+new Date().toLocaleDateString('sv-SE')+'.json',JSON.stringify(S.exportAll(),null,2));await S.markExport();window.dispatchEvent(new Event('backupchanged'));}
+async function backup(){const downloaded=await S.download('release-workspace-'+new Date().toLocaleDateString('sv-SE')+'.json',JSON.stringify(S.exportAll(),null,2));if(downloaded===false)throw Error('备份已取消');await S.markExport();window.dispatchEvent(new Event('backupchanged'));}
 let offered=false;
 async function checkVersion(){
  try{
@@ -24,7 +24,7 @@ function boot(){
    const file=event.target.files[0];if(!file)return;
    try{
     if(file.size>100000000)throw Error('工作台备份请小于 100 MB');
-    const bundle=JSON.parse(await file.text()),preview=S.inspectImportAll(bundle);
+    let bundle=JSON.parse(await file.text());if(bundle.format===window.ReleaseVault?.FORMAT){const key=await ReleaseVaultUI.requestKey('解密工作台备份');bundle=await ReleaseVault.importFile(bundle,key);}const preview=S.inspectImportAll(bundle);
     const names=preview.names.length?preview.names.map((name,index)=>(index+1)+'. '+name).join('\n'):'（空备份）';
     const date=preview.exportedAt?new Date(preview.exportedAt).toLocaleString():'未记录导出时间';
     if(!confirm('导入前预览\n\n备份时间：'+date+'\n项目：'+preview.projects+' 个\n历史快照：'+preview.snapshots+' 份\n浏览器草稿：'+preview.drafts+' 份\n\n'+names+'\n\n导入会新增项目，不覆盖现有项目。继续吗？'))return;

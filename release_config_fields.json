@@ -1,0 +1,245 @@
+[
+  {
+    "key": "app",
+    "label": "App 名称",
+    "group": "应用与发布",
+    "aliases": [
+      "App 名称"
+    ],
+    "maxLength": 200
+  },
+  {
+    "key": "platform",
+    "label": "平台",
+    "group": "应用与发布",
+    "aliases": [
+      "平台"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "version",
+    "label": "版本号",
+    "group": "应用与发布",
+    "aliases": [
+      "版本号"
+    ],
+    "maxLength": 100
+  },
+  {
+    "key": "build",
+    "label": "构建号",
+    "group": "构建配置",
+    "aliases": [
+      "构建号"
+    ],
+    "maxLength": 100
+  },
+  {
+    "key": "date",
+    "label": "检查日期",
+    "group": "应用与发布",
+    "aliases": [
+      "检查日期"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "owner",
+    "label": "负责人",
+    "group": "应用与发布",
+    "aliases": [
+      "负责人"
+    ],
+    "maxLength": 200
+  },
+  {
+    "key": "appIdIOS",
+    "label": "iOS 应用标识",
+    "group": "应用与发布",
+    "aliases": [
+      "iOS 应用标识"
+    ],
+    "maxLength": 200
+  },
+  {
+    "key": "appIdAndroid",
+    "label": "Android 应用标识",
+    "group": "应用与发布",
+    "aliases": [
+      "Android 应用标识"
+    ],
+    "maxLength": 200
+  },
+  {
+    "key": "environment",
+    "label": "环境",
+    "group": "应用与发布",
+    "aliases": [
+      "环境"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "apiBaseUrl",
+    "label": "API 基础地址",
+    "group": "应用与发布",
+    "aliases": [
+      "API 基础地址"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "targetDate",
+    "label": "目标发布日期",
+    "group": "应用与发布",
+    "aliases": [
+      "目标发布日期"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "status",
+    "label": "发布状态",
+    "group": "应用与发布",
+    "aliases": [
+      "发布状态"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "strictValidation",
+    "label": "完整发布检查",
+    "group": "应用与发布",
+    "aliases": [
+      "完整发布检查"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "timeZone",
+    "label": "发布时区",
+    "group": "应用与发布",
+    "aliases": [
+      "发布时区"
+    ],
+    "maxLength": 100
+  },
+  {
+    "key": "privacyPolicyUrl",
+    "label": "隐私政策地址",
+    "group": "应用与发布",
+    "aliases": [
+      "隐私政策地址"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "termsUrl",
+    "label": "用户协议地址",
+    "group": "应用与发布",
+    "aliases": [
+      "用户协议地址"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "supportUrl",
+    "label": "用户支持地址",
+    "group": "应用与发布",
+    "aliases": [
+      "用户支持地址"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "feedbackUrl",
+    "label": "反馈地址",
+    "group": "应用与发布",
+    "aliases": [
+      "反馈地址"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "firebaseProjectId",
+    "label": "Firebase projectId",
+    "group": "Firebase",
+    "aliases": [
+      "Firebase projectId"
+    ],
+    "maxLength": 200
+  },
+  {
+    "key": "firebaseAppId",
+    "label": "Firebase appId",
+    "group": "Firebase",
+    "aliases": [
+      "Firebase appId"
+    ],
+    "maxLength": 300
+  },
+  {
+    "key": "firebaseConfig",
+    "label": "Firebase 配置信息",
+    "group": "Firebase",
+    "aliases": [
+      "Firebase 配置信息"
+    ],
+    "maxLength": 8000
+  },
+  {
+    "key": "analysisApiUrl",
+    "label": "AnalysisApi 地址",
+    "group": "统计与归因",
+    "aliases": [
+      "AnalysisApi 地址"
+    ],
+    "maxLength": 1000
+  },
+  {
+    "key": "analysisApiProjectId",
+    "label": "AnalysisApi projectId",
+    "group": "统计与归因",
+    "aliases": [
+      "AnalysisApi projectId"
+    ],
+    "maxLength": 200
+  },
+  {
+    "key": "adjustAppToken",
+    "label": "Adjust appToken",
+    "group": "统计与归因",
+    "aliases": [
+      "Adjust appToken"
+    ],
+    "maxLength": 200
+  },
+  {
+    "key": "minAndroidSdk",
+    "label": "最低 Android SDK",
+    "group": "构建配置",
+    "aliases": [
+      "最低 Android SDK"
+    ],
+    "maxLength": 30
+  },
+  {
+    "key": "compileSdk",
+    "label": "compileSdk",
+    "group": "构建配置",
+    "aliases": [
+      "compileSdk"
+    ],
+    "maxLength": 30
+  },
+  {
+    "key": "targetSdk",
+    "label": "targetSdk",
+    "group": "构建配置",
+    "aliases": [
+      "targetSdk"
+    ],
+    "maxLength": 30
+  }
+]

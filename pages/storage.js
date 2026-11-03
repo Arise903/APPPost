@@ -10,17 +10,48 @@ const sameAsset=(a,b)=>!!a&&!!b&&a.data===b.data&&JSON.stringify(omit(a,'data'))
 const sameProject=(a,b)=>!!a&&!!b&&JSON.stringify(omit(a,'assets'))===JSON.stringify(omit(b,'assets'))&&Object.keys(a.assets||{}).length===Object.keys(b.assets||{}).length&&Object.entries(a.assets||{}).every(([id,asset])=>sameAsset(asset,b.assets?.[id]));
 const validate=data=>{if(!data||data.schema!==1||!data.projects||Array.isArray(data.projects)||typeof data.projects!=='object')throw Error('不支持的本地数据版本');if((data.storageVersion||1)>4)throw Error('本地数据版本较新，请更新网页后再操作');return data;};
 function parse(raw){try{return validate(raw?JSON.parse(raw):{schema:1,projects:{}});}catch(error){throw Error('浏览器记录无法读取：'+error.message+'。请先下载存储恢复包。');}}
+/* Everything sensitive is sealed with the workspace key before it reaches disk. */
+const vault=()=>root.ReleaseVault;
+function vaultReady(){const v=vault();return !!v&&v.status()==='unlocked';}
+async function sealValue(value){const v=vault();if(!v||v.status()!=='unlocked')return value;return v.encrypt(value);}
+async function unsealValue(value){const v=vault();if(!v||!value||value.format!==v.FORMAT)return value;if(v.status()!=='unlocked')throw Error('本机数据已加密，请先输入密钥解锁。');return v.decrypt(value);}
 function open(key){
  const modeKey=key+':storage-mode',signalKey=key+':signal',metaKey=key+':meta';
- let database,cache=null,cacheEpoch=0,initializing=null,backend='loading',channel;
+ let database,cache=null,cacheEpoch=0,initializing=null,backend='loading',channel,legacyPlain=null,legacyRaw=null;
  const legacy=()=>!root.indexedDB||localStorage.getItem(modeKey)==='legacy';
  const projectKey=id=>key+':project:'+id,assetKey=(id,assetId)=>key+':asset:'+id+':'+assetId;
- function readLegacy(){const data=parse(localStorage.getItem(key));if((data.storageVersion||1)>=3)throw Error('此工作台已迁移到 IndexedDB，当前不能读取迁移标记作为项目数据。请恢复数据库访问或下载存储恢复包；已停止兼容模式读写。');return data;}
+ async function sealOperations(operations){
+  if(!vaultReady())return operations;
+  const out=[];
+  for(const op of operations){
+   if(op.remove){out.push(op);continue;}
+   if(op.store==='assets')out.push({...op,value:await sealValue(op.value)});
+   else if(op.store==='projects')out.push({...op,value:{...op.value,value:await sealValue(op.value.value)}});
+   else if(op.store==='records'&&op.key!==key&&!op.key.endsWith(':migration'))out.push({...op,value:await sealValue(op.value)});
+   else out.push(op);
+  }
+  return out;
+ }
+ function readLegacy(){
+  const raw=localStorage.getItem(key);
+  if(legacyPlain&&legacyRaw===raw)return legacyPlain;
+  const data=parse(raw);
+  if(data.sealed){if(!legacyPlain)throw Error('本机数据已加密，请先输入密钥解锁。');return legacyPlain;}
+  if((data.storageVersion||1)>=3)throw Error('此工作台已迁移到 IndexedDB，当前不能读取迁移标记作为项目数据。请恢复数据库访问或下载存储恢复包；已停止兼容模式读写。');
+  legacyPlain=data;legacyRaw=raw;return legacyPlain;
+ }
+ async function unsealLegacy(){
+  const raw=localStorage.getItem(key),data=parse(raw);
+  if(data.sealed){if(!vaultReady())throw Error('本机数据已加密，请先输入密钥解锁。');legacyPlain=await unsealValue(data.sealed);}
+  else{if((data.storageVersion||1)>=3)throw Error('此工作台已迁移到 IndexedDB，当前不能读取迁移标记作为项目数据。请恢复数据库访问或下载存储恢复包；已停止兼容模式读写。');legacyPlain=data;}
+  legacyRaw=raw;return legacyPlain;
+ }
  function lock(action){if(!navigator.locks)throw Error('此浏览器不支持安全保存，请通过 HTTP/HTTPS 使用支持 Web Locks 的浏览器。');return navigator.locks.request('release-desk-pages-write',action);}
  function announce(){root.dispatchEvent?.(new Event('projectchanged'));try{localStorage.setItem(signalKey,String(Date.now())+Math.random());}catch(_){}channel?.postMessage('changed');}
  function openDB(){if(database)return Promise.resolve();return new Promise((resolve,reject)=>{const request=root.indexedDB.open('release-desk-workspace',2);request.onupgradeneeded=()=>{for(const name of ['records','projects','assets'])if(!request.result.objectStoreNames.contains(name))request.result.createObjectStore(name);};request.onerror=()=>reject(Error('无法打开 IndexedDB：'+request.error?.message));request.onblocked=()=>reject(Error('存储升级被其他页面阻止，请关闭旧标签页再重试。'));request.onsuccess=()=>{database=request.result;database.onversionchange=()=>{database.close();database=null;backend='stale';root.dispatchEvent?.(new Event('storageblocked'));};resolve();};});}
  function dbRead(name){return new Promise((resolve,reject)=>{const tx=database.transaction('records','readonly'),request=tx.objectStore('records').get(name);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
- function write(operations){return new Promise((resolve,reject)=>{const tx=database.transaction([...new Set(operations.map(op=>op.store))],'readwrite');tx.oncomplete=resolve;tx.onabort=tx.onerror=()=>reject(Error('保存失败，数据库事务已回滚：'+(tx.error?.message||'存储不可用或空间不足')));try{for(const op of operations){const store=tx.objectStore(op.store);if(op.remove)store.delete(op.key);else store.put(op.value,op.key);}}catch(error){tx.abort();reject(Error('保存失败，数据库事务已回滚：'+error.message));}});}
+ async function write(operations){return persist(await sealOperations(operations));}
+ function persist(operations){return new Promise((resolve,reject)=>{const tx=database.transaction([...new Set(operations.map(op=>op.store))],'readwrite');tx.oncomplete=resolve;tx.onabort=tx.onerror=()=>reject(Error('保存失败，数据库事务已回滚：'+(tx.error?.message||'存储不可用或空间不足')));try{for(const op of operations){const store=tx.objectStore(op.store);if(op.remove)store.delete(op.key);else store.put(op.value,op.key);}}catch(error){tx.abort();reject(Error('保存失败，数据库事务已回滚：'+error.message));}});}
  const put=(store,key,value)=>({store,key,value});
  function projectOperations(id,before,after){
   const ops=[];
@@ -35,7 +66,14 @@ function open(key){
   const tx=database.transaction(['records','projects','assets'],'readonly');let record,meta,projects={},failed;
   const fail=error=>{failed=error;tx.abort();};
   tx.onabort=tx.onerror=()=>reject(failed||Error('无法读取项目数据库：'+(tx.error?.message||'读取中断')));
-  tx.oncomplete=()=>{if(!record){resolve({record:null,data:null});return;}if(record.value){resolve({record,data:validate(record.value)});return;}try{resolve({record,data:validate({...meta,projects})});}catch(error){reject(error);}};
+  tx.oncomplete=async()=>{if(!record){resolve({record:null,data:null});return;}if(record.value){resolve({record,data:validate(record.value)});return;}
+   try{
+    for(const [id,project] of Object.entries(projects)){
+     if(project.__sealed){const sealed=project.__sealed;delete projects[id].__sealed;projects[id]={...(await unsealValue(sealed)),assets:project.assets};}
+     for(const [assetId,asset] of Object.entries(project.assets||{}))if(asset&&asset.format)projects[id].assets[assetId]=await unsealValue(asset);
+    }
+    resolve({record,data:validate({...await unsealValue(meta||{}),projects})});
+   }catch(error){reject(error);}};
   const request=tx.objectStore('records').get(key);request.onsuccess=()=>{
    record=request.result;if(!record||record.value)return;if(record.layout!=='split-v1'){fail(Error('未知存储布局，请更新网页'));return;}
    const metadata=tx.objectStore('records').get(metaKey);metadata.onsuccess=()=>{meta=metadata.result;};
@@ -43,6 +81,7 @@ function open(key){
    for(const id of ids){const get=tx.objectStore('projects').get(projectKey(id));get.onsuccess=()=>{
     const stored=get.result;if(!stored){fail(Error('项目记录缺失，请下载恢复包'));return;}
     const project={...stored.value,...(stored.hasAssets?{assets:{}}:{})};projects[id]=project;
+    if(stored.value&&stored.value.format)project.__sealed=stored.value;
     for(const [assetId,ref] of Object.entries(stored.assetRefs||{})){
      const existing=cache?.projects?.[id]?.assets?.[assetId];
      if(existing&&existing.sha256===ref.sha256&&existing.size===ref.size){project.assets=project.assets||{};project.assets[assetId]=existing;continue;}
@@ -61,7 +100,7 @@ function open(key){
  }
  function fence(){localStorage.setItem(key,JSON.stringify({schema:1,storageVersion:4,projects:{},migratedAt:Date.now()}));}
  async function start(){
-  if(legacy()){cache=readLegacy();backend='localStorage';return;}
+  if(legacy()){cache=await unsealLegacy();backend='localStorage';return;}
   await openDB();await lock(async()=>{
    let record=await dbRead(key);const raw=localStorage.getItem(key);let marker=false;try{marker=JSON.parse(raw||'{}').storageVersion>=3;}catch(_){}
    if(!record){if(marker)throw Error('迁移标记存在但数据库记录丢失，请从离线备份恢复。');record={value:parse(raw),epoch:0};const restored=await normalize(record,[put('records',key+':migration',{raw,date:Date.now()})]);cache=restored.data;cacheEpoch=restored.record.epoch;}
@@ -78,7 +117,7 @@ function open(key){
  async function transaction(action){await ready();return lock(async()=>{
   checkWritable();const snapshot=backend==='IndexedDB'?await readSnapshot():{data:readLegacy()};if(!snapshot.data)throw Error('数据库记录不存在，已停止保存。请刷新后从备份恢复。');cache=snapshot.data;
   const data=workspaceCopy(cache),result=action(data);if(result&&typeof result.then==='function')throw Error('存储事务中不能执行异步操作');
-  if(backend==='localStorage'){const changed=JSON.stringify(omit(data,'projects'))!==JSON.stringify(omit(cache,'projects'))||Object.keys(data.projects).length!==Object.keys(cache.projects).length||Object.entries(data.projects).some(([id,p])=>!sameProject(p,cache.projects[id]));if(changed){try{localStorage.setItem(key,JSON.stringify(data));}catch(_){throw Error('浏览器空间不足或禁止存储，本次修改未保存。请先导出项目，再整理历史备份。');}cache=data;announce();}return result;}
+  if(backend==='localStorage'){const changed=JSON.stringify(omit(data,'projects'))!==JSON.stringify(omit(cache,'projects'))||Object.keys(data.projects).length!==Object.keys(cache.projects).length||Object.entries(data.projects).some(([id,p])=>!sameProject(p,cache.projects[id]));if(changed){const payload=vaultReady()?{schema:1,storageVersion:4,projects:{},sealed:await sealValue(data),migratedAt:Date.now()}:data;try{localStorage.setItem(key,JSON.stringify(payload));}catch(_){throw Error('浏览器空间不足或禁止存储，本次修改未保存。请先导出项目，再整理历史备份。');}legacyPlain=data;legacyRaw=localStorage.getItem(key);cache=data;announce();}return result;}
   const ops=[],metadataChanged=JSON.stringify(omit(data,'projects'))!==JSON.stringify(omit(cache,'projects'));
   for(const id of new Set([...Object.keys(cache.projects),...Object.keys(data.projects)]))if(!sameProject(cache.projects[id],data.projects[id]))ops.push(...projectOperations(id,cache.projects[id],data.projects[id]));
   if(!ops.length&&!metadataChanged)return result;
@@ -92,6 +131,16 @@ function open(key){
   if(result&&typeof result.then==='function')throw Error('存储事务中不能执行异步操作');const after=data.projects[id];if(sameProject(before,after))return result;
   const ops=projectOperations(id,before,after),next={...header,epoch:header.epoch+1};ops.push(put('records',key,next));await write(ops);cache={...cache,projects:{...cache.projects,[id]:after}};cacheEpoch=next.epoch;announce();return result;
  });}
+ /* 生成密钥后把所有已有记录重写一遍，落盘即密文。 */
+ async function resave(){await ready();return lock(async()=>{
+  checkWritable();
+  if(backend==='localStorage'){const data=workspaceCopy(cache||legacyPlain||readLegacy());const payload=vaultReady()?{schema:1,storageVersion:4,projects:{},sealed:await sealValue(data),migratedAt:Date.now()}:data;localStorage.setItem(key,JSON.stringify(payload));legacyPlain=data;legacyRaw=localStorage.getItem(key);cache=data;announce();return;}
+  const snapshot=await readSnapshot();const data=snapshot.data,ops=[];
+  for(const [id,project] of Object.entries(data.projects))ops.push(...projectOperations(id,null,project));
+  ops.push(put('records',metaKey,omit(data,'projects')));
+  const header={layout:'split-v1',epoch:(snapshot.record?.epoch||0)+1,projectIds:Object.keys(data.projects)};ops.push(put('records',key,header));
+  await write(ops);cache=data;cacheEpoch=header.epoch;announce();
+ });}
  async function recovery(){if(root.indexedDB&&!database)await openDB();const snapshot=database?await readSnapshot():null;return {format:'release-desk-storage-recovery/v1',date:new Date().toISOString(),legacy:localStorage.getItem(key),migration:database?await dbRead(key+':migration'):null,indexedDB:snapshot?.record?{value:snapshot.data,epoch:snapshot.record.epoch}:null,beforeSplit:database?await dbRead(key+':before-split'):null,previous:database?await dbRead(key+':previous'):null,legacyConflict:database?await dbRead(key+':legacy-conflict'):null};}
  async function adoptLegacy(){await openDB();return lock(async()=>{const raw=localStorage.getItem(key),value=readLegacy(),previous=await readSnapshot();await normalize({value,epoch:previous.record?.epoch||0},[put('records',key+':previous',{value:previous.data,epoch:previous.record?.epoch}),put('records',key+':migration',{raw,date:Date.now()})]);localStorage.removeItem(modeKey);});}
  async function adoptIndexedDB(){await openDB();await lock(async()=>{let snapshot=await readSnapshot();if(!snapshot.record)throw Error('数据库记录不存在，请导入离线备份');if(snapshot.record.value)snapshot=await normalize(snapshot.record);validate(snapshot.data);await write([put('records',key+':legacy-conflict',{raw:localStorage.getItem(key),date:Date.now()})]);fence();localStorage.removeItem(modeKey);cache=snapshot.data;cacheEpoch=snapshot.record.epoch;backend='IndexedDB';});initializing=null;}
@@ -99,7 +148,7 @@ function open(key){
  async function migrate(){if(localStorage.getItem(modeKey)!=='legacy')return ready();await adoptLegacy();initializing=null;return ready();}
  function usage(){const data=backend==='localStorage'?readLegacy():cache;if(!data)throw Error('正在打开本机数据库');let bytes=JSON.stringify(omit(data,'projects')).length*2;for(const p of Object.values(data.projects)){bytes+=JSON.stringify(omit(p,'assets')).length*2;for(const asset of Object.values(p.assets||{}))bytes+=asset.data.length*2+JSON.stringify(omit(asset,'data')).length*2;}return {backend,layout:backend==='IndexedDB'?'split-v1':'legacy',bytes,projects:Object.keys(data.projects).length,snapshots:Object.values(data.projects).reduce((n,p)=>n+(p.snapshots||[]).length,0)};}
  root.addEventListener?.('storage',event=>{if([signalKey,key,modeKey].includes(event.key)&&cache)refresh().catch(error=>root.dispatchEvent?.(new CustomEvent('storageerror',{detail:error.message})));});
- return {read,readProject:id=>projectCopy((backend==='localStorage'?readLegacy():cache)?.projects[id]),ready,refresh,transaction,projectTransaction,usage,recovery,adoptLegacy,adoptIndexedDB,rollback,migrate};
+ return {read,readProject:id=>projectCopy((backend==='localStorage'?readLegacy():cache)?.projects[id]),ready,refresh,transaction,projectTransaction,resave,usage,recovery,adoptLegacy,adoptIndexedDB,rollback,migrate};
 }
 root.PagesStorage={open};
 })(window);

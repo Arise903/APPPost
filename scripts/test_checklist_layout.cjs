@@ -20,7 +20,7 @@ const server=http.createServer((req,res)=>{
  const url='http://127.0.0.1:'+server.address().port+'/APPPost/';
  try{
   browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{})});
-  const page=await browser.newPage({viewport:{width:820,height:900}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const page=await browser.newPage({viewport:{width:820,height:900}}),errors=[];page.on('pageerror',error=>errors.push(error.message));page.on('dialog',async dialog=>{if(dialog.type()!=='prompt')return;try{dialog.accept(await page.evaluate(()=>window.ReleaseVault.secret()));}catch(_){try{dialog.dismiss();}catch(_){}}});
   async function openCommand(selector){const control=page.locator(selector),id=await control.evaluate(el=>el.closest('details.board-menu')?.id);if(id&&!await page.locator('#'+id).evaluate(el=>el.open))await page.locator('#'+id+' > summary').click();}
   await page.goto(url);await page.waitForFunction(()=>document.getElementById('projectCount').textContent==='0');
   const id=await page.evaluate(()=>PagesStore.create({requireGuideConfirmation:false,name:'检查项排版验证',document:ReleaseTemplates.find(t=>t.id==='base').document,review:{guideAcknowledged:'on',release:{platform:'iOS / Android'},items:{base_test:{required:'on',evidenceRequired:'on'}},history:[]}}));

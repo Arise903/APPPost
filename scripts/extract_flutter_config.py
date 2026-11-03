@@ -97,7 +97,7 @@ def plist_values(text: str | None) -> dict[str, str]:
 
 
 FEATURE_KEYS = ["hasAccountSystem", "targetMinors", "hasFeedbackSystem", "hasSubscriptions", "hasPush",
-                "hasAdjust", "hasAnalysisApi"]
+                "hasAdjust", "hasAnalysisApi", "hasFirebase"]
 
 
 class Config:
@@ -452,6 +452,40 @@ def extract(repo: Repo, platform: str, catalogue: list[dict] | None = None) -> C
     cfg.note("功能开关依据源码判定：" + ("、".join(enabled) + " 已启用" if enabled else "均未在源码中确认启用"))
     cfg.add("未填写的信息", "、".join(["负责人", "目标发布日期", "商店价格与销售地区", "推送证书 / 远程推送配置"]))
     cfg.add("密钥处理", "Adjust appToken 为应用标识，已在上方记录；反馈 API Key、签名密码等仅记录变量与文件位置，不复制明文")
+    cfg.features['hasFirebase'] = bool(firebase or ios_plist or 'firebase_core' in pubspec)
+    firebase_config = {}
+    if firebase:
+        try:
+            firebase_config['android'] = json.loads(firebase)
+        except ValueError:
+            pass
+    if ios_plist:
+        firebase_config['ios'] = ios_plist
+    if firebase_config:
+        cfg.suggest('firebaseProjectId', ios_plist.get('PROJECT_ID', '') if ios else firebase_config.get('android', {}).get('project_info', {}).get('project_id', ''))
+        cfg.suggest('firebaseAppId', ios_plist.get('GOOGLE_APP_ID', '') if ios else next((c.get('client_info', {}).get('mobilesdk_app_id', '') for c in firebase_config.get('android', {}).get('client', [])), ''))
+        cfg.suggest('firebaseConfig', json.dumps(firebase_config, ensure_ascii=False, indent=2))
+        def flatten(value, prefix):
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    flatten(child, prefix + '.' + key)
+            elif isinstance(value, list):
+                for index, child in enumerate(value):
+                    flatten(child, prefix + '[' + str(index) + ']')
+            else:
+                cfg.add(prefix, str(value))
+        flatten(firebase_config, 'Firebase')
+    for key, value in plist.items():
+        cfg.add('iOS Info.plist · ' + key, value)
+    # Capture configuration declarations with source locations, including multiline values.
+    for path, text in lib.items():
+        if not any(part in path.lower() for part in ('config', 'analysis', 'validator', 'language_options', 'feature_limit')) or '/plugins/' in path:
+            continue
+        for match in re.finditer(r'(?:static\s+)?(?:const|final)\s+(?:[\w<>?,]+\s+)?(\w+)\s*=\s*([\s\S]*?);', text):
+            key, value = match.group(1), match.group(2).strip()
+            location = path + ':' + str(text.count('\n', 0, match.start()) + 1)
+            sensitive = re.search(r'password|secret|private.?key|api.?key|authorization|credential', key, re.I)
+            cfg.add(key + ' · ' + location, SECRET_HINT if sensitive else value.replace('\n', ' ').replace('\r', ''))
     return cfg
 
 
@@ -487,8 +521,9 @@ def markdown(cfg: Config, title: str, checklist: bool = True) -> str:
                   "termsUrl": "用户协议地址", "feedbackUrl": "反馈地址", "analysisApiUrl": "AnalysisApi 地址",
                   "analysisApiProjectId": "AnalysisApi projectId", "minAndroidSdk": "最低 Android SDK",
                   "compileSdk": "compileSdk", "targetSdk": "targetSdk"}
+        labels.update({field["key"]: field["label"] for field in json.loads((Path(__file__).resolve().parents[1] / "release_config_fields.json").read_text(encoding="utf-8"))})
         for key, value in cfg.release.items():
-            lines.append(f"| {labels.get(key, key)} | {value} |")
+            lines.append(f"| {labels.get(key, key)} | {str(value).replace(chr(10), ' ').replace(chr(13), '').replace(chr(124), '/')} |")
     return "\n".join(lines) + "\n"
 
 

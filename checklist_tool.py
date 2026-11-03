@@ -158,12 +158,13 @@ def ensure_module_sections(text: str, ids) -> str:
 
 def configure_document_features(text, features):
     current = parse_md(text)['features']
+    current.setdefault('hasFirebase', False)
     current.update(features)
     current['hasInitialization'] = current['hasAdjust'] or current['hasAnalysisApi']
     for module in load_checklist_modules():
         if current.get(module['feature']) and not any(('task:' + task_id) in text for task_id in [module['legacyTaskId'], *[item[0] for item in module['items']]]):
             text = text.rstrip() + '\n\n' + _module_section_text(module)
-    keys = ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush', 'hasAdjust', 'hasAnalysisApi')
+    keys = ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush', 'hasAdjust', 'hasAnalysisApi', 'hasFirebase')
     if any(type(current.get(k)) is not bool for k in keys):
         raise ValueError('项目特征无效')
     line = '<!-- FEATURES ' + ' '.join(k + '=' + str(int(current[k])) for k in keys) + ' -->'
@@ -189,7 +190,7 @@ def _parse_md(text: str) -> dict:
     path = []
 
     # 项目特征（决定哪些条目显示）
-    features = {"hasAccountSystem": True, "targetMinors": True, "hasFeedbackSystem": False, "hasSubscriptions": True, "hasPush": False}
+    features = {"hasFirebase": False, "hasAccountSystem": True, "targetMinors": True, "hasFeedbackSystem": False, "hasSubscriptions": True, "hasPush": False}
     features.update({module['feature']: any(('task:' + task_id) in text for task_id in [module['legacyTaskId'], *[item[0] for item in module['items']]]) for module in load_checklist_modules()})
     fm = RE_FEATURES.search(text)
     if fm:
@@ -1797,7 +1798,9 @@ def load_board_js():
         if path.parent not in (HERE, HERE / "board") or path.suffix != ".js":
             raise ValueError("Invalid board module: " + match.group(1))
         return path.read_text(encoding="utf-8")
-    return re.sub(r"^// @include ([A-Za-z_./-]+)$", include, source, flags=re.M).replace("__OPTIONAL_MODULES__", json.dumps(load_checklist_modules(), ensure_ascii=False).replace("</", "<\\/"))
+    schema = json.loads((HERE / "release_config_fields.json").read_text(encoding="utf-8"))
+    prefix = "const RELEASE_CONFIG_FIELDS=" + json.dumps(schema, ensure_ascii=False).replace("</", "<\\/") + ";\n"
+    return prefix + re.sub(r"^// @include ([A-Za-z_./-]+)$", include, source, flags=re.M).replace("__OPTIONAL_MODULES__", json.dumps(load_checklist_modules(), ensure_ascii=False).replace("</", "<\\/"))
 
 
 def build_html(md_path: Path, out_path: Path) -> Path:

@@ -52,7 +52,7 @@ jobs:
         run: |
           python scripts/build_pages.py
           git diff --exit-code -- docs
-          node --test test_pages.cjs
+          node --test test_pages.cjs scripts/test_vault_core.cjs
       - name: Browser visibility regression
         run: |
           npm install --no-save --package-lock=false playwright@1.62.1
@@ -64,6 +64,7 @@ jobs:
           node scripts/test_release_flow.cjs
           node scripts/test_github_sync.cjs
           node scripts/test_guide_gate.cjs
+          node scripts/test_vault.cjs
           pip install "Pillow>=11,<13"
           node scripts/test_visual.cjs
       - name: Upload visual comparison on failure

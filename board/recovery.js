@@ -11,7 +11,7 @@ function captureFormDraft(){
  return result;
 }
 function persistFormDraft(){try{const draft=captureFormDraft();if(draft.item||draft.release||draft.subscriptions||draft.features||draft.permissions)localStorage.setItem(FORM_DRAFT_KEY,JSON.stringify(draft));else localStorage.removeItem(FORM_DRAFT_KEY);}catch(_){/* Export remains available when local storage is unavailable. */}refreshRecoveryControls();}
-function exportCurrentDraft(){const url=URL.createObjectURL(new Blob([JSON.stringify(captureFormDraft(),null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='release-form-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function exportCurrentDraft(){saveFile('release-form-draft.json',new Blob([JSON.stringify(captureFormDraft(),null,2)],{type:'application/json'}));}
 function showFormSaveFailure(container,form,message){container.textContent=message;const retry=document.createElement('button');retry.type='button';retry.className='btn';retry.textContent='重试保存';retry.onclick=()=>form.requestSubmit();container.append(retry);}
 function clearFailedWrite(path){if(failedWrite?.path===path){failedWrite=null;saveConflict=false;refreshRecoveryControls();}}
 function rememberFailedWrite(path,body,error){failedWrite={path,body,message:error.message};persistFormDraft();if(error.status===409)saveConflict=true;refreshRecoveryControls();}

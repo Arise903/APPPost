@@ -138,8 +138,7 @@ document.getElementById("releaseSummary").onclick = () => {
     lines.push("- [" + ({done:"x",skip:"-",todo:" "}[item.state]) + "] " + item.text + (item.applicable===false ? "（不适用）" : ""));
     for(const [key,label] of [["reason","跳过原因"],["notes","备注"],["evidence","证据"]]) if(item[key]) lines.push("  "+label+"："+item[key]);
   }
-  const url = URL.createObjectURL(new Blob([lines.join("\n")], {type:"text/markdown;charset=utf-8"}));
-  const a = document.createElement("a"); a.href=url; a.download="发布检查摘要-"+String(snapshot.release?.version||snapshot.version||"版本").replace(/[^\w.-]+/g,"_")+".md"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveFile("发布检查摘要-"+String(snapshot.release?.version||snapshot.version||"版本").replace(/[^\w.-]+/g,"_")+".md", new Blob([lines.join("\n")], {type:"text/markdown;charset=utf-8"}));
 };
 document.getElementById("backupRestore").onclick = async () => {
   if(!online){ toast("请先连接本地服务"); return; }

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=e21bd16a78e9"></script><script src="release_analysis.js?v=e21bd16a78e9"></script><script src="storage.js?v=e21bd16a78e9"></script><script src="store.js?v=e21bd16a78e9"></script><script>PagesStore.install();</script><script defer src="experience.js?v=e21bd16a78e9"></script><link rel="stylesheet" href="history.css?v=e21bd16a78e9"><script defer src="history.js?v=e21bd16a78e9"></script><link rel="stylesheet" href="workflows.css?v=e21bd16a78e9"><script defer src="workflows.js?v=e21bd16a78e9"></script>
+<script src="data.js?v=4f139dfbf007"></script><script src="release_analysis.js?v=4f139dfbf007"></script><script src="vault.js?v=4f139dfbf007"></script><script src="storage.js?v=4f139dfbf007"></script><script src="store.js?v=4f139dfbf007"></script><script>PagesStore.install();</script><script defer src="vault-ui.js?v=4f139dfbf007"></script><script defer src="experience.js?v=4f139dfbf007"></script><link rel="stylesheet" href="history.css?v=4f139dfbf007"><script defer src="history.js?v=4f139dfbf007"></script><link rel="stylesheet" href="workflows.css?v=4f139dfbf007"><script defer src="workflows.js?v=4f139dfbf007"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -672,6 +672,7 @@ body.history-view #list{opacity:.92}
       <div class="panel-sec">
         <div class="featlist">
           <label class="featrow"><input type="checkbox" id="featAdjust"><span class="featmain"><b>使用 Adjust 广告归因</b><em>添加正式 Token、授权与初始化、深度链接及归因验证检查。所有模板均可选。</em></span></label>
+          <label class="featrow"><input type="checkbox" id="featFirebase"><span class="featmain"><b>使用 Firebase</b><em>在发布信息中填写 Firebase 配置。</em></span></label>
           <label class="featrow"><input type="checkbox" id="featAnalysisApi"><span class="featmain"><b>使用 AnalysisApi 自有统计</b><em>添加生产地址、projectId、UUID、上报队列及失败降级检查。关闭时保留进度和备注。</em></span></label>
           <label class="featrow">
             <input type="checkbox" id="featPush">
@@ -802,7 +803,7 @@ body.history-view #list{opacity:.92}
   </div>
 </div>
 
-<dialog id="releaseEditDialog" aria-labelledby="releaseEditTitle"><form id="releaseEditForm"><h2 id="releaseEditTitle">发布信息</h2><div class="subscription-grid"><label>App 名称<input name="app" maxlength="200"></label><label>平台<select name="platform"><option value="">未指定</option><option value="iOS / Android">iOS / Android</option><option value="iOS">iOS</option><option value="Android">Android</option></select></label><label>版本号<input name="version" maxlength="100"></label><label>构建号<input name="build" maxlength="100"></label><label>检查日期<input name="date" type="date"></label><label>负责人<input name="owner" maxlength="200"></label></div><div class="subscription-grid"><label>iOS 应用标识<input name="appIdIOS" maxlength="200"></label><label>Android 应用标识<input name="appIdAndroid" maxlength="200"></label><label>环境<select name="environment"><option value="production">production</option><option value="staging">staging</option><option value="development">development</option></select></label><label>API 基础地址<input name="apiBaseUrl" type="url" maxlength="1000"></label><label>目标发布日期<input name="targetDate" type="date"></label><label>发布时区<input name="timeZone" maxlength="100" placeholder="Asia/Shanghai"></label><label>发布状态<select name="status"><option value="planning">计划中</option><option value="review">待发布</option><option value="released">已发布</option></select></label><label>完整发布检查<select name="strictValidation"><option value="off">仅检查条目</option><option value="on">同时检查发布信息及商品完整性</option></select></label></div><h3>项目实际配置与地址</h3><div class="subscription-grid"><label>隐私政策地址<input name="privacyPolicyUrl" type="url" maxlength="1000"></label><label>用户协议地址<input name="termsUrl" type="url" maxlength="1000"></label><label>用户支持地址<input name="supportUrl" type="url" maxlength="1000"></label><label>反馈地址<input name="feedbackUrl" type="url" maxlength="1000"></label><label>AnalysisApi 地址<input name="analysisApiUrl" type="url" maxlength="1000"></label><label>AnalysisApi projectId<input name="analysisApiProjectId" maxlength="200"></label><label>Adjust appToken<input name="adjustAppToken" maxlength="200" placeholder="填写 Adjust appToken，例如 abcd1234"></label><label>最低 Android SDK<input name="minAndroidSdk" maxlength="30"></label><label>compileSdk<input name="compileSdk" maxlength="30"></label><label>targetSdk<input name="targetSdk" maxlength="30"></label></div><p class="form-hint">填写项目真实使用的值与地址；Adjust 只填 appToken 本身，需要记录代码位置时写在检查备注里。</p><p id="releaseEditError" role="alert"></p><p class="save-explanation">草稿 · 保存平台后会更新适用清单，已有进度保留。</p><button class="btn" type="button" id="releaseEditCancel">取消</button><button class="btn primary" type="submit">保存发布信息</button></form></dialog>
+<dialog id="releaseEditDialog" aria-labelledby="releaseEditTitle"><form id="releaseEditForm"><h2 id="releaseEditTitle">发布信息</h2><div class="subscription-grid"><label>App 名称<input name="app" maxlength="200"></label><label>平台<select name="platform"><option value="">未指定</option><option value="iOS / Android">iOS / Android</option><option value="iOS">iOS</option><option value="Android">Android</option></select></label><label>版本号<input name="version" maxlength="100"></label><label>构建号<input name="build" maxlength="100"></label><label>检查日期<input name="date" type="date"></label><label>负责人<input name="owner" maxlength="200"></label></div><div class="subscription-grid"><label>iOS 应用标识<input name="appIdIOS" maxlength="200"></label><label>Android 应用标识<input name="appIdAndroid" maxlength="200"></label><label>环境<select name="environment"><option value="production">production</option><option value="staging">staging</option><option value="development">development</option></select></label><label>API 基础地址<input name="apiBaseUrl" type="url" maxlength="1000"></label><label>目标发布日期<input name="targetDate" type="date"></label><label>发布时区<input name="timeZone" maxlength="100" placeholder="Asia/Shanghai"></label><label>发布状态<select name="status"><option value="planning">计划中</option><option value="review">待发布</option><option value="released">已发布</option></select></label><label>完整发布检查<select name="strictValidation"><option value="off">仅检查条目</option><option value="on">同时检查发布信息及商品完整性</option></select></label></div><h3>项目实际配置与地址</h3><div class="subscription-grid"><label>隐私政策地址<input name="privacyPolicyUrl" type="url" maxlength="1000"></label><label>用户协议地址<input name="termsUrl" type="url" maxlength="1000"></label><label>用户支持地址<input name="supportUrl" type="url" maxlength="1000"></label><label>反馈地址<input name="feedbackUrl" type="url" maxlength="1000"></label><label>Firebase projectId<input name="firebaseProjectId" maxlength="200"></label><label>Firebase appId<input name="firebaseAppId" maxlength="300"></label><label>Firebase 配置信息<textarea name="firebaseConfig" maxlength="8000"></textarea></label><label>AnalysisApi 地址<input name="analysisApiUrl" type="url" maxlength="1000"></label><label>AnalysisApi projectId<input name="analysisApiProjectId" maxlength="200"></label><label>Adjust appToken<input name="adjustAppToken" maxlength="200" placeholder="填写 Adjust appToken，例如 abcd1234"></label><label>最低 Android SDK<input name="minAndroidSdk" maxlength="30"></label><label>compileSdk<input name="compileSdk" maxlength="30"></label><label>targetSdk<input name="targetSdk" maxlength="30"></label></div><p class="form-hint">填写项目真实使用的值与地址；Adjust 只填 appToken 本身，需要记录代码位置时写在检查备注里。</p><p id="releaseEditError" role="alert"></p><p class="save-explanation">草稿 · 保存平台后会更新适用清单，已有进度保留。</p><button class="btn" type="button" id="releaseEditCancel">取消</button><button class="btn primary" type="submit">保存发布信息</button></form></dialog>
 <dialog id="itemReviewDialog" class="item-drawer" aria-labelledby="itemReviewTitle"><form id="itemReviewForm"><header class="form-heading"><div><span id="itemReviewMeta" class="detail-meta"></span><h2 id="itemReviewTitle">检查项详情</h2></div><button class="btn" type="button" id="itemReviewClose" aria-label="关闭条目详情">关闭</button></header><div class="form-body"><p id="itemReviewText" class="detail-title"></p><input type="hidden" name="attachmentIds"><section class="detail-section"><h3>检查记录</h3><label>检查备注<textarea name="notes" maxlength="4000" placeholder="记录验证过程和结果"></textarea></label></section><details class="detail-section" id="itemEvidenceSection"><summary>证据与附件 <span id="itemEvidenceCount"></span></summary><label>验证证据（项目实际值及路径或链接）<textarea name="evidence" maxlength="4000" placeholder="填写本项目实际配置值、文件路径:行号或可访问地址、验证结果；不要填写模板示例或密钥明文。"></textarea></label><p class="form-hint">涉及地址、标识、SDK 或商店配置时，记录实际使用的值及其来源；密钥只记录变量名、存放位置和验证方式。</p><label>证据有效至<input name="evidenceExpiresAt" type="date"></label><div id="itemAttachments"></div><label id="itemAttachmentPicker">添加截图或文件<input id="itemAttachmentUpload" type="file" multiple></label><p class="form-hint">附件与本次详情一起保存。单文件最多 5 MiB。</p></details><section class="detail-section"><h3>例外与复查</h3><label>跳过原因<textarea name="reason" maxlength="4000"></textarea></label><details class="exception-fields"><summary>跳过分类、负责人和复查记录</summary><label>跳过类型<select name="exceptionType"><option value="legacy">普通跳过（兼容原记录）</option><option value="not-applicable">不适用</option><option value="deferred">暂缓处理</option><option value="risk-accepted">风险接受</option></select></label><label>负责人<input name="exceptionOwner" maxlength="200"></label><label>复查期限<input name="reviewDue" type="date"></label><label>复查状态<select name="reviewStatus"><option value="pending">待复查</option><option value="reviewed">已复查</option></select></label><label>复查日期<input name="reviewedAt" type="date"></label><p>审批记录由你手动登记，用于追溯；风险接受需填写已批准状态、批准人和日期。</p><label>审批状态<select name="approvalStatus"><option value="pending">待审批</option><option value="approved">已批准</option><option value="rejected">已拒绝</option></select></label><label>批准人<input name="approvalBy" maxlength="200"></label><label>批准日期<input name="approvalDate" type="date"></label></details></section><details class="detail-section"><summary>检查要求</summary><label class="inline-check"><input name="required" type="checkbox" checked>发布必需项</label><label class="inline-check"><input name="evidenceRequired" type="checkbox">完成时必须提供证据</label></details></div><footer class="form-footer"><p id="itemReviewError" role="alert"></p><button type="button" class="btn" id="itemReviewCancel">取消</button><button type="submit" class="btn primary">保存详情</button></footer></form></dialog>
 <dialog id="subscriptionDialog" aria-labelledby="subscriptionTitle">
 <form id="subscriptionForm">
@@ -1150,6 +1151,7 @@ const EMBEDDED_PROFILES = PAGES_DATA.profiles;
 const PAGES_STRINGS = {"connectedBadge": "Pages 个人版 · 保存到当前浏览器", "connectedStatus": "已连接本机存储 · 世代 {gen} · 勾选可直接写回 md", "connectedToast": "本机存储已就绪；请定期导出完整记录", "saveTitle": "保存检查进度到当前浏览器？", "saveKeepNote": "项目保存在当前浏览器，不会上传 GitHub。", "saveDetail": "保存前保留本机项目快照；请定期从工作台导出完整记录。", "savedToast": "已保存到当前浏览器", "clearRewrite": "浏览器中的项目记录会更新", "clearDetail": "操作前保留完整本机快照。清理网站数据会删除项目和快照，请先导出备份。"};
 window.BOARD_STRINGS = PAGES_STRINGS;
 document.getElementById("pagesProjectName").textContent=PagesStore.get(PagesStore.projectId()).name;
+const RELEASE_CONFIG_FIELDS=[{"key": "app", "label": "App 名称", "group": "应用与发布", "aliases": ["App 名称"], "maxLength": 200}, {"key": "platform", "label": "平台", "group": "应用与发布", "aliases": ["平台"], "maxLength": 1000}, {"key": "version", "label": "版本号", "group": "应用与发布", "aliases": ["版本号"], "maxLength": 100}, {"key": "build", "label": "构建号", "group": "构建配置", "aliases": ["构建号"], "maxLength": 100}, {"key": "date", "label": "检查日期", "group": "应用与发布", "aliases": ["检查日期"], "maxLength": 1000}, {"key": "owner", "label": "负责人", "group": "应用与发布", "aliases": ["负责人"], "maxLength": 200}, {"key": "appIdIOS", "label": "iOS 应用标识", "group": "应用与发布", "aliases": ["iOS 应用标识"], "maxLength": 200}, {"key": "appIdAndroid", "label": "Android 应用标识", "group": "应用与发布", "aliases": ["Android 应用标识"], "maxLength": 200}, {"key": "environment", "label": "环境", "group": "应用与发布", "aliases": ["环境"], "maxLength": 1000}, {"key": "apiBaseUrl", "label": "API 基础地址", "group": "应用与发布", "aliases": ["API 基础地址"], "maxLength": 1000}, {"key": "targetDate", "label": "目标发布日期", "group": "应用与发布", "aliases": ["目标发布日期"], "maxLength": 1000}, {"key": "status", "label": "发布状态", "group": "应用与发布", "aliases": ["发布状态"], "maxLength": 1000}, {"key": "strictValidation", "label": "完整发布检查", "group": "应用与发布", "aliases": ["完整发布检查"], "maxLength": 1000}, {"key": "timeZone", "label": "发布时区", "group": "应用与发布", "aliases": ["发布时区"], "maxLength": 100}, {"key": "privacyPolicyUrl", "label": "隐私政策地址", "group": "应用与发布", "aliases": ["隐私政策地址"], "maxLength": 1000}, {"key": "termsUrl", "label": "用户协议地址", "group": "应用与发布", "aliases": ["用户协议地址"], "maxLength": 1000}, {"key": "supportUrl", "label": "用户支持地址", "group": "应用与发布", "aliases": ["用户支持地址"], "maxLength": 1000}, {"key": "feedbackUrl", "label": "反馈地址", "group": "应用与发布", "aliases": ["反馈地址"], "maxLength": 1000}, {"key": "firebaseProjectId", "label": "Firebase projectId", "group": "Firebase", "aliases": ["Firebase projectId"], "maxLength": 200}, {"key": "firebaseAppId", "label": "Firebase appId", "group": "Firebase", "aliases": ["Firebase appId"], "maxLength": 300}, {"key": "firebaseConfig", "label": "Firebase 配置信息", "group": "Firebase", "aliases": ["Firebase 配置信息"], "maxLength": 8000}, {"key": "analysisApiUrl", "label": "AnalysisApi 地址", "group": "统计与归因", "aliases": ["AnalysisApi 地址"], "maxLength": 1000}, {"key": "analysisApiProjectId", "label": "AnalysisApi projectId", "group": "统计与归因", "aliases": ["AnalysisApi projectId"], "maxLength": 200}, {"key": "adjustAppToken", "label": "Adjust appToken", "group": "统计与归因", "aliases": ["Adjust appToken"], "maxLength": 200}, {"key": "minAndroidSdk", "label": "最低 Android SDK", "group": "构建配置", "aliases": ["最低 Android SDK"], "maxLength": 30}, {"key": "compileSdk", "label": "compileSdk", "group": "构建配置", "aliases": ["compileSdk"], "maxLength": 30}, {"key": "targetSdk", "label": "targetSdk", "group": "构建配置", "aliases": ["targetSdk"], "maxLength": 30}];
 /* Pure configuration checks and release comparison. Raw input files are never persisted. */
 (function(root){
 'use strict';
@@ -1239,9 +1241,9 @@ function decisionLines(snapshot,previous){
 }
 function configurationLines(snapshot,profiles={}){
  const features=snapshot.features||{},release=snapshot.release||{},selected=snapshot.selectedPermissions||snapshot.permissions?.selected||[];
- const enabled=[['hasAccountSystem','账号系统'],['hasAdjust','Adjust 广告归因'],['hasAnalysisApi','AnalysisApi 自有统计'],['hasPush','推送'],['hasFeedbackSystem','反馈系统'],['targetMinors','面向未成年用户'],['hasInitialization','初始化流程核对']].filter(([key])=>features[key]===true).map(([,label])=>label);
+ const enabled=[['hasAccountSystem','账号系统'],['hasAdjust','Adjust 广告归因'],['hasAnalysisApi','AnalysisApi 自有统计'],['hasFirebase','Firebase'],['hasPush','推送'],['hasFeedbackSystem','反馈系统'],['targetMinors','面向未成年用户'],['hasInitialization','初始化流程核对']].filter(([key])=>features[key]===true).map(([,label])=>label);
  const names=new Map((profiles.permissions||[]).map(p=>[p.id,p.name]));
- return ['平台：'+(release.platform||'未指定'),'订阅商品：'+(features.hasSubscriptions===true?'已启用':'未启用'),'功能：'+(enabled.join('、')||'未启用附加功能'),'权限（'+selected.length+'）：'+(selected.map(id=>names.get(id)||id).join('、')||'未选择')];
+ return ['Firebase：'+(features.hasFirebase?'已启用':'未启用'),'Firebase projectId：'+(release.firebaseProjectId||'未填写'),'Firebase appId：'+(release.firebaseAppId||'未填写'),'Firebase 配置：'+(release.firebaseConfig||'未填写'),'平台：'+(release.platform||'未指定'),'订阅商品：'+(features.hasSubscriptions===true?'已启用':'未启用'),'功能：'+(enabled.join('、')||'未启用附加功能'),'权限（'+selected.length+'）：'+(selected.map(id=>names.get(id)||id).join('、')||'未选择')];
 }
 function aiReviewSnapshot(payload,profiles){
  const review=payload.review||{},features=payload.features||{},selected=payload.permSelected||[],permissions={selected,descs:payload.permDescs||{},descsEn:payload.permDescsEn||{}};
@@ -1519,7 +1521,7 @@ function installBoardExperience(){
  installReleaseEditor();refreshReadiness();
 }
 
-const RELEASE_EDITOR_FIELDS=['app','platform','version','build','date','owner','appIdIOS','appIdAndroid','environment','apiBaseUrl','targetDate','status','strictValidation','timeZone','privacyPolicyUrl','termsUrl','supportUrl','feedbackUrl','analysisApiUrl','analysisApiProjectId','adjustAppToken','minAndroidSdk','compileSdk','targetSdk'];
+const RELEASE_EDITOR_FIELDS=RELEASE_CONFIG_FIELDS.map(field=>field.key);
 function releaseEditorValues(){const form=document.getElementById('releaseEditForm');return Object.fromEntries(RELEASE_EDITOR_FIELDS.map(k=>[k,form.elements[k].value.trim()]));}
 function releaseEditorDirty(){const dialog=document.getElementById('releaseEditDialog');return !!dialog?.open&&dialog.dataset.baseline!==JSON.stringify(releaseEditorValues());}
 function openReleaseEditor(){if(!online){toast('请先连接存储服务');return;}const form=document.getElementById('releaseEditForm'),release=reviewData.release||{},docConfig=window.BoardConfig?window.BoardConfig.documentConfigValues():null;for(const key of RELEASE_EDITOR_FIELDS){const input=form.elements[key],value=release[key]||(key==='adjustAppToken'?['Adjust appToken','Adjust App Token'].map(label=>docConfig?.get(label)).find(Boolean)||'':'')||(docConfig?window.BoardConfig.configValue(release,key,docConfig):'')||(key==='date'?ReleaseReadiness.calendarDate(undefined,release.timeZone):key==='timeZone'?ReleaseReadiness.DEFAULT_TIME_ZONE:key==='environment'?'production':key==='status'?'planning':key==='strictValidation'?'off':'');if(input.tagName==='SELECT'&&value&&![...input.options].some(o=>o.value===value))input.add(new Option(value,value));input.value=value;}const dialog=document.getElementById('releaseEditDialog');dialog.dataset.baseline=JSON.stringify(releaseEditorValues());document.getElementById('releaseEditError').textContent='';dialog.showModal();}
@@ -1540,7 +1542,7 @@ function boardFetch(path, options){
  * ------------------------------------------------------------------ */
 let saveConflict=false;
 let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=EMBEDDED.updatedAt||null;
-function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush','hasAdjust','hasAnalysisApi'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
+function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush','hasAdjust','hasAnalysisApi','hasFirebase'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
  if(historyView){
@@ -1583,6 +1585,17 @@ const GUIDE_KEY = EDITION === "local" ? "app-guide-ack" : "app-guide-ack:" + STO
 const LS_KEY = "app-release-checklist-state-v2:" + STORAGE_SCOPE;
 
 function st(id){ return state[id] || "todo"; }
+/* 统一导出入口：导出前要求再次输入加密密钥（Pages 版），取消则不产生任何文件。 */
+async function saveFile(name,blob,type){
+ if(window.ReleaseVaultUI){
+  try{ await window.ReleaseVaultUI.authorize("导出 "+name); }
+  catch(error){ if(typeof toast==="function")toast(error.message); return false; }
+ }
+ const url=URL.createObjectURL(blob),link=document.createElement("a");
+ link.href=url;link.download=name;link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ return true;
+}
 function isResolved(id){ const s = st(id); return s === "done" || s === "skip"; }
 
 function loadState(g){
@@ -2057,7 +2070,7 @@ function hiddenItems(){
 }
 
 function featureHiddenItems(){
-  const keys = ["hasAccountSystem", "hasFeedbackSystem", "targetMinors", "hasSubscriptions", "hasPush", "hasAdjust", "hasAnalysisApi"];
+  const keys = ["hasAccountSystem", "hasFeedbackSystem", "targetMinors", "hasSubscriptions", "hasPush", "hasAdjust", "hasAnalysisApi", "hasFirebase"];
   return hiddenItems().filter(it => keys.includes(it.cond) && !condOk(it.cond));
 }
 
@@ -2536,12 +2549,8 @@ document.getElementById("mExport").addEventListener("click", () => {
     lines.push("## " + sec.title); lines.push(""); walk(sec.blocks); lines.push("");
   }
   const blob = new Blob([lines.join("\n")], {type:"text/markdown;charset=utf-8"});
-  const a = document.createElement("a");
   const d = new Date(); const pad = n => String(n).padStart(2,"0");
-  a.href = URL.createObjectURL(blob);
-  a.download = "上架前App配置清单-" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".md";
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  saveFile("上架前App配置清单-" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ".md", blob);
   toast("已导出副本（未修改原文件）");
 });
 
@@ -2952,7 +2961,7 @@ document.getElementById("permEn").addEventListener("click", async () => {
   if(!online){ toast("离线模式无法写入文件，请启动本地服务"); return; }
   try{
     const d = await api("/api/perm-write-en", {selected: permSelected, descsEn: permDescsEn});
-    if(window.RELEASE_CLOUD || window.RELEASE_PAGES){ const link = document.createElement("a"); const url = URL.createObjectURL(new Blob([d.doc], {type:"text/markdown;charset=utf-8"})); link.href=url; link.download=d.path; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    if(window.RELEASE_CLOUD || window.RELEASE_PAGES)saveFile(d.path, new Blob([d.doc], {type:"text/markdown;charset=utf-8"}));
     toast("已生成 " + d.path + "（" + d.lines + " 行）");
   }catch(e){
     toast("生成失败：" + e.message);
@@ -3086,6 +3095,7 @@ document.getElementById("seqline").addEventListener("click", jumpToCurrent);
  * 项目设置：账号系统 / 未成年用户
  * 切换后立即重算可见条目并重新连续编号；保存时写回 md 的 FEATURES 行。
  * -------------------------------------------------------------- */
+const featFirebase=document.getElementById("featFirebase");
 const featAdjust=document.getElementById("featAdjust"),featAnalysisApi=document.getElementById("featAnalysisApi");
 const featPush = document.getElementById("featPush");
 const featFeedback = document.getElementById("featFeedback");
@@ -3095,7 +3105,7 @@ const featMinor = document.getElementById("featMinor");
 function currentFeatures(){
   return {
     hasAccountSystem: !!(DATA && DATA.features && DATA.features.hasAccountSystem),
-    hasAdjust: DATA?.features?.hasAdjust===true, hasAnalysisApi: DATA?.features?.hasAnalysisApi===true,
+    hasFirebase:DATA?.features?.hasFirebase===true, hasAdjust: DATA?.features?.hasAdjust===true, hasAnalysisApi: DATA?.features?.hasAnalysisApi===true,
     hasPush: DATA?.features?.hasPush === true,
     hasSubscriptions: DATA?.features?.hasSubscriptions !== false,
     hasFeedbackSystem: !!(DATA && DATA.features && DATA.features.hasFeedbackSystem),
@@ -3104,7 +3114,7 @@ function currentFeatures(){
 }
 function refreshFeatUI(){
   const f = currentFeatures();
-  featAdjust.checked=f.hasAdjust;featAnalysisApi.checked=f.hasAnalysisApi;
+  featFirebase.checked=f.hasFirebase;featAdjust.checked=f.hasAdjust;featAnalysisApi.checked=f.hasAnalysisApi;
   featPush.checked = f.hasPush;
   featFeedback.checked = f.hasFeedbackSystem;
   featAcc.checked = f.hasAccountSystem;
@@ -3158,7 +3168,7 @@ function onFeatToggle(){
   saveFailure="";
   if(!DATA) return;
   DATA.features = {
-    hasAdjust:featAdjust.checked,hasAnalysisApi:featAnalysisApi.checked,hasPush: featPush.checked, hasSubscriptions: DATA?.features?.hasSubscriptions !== false, hasFeedbackSystem: featFeedback.checked,
+    hasFirebase:featFirebase.checked,hasAdjust:featAdjust.checked,hasAnalysisApi:featAnalysisApi.checked,hasPush: featPush.checked, hasSubscriptions: DATA?.features?.hasSubscriptions !== false, hasFeedbackSystem: featFeedback.checked,
     hasAccountSystem: featAcc.checked,
     targetMinors: featMinor.checked
   };
@@ -3175,7 +3185,7 @@ featMinor.addEventListener("change", onFeatToggle);
 
 // 保存到 md
 document.getElementById("featSave").addEventListener("click", async () => {
-  const f = {hasAdjust:featAdjust.checked,hasAnalysisApi:featAnalysisApi.checked,hasAccountSystem: featAcc.checked, targetMinors: featMinor.checked, hasPush: featPush.checked, hasSubscriptions: DATA?.features?.hasSubscriptions !== false, hasFeedbackSystem: featFeedback.checked};
+  const f = {hasFirebase:featFirebase.checked,hasAdjust:featAdjust.checked,hasAnalysisApi:featAnalysisApi.checked,hasAccountSystem: featAcc.checked, targetMinors: featMinor.checked, hasPush: featPush.checked, hasSubscriptions: DATA?.features?.hasSubscriptions !== false, hasFeedbackSystem: featFeedback.checked};
   if(!online){
     toast("离线模式无法写入文件，请启动本地服务");
     return;
@@ -3197,6 +3207,8 @@ document.getElementById("featSave").addEventListener("click", async () => {
   }
 });
 
+
+featFirebase.addEventListener("change",onFeatToggle);
 
 
 /* ---- 使用说明入口 ---- */
@@ -3382,8 +3394,7 @@ document.getElementById("releaseSummary").onclick = () => {
     lines.push("- [" + ({done:"x",skip:"-",todo:" "}[item.state]) + "] " + item.text + (item.applicable===false ? "（不适用）" : ""));
     for(const [key,label] of [["reason","跳过原因"],["notes","备注"],["evidence","证据"]]) if(item[key]) lines.push("  "+label+"："+item[key]);
   }
-  const url = URL.createObjectURL(new Blob([lines.join("\n")], {type:"text/markdown;charset=utf-8"}));
-  const a = document.createElement("a"); a.href=url; a.download="发布检查摘要-"+String(snapshot.release?.version||snapshot.version||"版本").replace(/[^\w.-]+/g,"_")+".md"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveFile("发布检查摘要-"+String(snapshot.release?.version||snapshot.version||"版本").replace(/[^\w.-]+/g,"_")+".md", new Blob([lines.join("\n")], {type:"text/markdown;charset=utf-8"}));
 };
 document.getElementById("backupRestore").onclick = async () => {
   if(!online){ toast("请先连接本地服务"); return; }
@@ -3486,7 +3497,7 @@ const subscriptionFields=[
   ['offerTimezone','优惠时区（如 Asia/Shanghai）','text'],['offerLimit','每用户可享次数','integer'],
   ['offerEligibility','优惠适用用户 / 资格','text'],['stacking','试用与优惠叠加规则','textarea'],['notes','其他配置 / 升降级 / 价格变更备注','textarea']]]
 ];
-const subscriptionEditableFields=new Set(['iosProductId','androidProductId','currency','price','period','periodCount','customPeriod']);
+const subscriptionEditableFields=new Set(subscriptionFields.flatMap(([,fields])=>fields.map(([key])=>key)));
 function subscriptionRequiredFields(product){const platform=product.platform||subscriptionProjectPlatform();return new Set(['currency','price','period','periodCount',...(platform==='ios'?['iosProductId']:platform==='android'?['androidProductId']:['iosProductId','androidProductId']),...(product.period==='custom'?['customPeriod']:[])]);}
 function subscriptionProjectPlatform(){const value=String(reviewData.release?.platform||'').toLowerCase();return ['ios','android'].includes(value)?value:'both';}
 function subscriptionPeriodName(product){return product.period==='custom'?(product.customPeriod||'自定义订阅'):(product.periodCount==='1'?'':product.periodCount||'')+({day:'天订阅',week:'周订阅',month:'月订阅',year:'年订阅'}[product.period]||'订阅');}
@@ -3500,7 +3511,7 @@ function subscriptionConditions(){
  document.getElementById('subscriptionConfiguration').classList.toggle('subscription-off',!enabled);
  subscriptionForm.querySelectorAll('[data-add-subscription]').forEach(button=>button.disabled=!enabled||subscriptionSaving);
  for(const card of subscriptionProducts.querySelectorAll('[data-subscription-product]')){
-  const get=key=>card.querySelector('[data-field="'+key+'"]')?.value;const product={...subscriptionDraft[Number(card.dataset.subscriptionProduct)],period:get('period')};const required=subscriptionRequiredFields(product);const platform=product.platform||subscriptionProjectPlatform();
+  const get=key=>card.querySelector('[data-field="'+key+'"]')?.value;const product={...subscriptionDraft[Number(card.dataset.subscriptionProduct)],period:get('period'),platform:get('platform')};const required=subscriptionRequiredFields(product);const platform=product.platform||subscriptionProjectPlatform();
   for(const label of card.querySelectorAll('[data-field-label]')){const key=label.dataset.fieldLabel;let visible=true;
    if(label.dataset.group==='trial'&&key!=='trialEnabled')visible=get('trialEnabled')==='on';
    if(label.dataset.group==='offer'&&key!=='offerEnabled')visible=get('offerEnabled')==='on';
@@ -3536,12 +3547,23 @@ function subscriptionClose(){if(subscriptionSaving)return;if(subscriptionHasChan
 document.getElementById('btnSubscriptions').onclick=()=>{subscriptionFocus=document.activeElement;subscriptionDraft=JSON.parse(JSON.stringify(reviewData.subscriptions||[]));subscriptionEnabled.checked=DATA?.features?.hasSubscriptions!==false;subscriptionRender();subscriptionBaseline=JSON.stringify(subscriptionState());subscriptionUpdateStatus();subscriptionDialog.showModal();};
 document.getElementById('subscriptionClose').onclick=subscriptionClose;document.getElementById('subscriptionCancel').onclick=subscriptionClose;
 subscriptionDialog.addEventListener('cancel',event=>{event.preventDefault();subscriptionClose();});
-subscriptionForm.addEventListener('input',subscriptionUpdateStatus);subscriptionForm.addEventListener('change',subscriptionUpdateStatus);
+subscriptionForm.addEventListener('input',event=>{if(event.target.dataset.field==='name'){const card=event.target.closest('[data-subscription-product]');subscriptionDraft[Number(card.dataset.subscriptionProduct)].nameGenerated='off';}subscriptionUpdateStatus();});subscriptionForm.addEventListener('change',subscriptionUpdateStatus);
 subscriptionForm.querySelectorAll('[data-add-subscription]').forEach(button=>button.onclick=()=>{subscriptionDraft=subscriptionRead();subscriptionDraft.push({id:crypto.randomUUID(),nameGenerated:'on',name:({week:'周订阅',month:'月订阅',year:'年订阅',custom:'自定义订阅'})[button.dataset.addSubscription],period:button.dataset.addSubscription,periodCount:'1',status:'draft',platform:subscriptionProjectPlatform(),currency:'CNY',price:'',familySharing:'off',renewal:'auto',trialEnabled:'off',trialUnit:'day',offerEnabled:'off',offerType:'intro',paymentMode:'recurring',offerPeriod:'month',offerTimezone:ReleaseReadiness.DEFAULT_TIME_ZONE});subscriptionRender();subscriptionUpdateStatus();subscriptionProducts.lastElementChild.scrollIntoView({block:'nearest'});});
 function subscriptionValidate(products){
  const ids=new Set();
  for(const product of products){
   const name=product.name||subscriptionPeriodName(product);
+  const positive=key=>{if(!Number.isSafeInteger(Number(product[key]))||Number(product[key])<1)throw Error(name+'：'+key+' 必须是正整数');};
+  if(product.trialEnabled==='on'){positive('trialCount');if(!['day','week','month','year'].includes(product.trialUnit))throw Error(name+'：请选择试用周期');}
+  if(product.offerEnabled==='on'){
+   positive('offerPeriodCount');positive('offerCycles');if(product.offerLimit)positive('offerLimit');
+   if(product.offerPeriod==='custom'&&!product.offerCustomPeriod?.trim())throw Error(name+'：请填写自定义优惠周期');
+   if(product.paymentMode!=='free'&&(product.offerPrice===''||product.offerPrice===undefined||!Number.isFinite(Number(product.offerPrice))||Number(product.offerPrice)<0))throw Error(name+'：请填写有效优惠金额');
+   if(product.discountAmount&&(!Number.isFinite(Number(product.discountAmount))||Number(product.discountAmount)<0||Number(product.discountAmount)>Number(product.price)))throw Error(name+'：减免金额必须在标准价格范围内');
+   if(product.offerStart&&product.offerEnd&&product.offerStart>=product.offerEnd)throw Error(name+'：优惠结束时间必须晚于开始时间');
+   if(product.offerTimezone)try{new Intl.DateTimeFormat('en',{timeZone:product.offerTimezone});}catch(_){throw Error(name+'：优惠时区无效');}
+  }
+
   if(!/^[A-Z]{3}$/.test(product.currency||''))throw Error(name+'：请填写三位大写币种代码');
   if(product.price===''||product.price===undefined||!Number.isFinite(Number(product.price))||Number(product.price)<0)throw Error(name+'：请填写有效的标准订阅金额');
   if(!subscriptionPeriods.some(([value])=>value===product.period))throw Error(name+'：请选择订阅周期');
@@ -3561,7 +3583,7 @@ subscriptionForm.onsubmit=async event=>{
  }catch(error){showFormSaveFailure(document.getElementById('subscriptionError'),subscriptionForm,error.message);}
  finally{subscriptionSaving=false;subscriptionForm.querySelectorAll('button,input,select,textarea').forEach(input=>input.disabled=false);subscriptionConditions();updateSaveStatus();}
 };
-document.getElementById('subscriptionExport').onclick=()=>{const products=subscriptionRead();const url=URL.createObjectURL(new Blob([JSON.stringify({format:'release-desk-subscriptions/v1',enabled:subscriptionEnabled.checked,products},null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='订阅商品配置.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+document.getElementById('subscriptionExport').onclick=()=>{const products=subscriptionRead();saveFile('订阅商品配置.json',new Blob([JSON.stringify({format:'release-desk-subscriptions/v1',enabled:subscriptionEnabled.checked,products},null,2)],{type:'application/json'}));};
 window.addEventListener('beforeunload',event=>{if(subscriptionHasChanges()){event.preventDefault();event.returnValue='';}});
 
 
@@ -3647,7 +3669,7 @@ function captureFormDraft(){
  return result;
 }
 function persistFormDraft(){try{const draft=captureFormDraft();if(draft.item||draft.release||draft.subscriptions||draft.features||draft.permissions)localStorage.setItem(FORM_DRAFT_KEY,JSON.stringify(draft));else localStorage.removeItem(FORM_DRAFT_KEY);}catch(_){/* Export remains available when local storage is unavailable. */}refreshRecoveryControls();}
-function exportCurrentDraft(){const url=URL.createObjectURL(new Blob([JSON.stringify(captureFormDraft(),null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='release-form-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function exportCurrentDraft(){saveFile('release-form-draft.json',new Blob([JSON.stringify(captureFormDraft(),null,2)],{type:'application/json'}));}
 function showFormSaveFailure(container,form,message){container.textContent=message;const retry=document.createElement('button');retry.type='button';retry.className='btn';retry.textContent='重试保存';retry.onclick=()=>form.requestSubmit();container.append(retry);}
 function clearFailedWrite(path){if(failedWrite?.path===path){failedWrite=null;saveConflict=false;refreshRecoveryControls();}}
 function rememberFailedWrite(path,body,error){failedWrite={path,body,message:error.message};persistFormDraft();if(error.status===409)saveConflict=true;refreshRecoveryControls();}
@@ -3708,7 +3730,8 @@ function categories(result){return [
 ];}
 /* 导入的清单常带一张从分支源码提取的「配置项 / 值」表。发布信息还没保存过这些字段时，
    先显示表里已提取的值，避免明明提取到了却显示「未填写」。 */
-const RELEASE_DOC_LABELS={app:['应用名称','App 名称'],platform:['发布平台','平台'],environment:['发布环境','环境','运行环境'],appIdIOS:['iOS 应用标识','iOS Bundle ID','Bundle ID'],appIdAndroid:['Android 应用标识','应用标识','Android 包名','包名'],apiBaseUrl:['API 基础地址','接口地址','Base URL'],privacyPolicyUrl:['隐私政策地址','隐私政策'],termsUrl:['用户协议地址','用户协议','服务条款'],supportUrl:['用户支持地址','支持地址'],feedbackUrl:['反馈地址','反馈服务地址'],analysisApiUrl:['AnalysisApi 地址','Analysis API 地址','自有统计地址','统计地址'],analysisApiProjectId:['AnalysisApi projectId','AnalysisApi projectID','统计 projectId','projectId'],adjustTokenSource:['Adjust Token 配置位置','Adjust Token 存放位置','Adjust Token','Adjust'],minAndroidSdk:['最低 Android SDK','minSdk','minSdkVersion'],compileSdk:['compileSdk','compileSdkVersion'],targetSdk:['targetSdk','targetSdkVersion'],owner:['负责人','发布负责人'],targetDate:['目标发布日期','目标日期'],timeZone:['发布时区','时区']};
+const RELEASE_DOC_LABELS={app:['应用名称','App 名称'],platform:['发布平台','平台'],environment:['发布环境','环境','运行环境'],appIdIOS:['iOS 应用标识','iOS Bundle ID','Bundle ID'],appIdAndroid:['Android 应用标识','应用标识','Android 包名','包名'],apiBaseUrl:['API 基础地址','接口地址','Base URL'],privacyPolicyUrl:['隐私政策地址','隐私政策'],termsUrl:['用户协议地址','用户协议','服务条款'],supportUrl:['用户支持地址','支持地址'],feedbackUrl:['反馈地址','反馈服务地址'],firebaseProjectId:['Firebase projectId'],firebaseAppId:['Firebase appId'],firebaseConfig:['Firebase 配置信息'],analysisApiUrl:['AnalysisApi 地址','Analysis API 地址','自有统计地址','统计地址'],analysisApiProjectId:['AnalysisApi projectId','AnalysisApi projectID','统计 projectId','projectId'],adjustTokenSource:['Adjust Token 配置位置','Adjust Token 存放位置','Adjust Token','Adjust'],minAndroidSdk:['最低 Android SDK','minSdk','minSdkVersion'],compileSdk:['compileSdk','compileSdkVersion'],targetSdk:['targetSdk','targetSdkVersion'],owner:['负责人','发布负责人'],targetDate:['目标发布日期','目标日期'],timeZone:['发布时区','时区']};
+for(const field of RELEASE_CONFIG_FIELDS)RELEASE_DOC_LABELS[field.key]=[...new Set([...(RELEASE_DOC_LABELS[field.key]||[]),...field.aliases])];
 const RELEASE_KEY_ALIASES={analysisApiProjectId:['analysisProjectId','analysisProjectID','analysisApiProject'],analysisApiUrl:['analysisBaseUrl','analysisApiBaseUrl','analysisUrl'],adjustTokenSource:['adjustToken'],appIdAndroid:['applicationId','packageName'],appIdIOS:['bundleIdentifier','bundleId'],minAndroidSdk:['minSdk']};
 const RELEASE_DOC_SPLIT={version:{label:'版本 / 构建',index:0},build:{label:'版本 / 构建',index:1},versionName:{label:'版本 / 构建',index:0}};
 const ADJUST_TOKEN_LABELS=['Adjust appToken','Adjust App Token','Adjust appToken 值'];
@@ -3730,18 +3753,19 @@ function configValue(release,key,doc){
 function documentConfigExtras(doc,usedLabels){
  const extras=[];
  for(const [label,value] of doc){if(!value||usedLabels.has(label)||/^(配置项|配置项目|项目|名称|字段)$/.test(label))continue;extras.push([label,value]);}
- return extras.slice(0,40);
+ return extras;
 }
 function refresh(){
  if(!DATA)return;
  const config=$('projectConfigurationLines'),release=reviewData.release||{},features=DATA.features||{},names=new Map((EMBEDDED_PROFILES.permissions||[]).map(permission=>[permission.id,permission.name]));
  const doc=documentConfigValues();
- const entries=[['应用名称',configValue(release,'app',doc)||DATA.title],['发布平台',configValue(release,'platform',doc)],['版本 / 构建',[configValue(release,'version',doc),configValue(release,'build',doc)].filter(Boolean).join(' / ')],['iOS 应用标识',configValue(release,'appIdIOS',doc)],['Android 应用标识',configValue(release,'appIdAndroid',doc)],['发布环境',configValue(release,'environment',doc)],['API 基础地址',configValue(release,'apiBaseUrl',doc)],['隐私政策地址',configValue(release,'privacyPolicyUrl',doc)],['用户协议地址',configValue(release,'termsUrl',doc)],['用户支持地址',configValue(release,'supportUrl',doc)],['反馈地址',configValue(release,'feedbackUrl',doc)],['AnalysisApi 地址',configValue(release,'analysisApiUrl',doc)],['AnalysisApi projectId',configValue(release,'analysisApiProjectId',doc)],['Adjust Token 配置位置',configValue(release,'adjustTokenSource',doc)],['Adjust appToken',release.adjustAppToken||ADJUST_TOKEN_LABELS.map(label=>doc.get(label)).find(Boolean)||''],['最低 Android SDK',configValue(release,'minAndroidSdk',doc)],['compileSdk',configValue(release,'compileSdk',doc)],['targetSdk',configValue(release,'targetSdk',doc)],['负责人',configValue(release,'owner',doc)],['目标发布日期',configValue(release,'targetDate',doc)],['发布时区',configValue(release,'timeZone',doc)],['订阅商品',features.hasSubscriptions?'已启用':'未启用'],['Adjust 广告归因',features.hasAdjust?'已启用':'未启用'],['AnalysisApi 自有统计',features.hasAnalysisApi?'已启用':'未启用'],['初始化流程核对',features.hasAdjust||features.hasAnalysisApi?'已启用':'未启用'],['账号系统',features.hasAccountSystem?'已启用':'未启用'],['推送',features.hasPush?'已启用':'未启用'],['反馈系统',features.hasFeedbackSystem?'已启用':'未启用'],['面向未成年用户',features.targetMinors?'是':'否'],['权限',(DATA.permSelected||[]).map(id=>names.get(id)||id).join('、')]];
+ const entries=[['应用名称',configValue(release,'app',doc)||DATA.title],['发布平台',configValue(release,'platform',doc)],['版本 / 构建',[configValue(release,'version',doc),configValue(release,'build',doc)].filter(Boolean).join(' / ')],['iOS 应用标识',configValue(release,'appIdIOS',doc)],['Android 应用标识',configValue(release,'appIdAndroid',doc)],['发布环境',configValue(release,'environment',doc)],['API 基础地址',configValue(release,'apiBaseUrl',doc)],['隐私政策地址',configValue(release,'privacyPolicyUrl',doc)],['用户协议地址',configValue(release,'termsUrl',doc)],['用户支持地址',configValue(release,'supportUrl',doc)],['反馈地址',configValue(release,'feedbackUrl',doc)],['Firebase projectId',release.firebaseProjectId||''],['Firebase appId',release.firebaseAppId||''],['Firebase 配置信息',release.firebaseConfig||''],['Firebase',features.hasFirebase?'已启用':'未启用'],['AnalysisApi 地址',configValue(release,'analysisApiUrl',doc)],['AnalysisApi projectId',configValue(release,'analysisApiProjectId',doc)],['Adjust Token 配置位置',configValue(release,'adjustTokenSource',doc)],['Adjust appToken',release.adjustAppToken||ADJUST_TOKEN_LABELS.map(label=>doc.get(label)).find(Boolean)||''],['最低 Android SDK',configValue(release,'minAndroidSdk',doc)],['compileSdk',configValue(release,'compileSdk',doc)],['targetSdk',configValue(release,'targetSdk',doc)],['负责人',configValue(release,'owner',doc)],['目标发布日期',configValue(release,'targetDate',doc)],['发布时区',configValue(release,'timeZone',doc)],['订阅商品',features.hasSubscriptions?'已启用':'未启用'],['Adjust 广告归因',features.hasAdjust?'已启用':'未启用'],['AnalysisApi 自有统计',features.hasAnalysisApi?'已启用':'未启用'],['初始化流程核对',features.hasAdjust||features.hasAnalysisApi?'已启用':'未启用'],['账号系统',features.hasAccountSystem?'已启用':'未启用'],['推送',features.hasPush?'已启用':'未启用'],['反馈系统',features.hasFeedbackSystem?'已启用':'未启用'],['面向未成年用户',features.targetMinors?'是':'否'],['权限',(DATA.permSelected||[]).map(id=>names.get(id)||id).join('、')]];
  for(const product of reviewData.subscriptions||[])entries.push(['订阅商品 ID',[product.iosProductId,product.androidProductId].filter(Boolean).join(' / ')]);
  const usedLabels=new Set([...Object.values(RELEASE_DOC_LABELS).flat(),...Object.values(RELEASE_DOC_SPLIT).map(option=>option.label),...ADJUST_TOKEN_LABELS]);
+ const grouped=[];let previous='';for(const entry of entries){const label=entry[0];const group=/Firebase/.test(label)?'Firebase':/Adjust|AnalysisApi|统计|初始化/.test(label)?'统计与归因':/订阅/.test(label)?'订阅商品':/SDK|compileSdk|targetSdk|构建/.test(label)?'构建配置':/权限|账号|推送|反馈系统|未成年/.test(label)?'功能与权限':'应用与发布';if(group!==previous){grouped.push([group,undefined]);previous=group;}grouped.push(entry);}entries.splice(0,entries.length,...grouped);
  const extras=documentConfigExtras(doc,usedLabels);
  if(extras.length)entries.push(['清单中提取的其他配置',undefined],...extras);
- const configSignature=JSON.stringify(entries);if(config&&config.dataset.signature!==configSignature){config.dataset.signature=configSignature;const table=document.createElement('table');table.className='project-configuration-table';const body=document.createElement('tbody');for(const [label,value] of entries){const row=document.createElement('tr');if(value===undefined){const heading=document.createElement('th');heading.className='configuration-group';heading.colSpan=2;heading.scope='colgroup';heading.textContent=label;row.append(heading);}else{const key=document.createElement('th'),cell=document.createElement('td');key.scope='row';key.textContent=label;cell.textContent=String(value||'未填写');row.append(key,cell);}body.append(row);}table.append(body);config.replaceChildren(table);}
+ const configSignature=JSON.stringify(entries);if(config&&config.dataset.signature!==configSignature){config.dataset.signature=configSignature;const table=document.createElement('table');table.className='project-configuration-table';const body=document.createElement('tbody');for(const [label,value] of entries){const row=document.createElement('tr');if(value===undefined){const heading=document.createElement('th');heading.className='configuration-group';heading.colSpan=2;heading.scope='colgroup';heading.textContent=label;row.append(heading);}else{const key=document.createElement('th'),cell=document.createElement('td');key.scope='row';key.textContent=label;cell.textContent=String(value||'未填写');row.append(key,cell);}body.append(row);}table.append(body);const search=document.createElement('input');search.type='search';search.placeholder='搜索配置名称、内容或源码位置';search.setAttribute('aria-label','搜索项目配置');search.oninput=()=>{for(const row of body.rows)row.hidden=!row.textContent.toLowerCase().includes(search.value.toLowerCase());};for(const row of body.rows){const cell=row.cells[1];if(!cell)continue;const value=cell.textContent;if(value.length>180){const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent=value.slice(0,100)+'… 展开';pre.textContent=value;pre.style.whiteSpace='pre-wrap';details.append(summary,pre);cell.replaceChildren(details);}const copy=document.createElement('button');copy.type='button';copy.textContent='复制';copy.onclick=async()=>{try{await navigator.clipboard.writeText(value);copy.textContent='已复制';}catch(_){toast('复制失败，请手动选择内容');}};cell.append(copy);}config.replaceChildren(search,table);}
  const snapshot=releaseSnapshot(),result=snapshot.readiness,host=$('releasePriorities');
  const signature=JSON.stringify(result);if(host.dataset.signature!==signature){
   host.dataset.signature=signature;host.replaceChildren();
@@ -3794,8 +3818,7 @@ async function exportAIReview(){
   const snapshot=ReleaseAnalysis.aiReviewSnapshot(data,EMBEDDED_PROFILES);
   const markdown=ReleaseAnalysis.aiReviewMarkdown(snapshot,EMBEDDED_PROFILES);
   const name=(snapshot.release.app||data.title||'项目').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').slice(0,100);
-  const url=URL.createObjectURL(new Blob([markdown],{type:'text/markdown;charset=utf-8'}));
-  const link=document.createElement('a');link.href=url;link.download=name+'-AI排查-'+ReleaseReadiness.calendarDate(undefined,snapshot.release.timeZone)+'.md';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  saveFile(name+'-AI排查-'+ReleaseReadiness.calendarDate(undefined,snapshot.release.timeZone)+'.md',new Blob([markdown],{type:'text/markdown;charset=utf-8'}));
   toast('AI 排查文档已导出，请与项目源码一起提供给 AI 工具');
  }catch(error){toast('导出失败：'+error.message);}finally{aiExporting=false;refresh();}
 }
@@ -3831,5 +3854,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=e21bd16a78e9"></script></body>
+<script defer src="bootstrap.js?v=4f139dfbf007"></script></body>
 </html>
