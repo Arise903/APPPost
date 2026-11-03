@@ -589,3 +589,5 @@ body.history-view #list{opacity:.92}
 .project-configuration-table th.configuration-group{width:auto;background:transparent;border-left:0;border-right:0;padding:14px 0 4px;font-weight:600;color:var(--text-2)}.project-configuration-table td{min-width:0;word-break:break-word}
 
 .ai-export-hint{margin:0 10px 8px;font-size:11px;color:var(--text-2);line-height:1.6}
+
+.dialog-actions{display:flex;justify-content:flex-end;gap:12px;padding:16px 0;position:sticky;bottom:0;background:var(--bg,#fff)}dialog{max-height:85dvh;overflow:auto}dialog .subscription-grid{min-width:0}dialog input,dialog select,dialog textarea{max-width:100%;box-sizing:border-box}@media(max-width:640px){dialog{max-width:calc(100vw - 24px);padding:16px}.subscription-grid{grid-template-columns:minmax(0,1fr)}.project-configuration-table{table-layout:fixed;width:100%}.project-configuration-table td{overflow-wrap:anywhere}}

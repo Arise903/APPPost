@@ -65,6 +65,7 @@ jobs:
           node scripts/test_github_sync.cjs
           node scripts/test_guide_gate.cjs
           node scripts/test_vault.cjs
+          node scripts/test_dashboard_upgrade.cjs
           pip install "Pillow>=11,<13"
           node scripts/test_visual.cjs
       - name: Upload visual comparison on failure

@@ -89,7 +89,8 @@ function configurationLines(snapshot,profiles={}){
  const features=snapshot.features||{},release=snapshot.release||{},selected=snapshot.selectedPermissions||snapshot.permissions?.selected||[];
  const enabled=[['hasAccountSystem','账号系统'],['hasAdjust','Adjust 广告归因'],['hasAnalysisApi','AnalysisApi 自有统计'],['hasFirebase','Firebase'],['hasPush','推送'],['hasFeedbackSystem','反馈系统'],['targetMinors','面向未成年用户'],['hasInitialization','初始化流程核对']].filter(([key])=>features[key]===true).map(([,label])=>label);
  const names=new Map((profiles.permissions||[]).map(p=>[p.id,p.name]));
- return ['Firebase：'+(features.hasFirebase?'已启用':'未启用'),'平台：'+(release.platform||'未指定'),'订阅商品：'+(features.hasSubscriptions===true?'已启用':'未启用'),'功能：'+(enabled.join('、')||'未启用附加功能'),'权限（'+selected.length+'）：'+(selected.map(id=>names.get(id)||id).join('、')||'未选择')];
+ const firebaseStatus=!features.hasFirebase?'未启用':!release.firebaseProjectId||!release.firebaseAppId?'已启用 · 配置待补全':'已记录 · 待验证';
+ return ['Firebase：'+firebaseStatus,'平台：'+(release.platform||'未指定'),'订阅商品：'+(features.hasSubscriptions===true?'已启用':'未启用'),'功能：'+(enabled.join('、')||'未启用附加功能'),'权限（'+selected.length+'）：'+(selected.map(id=>names.get(id)||id).join('、')||'未选择')];
 }
 function aiReviewSnapshot(payload,profiles){
  const review=payload.review||{},features=payload.features||{},selected=payload.permSelected||[],permissions={selected,descs:payload.permDescs||{},descsEn:payload.permDescsEn||{}};
