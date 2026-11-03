@@ -96,11 +96,21 @@ def plist_values(text: str | None) -> dict[str, str]:
     return values
 
 
+FEATURE_KEYS = ["hasAccountSystem", "targetMinors", "hasFeedbackSystem", "hasSubscriptions", "hasPush",
+                "hasAdjust", "hasAnalysisApi"]
+
+
 class Config:
     def __init__(self):
         self.rows: list[tuple[str, str]] = []
         self.release: dict[str, str] = {}
         self.notes: list[str] = []
+        self.features: dict[str, bool] = {}
+
+    def feature_line(self) -> str:
+        if not self.features:
+            return ""
+        return "<!-- FEATURES " + " ".join(f"{key}={1 if self.features.get(key) else 0}" for key in FEATURE_KEYS) + " -->"
 
     def add(self, label: str, value: str) -> None:
         value = str(value or "").strip()
@@ -116,6 +126,23 @@ class Config:
     def note(self, text: str) -> None:
         if text not in self.notes:
             self.notes.append(text)
+
+
+def detect_features(pubspec: str, lib: dict[str, str], ios: bool) -> dict[str, bool]:
+    """Decide the board feature switches from source evidence."""
+    sources = "\n".join(lib.values())
+    adjust_installed = "adjust_sdk" in pubspec
+    # AdjustManager 里有 `if (!Platform.isIOS) return;` / `_isIOS` 门禁时，只有 iOS 真正初始化。
+    ios_only_adjust = bool(re.search(r"if\s*\(!Platform\.isIOS\)\s*return|_isIOS", sources))
+    return {
+        "hasAdjust": bool(adjust_installed and (ios or not ios_only_adjust)),
+        "hasAnalysisApi": bool(re.search(r"_baseUrl\s*=\s*\"https?://", sources)),
+        "hasFeedbackSystem": bool(re.search(r"feedbackApiKey|/feedback/add", sources)),
+        "hasSubscriptions": bool(re.search(r"productId\w*\s*=\s*\"|billing_core|in_app_purchase", pubspec + sources)),
+        "hasPush": "firebase_messaging" in pubspec,
+        "hasAccountSystem": bool(re.search(r"signIn|logIn|login|register|注销|deleteAccount|accountDeletion", sources)),
+        "targetMinors": False,
+    }
 
 
 def extract(repo: Repo, platform: str) -> Config:
@@ -345,6 +372,13 @@ def extract(repo: Repo, platform: str) -> Config:
             cfg.note(f"GoogleService-Info.plist 的 BUNDLE_ID（{ios_plist['BUNDLE_ID']}）与工程 Bundle ID（{ios_id}）不一致")
     cfg.add("发布环境", "production（release 构建；debug 走 sandbox）")
     cfg.suggest("environment", "production")
+    cfg.features = detect_features(pubspec, lib, ios)
+    enabled = [label for key, label in [("hasAdjust", "Adjust 广告归因"), ("hasAnalysisApi", "AnalysisApi 自有统计"),
+                                        ("hasSubscriptions", "订阅商品"), ("hasFeedbackSystem", "反馈系统"),
+                                        ("hasAccountSystem", "账号系统"), ("hasPush", "推送"),
+                                        ("targetMinors", "面向未成年用户")] if cfg.features.get(key)]
+    cfg.add("功能开关（写入清单）", cfg.feature_line())
+    cfg.note("功能开关依据源码判定：" + ("、".join(enabled) + " 已启用" if enabled else "均未在源码中确认启用"))
     cfg.add("未填写的信息", "、".join(["负责人", "目标发布日期", "商店价格与销售地区", "推送证书 / 远程推送配置"]))
     cfg.add("密钥处理", "Adjust appToken 为应用标识，已在上方记录；反馈 API Key、签名密码等仅记录变量与文件位置，不复制明文")
     return cfg
@@ -362,7 +396,10 @@ CHECKLIST = [
 
 
 def markdown(cfg: Config, title: str, checklist: bool = True) -> str:
-    lines = [f"## {title} <!-- section:extracted_config -->", "",
+    lines = []
+    if cfg.features:
+        lines += [cfg.feature_line(), ""]
+    lines += [f"## {title} <!-- section:extracted_config -->", "",
              "| 配置项 | 代码中的值 / 分析结论 |", "| --- | --- |"]
     for label, value in cfg.rows:
         lines.append(f"| {label} | {str(value).replace('|', '/')} |")
@@ -386,13 +423,16 @@ def markdown(cfg: Config, title: str, checklist: bool = True) -> str:
 
 def project_json(cfg: Config, document: str, name: str) -> str:
     """A single project export the board can import (新建项目 → 导入记录)."""
-    return json.dumps({
+    project = {
         "format": "release-desk/v1",
         "name": name,
         "document": document,
         "permissions": {"selected": [], "descs": {}, "descsEn": {}},
         "review": {"release": cfg.release, "items": {}, "history": []},
-    }, ensure_ascii=False, indent=2)
+    }
+    if cfg.features:
+        project["features"] = dict(cfg.features)
+    return json.dumps(project, ensure_ascii=False, indent=2)
 
 
 def main(argv=None) -> int:

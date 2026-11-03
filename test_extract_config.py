@@ -20,6 +20,7 @@ dependencies:
     git:
       url: git@github.com:einsts/billing_core.git
       ref: 0.2.1
+  adjust_sdk: ^5.8.0
 """
 GRADLE = """android {
     namespace = "com.example.demo"
@@ -132,12 +133,22 @@ class FlutterConfigExtractionTests(unittest.TestCase):
         self.assertEqual(config.release["compileSdk"], "35")
         self.assertEqual(config.release["adjustAppToken"], "tokenvalue")
         self.assertIn("com.example.other", " ".join(config.notes))
+        self.assertEqual(config.features["hasAnalysisApi"], True)
+        self.assertEqual(config.features["hasSubscriptions"], True)
+        self.assertEqual(config.features["hasFeedbackSystem"], True)
+        self.assertEqual(config.features["hasAdjust"], False, "Adjust 只在 iOS 初始化")
+        self.assertIn("hasAdjust=0 hasAnalysisApi=1", config.feature_line())
 
     def test_output_is_importable(self):
         config = extractor.extract(extractor.Repo(self.root, None), "Android")
         document = extractor.markdown(config, "从分支提取的配置信息")
         self.assertIn("## 源码配置核对 <!-- section:extracted_checks -->", document)
         self.assertIn("- [ ] 已核对 Adjust appToken", document)
+        self.assertTrue(document.startswith("<!-- FEATURES "), "功能开关要写进清单才能生效")
+        exported = json.loads(extractor.project_json(config, document, "Demo · Android"))
+        self.assertEqual(exported["format"], "release-desk/v1")
+        self.assertEqual(exported["features"]["hasAnalysisApi"], True)
+        self.assertEqual(exported["features"]["hasAdjust"], False)
         project = json.loads(extractor.project_json(config, document, "Demo · Android"))
         self.assertEqual(project["format"], "release-desk/v1")
         self.assertEqual(project["review"]["release"]["adjustAppToken"], "tokenvalue")
@@ -153,6 +164,7 @@ class FlutterConfigExtractionTests(unittest.TestCase):
         self.assertIn("NSCameraUsageDescription", rows["iOS 权限用途说明"])
         self.assertIn("adjust_manager.dart", rows["Adjust Token 配置位置"])
         self.assertEqual(rows["Adjust appToken"], "tokenvalue")
+        self.assertEqual(config.features["hasAdjust"], True)
 
     def test_markdown_and_branch_reading(self):
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)
