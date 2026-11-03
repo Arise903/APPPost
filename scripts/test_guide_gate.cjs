@@ -1,3 +1,4 @@
+const unlockVault=require('./vault-test-helper.cjs');
 /* Real DOM regression: visibility must remain correct on initial load and every rebuild. */
 const assert=require('node:assert/strict');
 const http=require('node:http');
@@ -18,7 +19,7 @@ const server=http.createServer((req,res)=>{
 
 (async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;try{
  browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{})});
- const page=await browser.newPage(),url='http://127.0.0.1:'+server.address().port+'/APPPost/',errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url);await page.waitForFunction(()=>document.getElementById('projectCount').textContent==='0');
+ const page=await browser.newPage(),url='http://127.0.0.1:'+server.address().port+'/APPPost/',errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url);await unlockVault(page);await page.waitForFunction(()=>document.getElementById('projectCount').textContent==='0');
 
  const ids=await page.evaluate(async()=>{const ids=[];for(const t of PagesStore.listTemplates().filter(t=>t.builtin))ids.push(await PagesStore.create({name:t.name,document:t.document,features:t.features}));ids.push(await PagesStore.create({name:'Original',document:PAGES_DATA.document}));ids.push(await PagesStore.create({name:'Imported custom',document:'# Custom\n## Checks\n- [x] 已有进度 <!-- task:existing -->\n- [ ] 未完成 <!-- task:todo -->\n',review:{guideAcknowledged:'on',release:{},items:{},history:[]}}));return ids;});
  for(const id of ids){
