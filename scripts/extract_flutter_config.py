@@ -448,6 +448,7 @@ def extract(repo: Repo, platform: str, catalogue: list[dict] | None = None) -> C
                                         ("hasSubscriptions", "订阅商品"), ("hasFeedbackSystem", "反馈系统"),
                                         ("hasAccountSystem", "账号系统"), ("hasPush", "推送"),
                                         ("targetMinors", "面向未成年用户")] if cfg.features.get(key)]
+    cfg.features["hasFirebase"] = bool(firebase or ios_plist or "firebase_core" in pubspec)
     cfg.add("功能开关（写入清单）", cfg.feature_line())
     cfg.note("功能开关依据源码判定：" + ("、".join(enabled) + " 已启用" if enabled else "均未在源码中确认启用"))
     cfg.add("未填写的信息", "、".join(["负责人", "目标发布日期", "商店价格与销售地区", "推送证书 / 远程推送配置"]))
