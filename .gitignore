@@ -31,3 +31,6 @@ node_modules/
 
 *.subscription-txn.json
 exported/
+
+# 本地项目分析报告
+/reports/
