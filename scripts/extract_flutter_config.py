@@ -225,6 +225,8 @@ def extract(repo: Repo, platform: str) -> Config:
             env = "sandbox（debug）/ production（release）由 kDebugMode 决定"
             cfg.add("Adjust appToken", found.group(1))
             cfg.add("Adjust Token 配置位置", f"{path}:{line} 硬编码 AdjustConfig 第一个参数（appToken）；环境：{env}")
+            cfg.suggest("adjustAppToken", found.group(1))
+            cfg.suggest("adjustTokenSource", f"{path}:{line} AdjustConfig 第一个参数（appToken）")
             if ios:
                 cfg.add("Adjust", "已启用：启动即 initSdk（首会话延迟），随后等待 ATT 结果再完成首次会话")
             else:
@@ -348,12 +350,26 @@ def extract(repo: Repo, platform: str) -> Config:
     return cfg
 
 
-def markdown(cfg: Config, title: str) -> str:
+CHECKLIST = [
+    ("cfg_identity", "已核对应用标识、版本与构建号与最终构建产物一致"),
+    ("cfg_analysis", "已核对 AnalysisApi 地址与 projectId 指向正式环境，Release 包不会打到测试环境"),
+    ("cfg_adjust", "已核对 Adjust appToken 与 Adjust 后台一致，并按平台确认是否真的初始化"),
+    ("cfg_permissions", "已核对权限声明、用途说明与代码实际调用一致"),
+    ("cfg_urls", "已核对隐私政策、用户协议与反馈地址可访问，且内容与本版本一致"),
+    ("cfg_products", "已核对订阅商品 ID、价格与销售地区和商店后台一致"),
+    ("cfg_build", "已核对混淆、ABI、明文网络与签名配置符合发布要求"),
+]
+
+
+def markdown(cfg: Config, title: str, checklist: bool = True) -> str:
     lines = [f"## {title} <!-- section:extracted_config -->", "",
              "| 配置项 | 代码中的值 / 分析结论 |", "| --- | --- |"]
     for label, value in cfg.rows:
         lines.append(f"| {label} | {str(value).replace('|', '/')} |")
     lines += ["", "> 上述为源码静态证据，不代表正式包、商店后台、真机购买或服务器状态已验收。未能确认的值保留为空。"]
+    if checklist:
+        lines += ["", "## 源码配置核对 <!-- section:extracted_checks -->", ""]
+        lines += [f"- [ ] {text} <!-- task:{task} -->" for task, text in CHECKLIST]
     if cfg.notes:
         lines += ["", "### 需要人工确认", ""] + [f"- {note}" for note in cfg.notes]
     if cfg.release:
@@ -368,6 +384,17 @@ def markdown(cfg: Config, title: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def project_json(cfg: Config, document: str, name: str) -> str:
+    """A single project export the board can import (新建项目 → 导入记录)."""
+    return json.dumps({
+        "format": "release-desk/v1",
+        "name": name,
+        "document": document,
+        "permissions": {"selected": [], "descs": {}, "descsEn": {}},
+        "review": {"release": cfg.release, "items": {}, "history": []},
+    }, ensure_ascii=False, indent=2)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Extract release configuration from a Flutter repository")
     parser.add_argument("repo", help="path to the Flutter project")
@@ -375,12 +402,15 @@ def main(argv=None) -> int:
     parser.add_argument("--platform", default="iOS / Android", help="declared release platform")
     parser.add_argument("--title", default="从分支提取的配置信息", help="markdown section title")
     parser.add_argument("--out", help="write the markdown to this file")
+    parser.add_argument("--project", help="write an importable project JSON (release fields prefilled)")
+    parser.add_argument("--no-checklist", action="store_true", help="do not append the verification checklist")
     args = parser.parse_args(argv)
     root = Path(args.repo).expanduser().resolve()
     if not root.is_dir():
         print("项目路径不存在：" + str(root), file=sys.stderr)
         return 1
-    text = markdown(extract(Repo(root, args.branch), args.platform), args.title)
+    config = extract(Repo(root, args.branch), args.platform)
+    text = markdown(config, args.title, not args.no_checklist)
     if args.out:
         out = Path(args.out).expanduser().resolve()
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -388,6 +418,12 @@ def main(argv=None) -> int:
         print(f"已写入 {out}")
     else:
         sys.stdout.write(text)
+    if args.project:
+        name = f"{config.release.get('app') or 'App'} · {args.platform}"
+        target = Path(args.project).expanduser().resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(project_json(config, text, name), encoding="utf-8")
+        print(f"已写入 {target}（可直接导入看板，发布信息已预填 {len(config.release)} 项）")
     return 0
 
 

@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 import tempfile
@@ -127,7 +128,21 @@ class FlutterConfigExtractionTests(unittest.TestCase):
         self.assertIn("billing_core @ 0.2.1", rows["Git 依赖"])
         self.assertEqual(config.release["version"], "2.0.1")
         self.assertEqual(config.release["analysisApiProjectId"], "22")
+        self.assertEqual(config.release["minAndroidSdk"], "24")
+        self.assertEqual(config.release["compileSdk"], "35")
+        self.assertEqual(config.release["adjustAppToken"], "tokenvalue")
         self.assertIn("com.example.other", " ".join(config.notes))
+
+    def test_output_is_importable(self):
+        config = extractor.extract(extractor.Repo(self.root, None), "Android")
+        document = extractor.markdown(config, "从分支提取的配置信息")
+        self.assertIn("## 源码配置核对 <!-- section:extracted_checks -->", document)
+        self.assertIn("- [ ] 已核对 Adjust appToken", document)
+        project = json.loads(extractor.project_json(config, document, "Demo · Android"))
+        self.assertEqual(project["format"], "release-desk/v1")
+        self.assertEqual(project["review"]["release"]["adjustAppToken"], "tokenvalue")
+        self.assertEqual(project["review"]["release"]["minAndroidSdk"], "24")
+        self.assertIn("- [ ] ", project["document"])
 
     def test_ios_branch_values(self):
         rows, config = self.rows("iOS")
