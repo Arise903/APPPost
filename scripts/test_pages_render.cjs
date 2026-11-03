@@ -132,8 +132,8 @@ const server=http.createServer((req,res)=>{
   assert.equal(configRows['源分支'],'android');
   assert.equal(configRows['HTTP 明文开关'],'usesCleartextTraffic=true');
   assert.equal(configRows['配置项'],undefined,'表头不作为配置值');
-  await clickCommand('#releaseEdit');assert.equal(await page.locator('#releaseEditForm [name=analysisApiProjectId]').inputValue(),'104');await page.locator('#releaseEditForm [type=submit]').click();await page.waitForFunction(()=>!document.getElementById('releaseEditDialog').open);
-  assert.equal(await page.evaluate(()=>reviewData.release.analysisApiProjectId),'104');
+  await clickCommand('#releaseEdit');assert.equal(await page.locator('#releaseEditForm [name=analysisApiProjectId]').inputValue(),'104');assert.equal(await page.locator('#releaseEditForm [name=adjustAppToken]').inputValue(),'tokendemo','Adjust 字段只填 appToken');assert.equal(await page.locator('#releaseEditForm [name=adjustTokenSource]').count(),0,'不再要求填写配置位置');await page.locator('#releaseEditForm [type=submit]').click();await page.waitForFunction(()=>!document.getElementById('releaseEditDialog').open);
+  assert.equal(await page.evaluate(()=>reviewData.release.analysisApiProjectId),'104');assert.equal(await page.evaluate(()=>reviewData.release.adjustAppToken),'tokendemo');
   assert.deepEqual(errors,[]);console.log('Pages DOM regression passed: creation setup, platform visibility, explicit drafts, readiness evidence, archives, guide, settings, backups, private sync, history, extracted configuration and mobile layout.');
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
