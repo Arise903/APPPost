@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=301a590a707d"></script><script src="release_analysis.js?v=301a590a707d"></script><script src="vault.js?v=301a590a707d"></script><script src="storage.js?v=301a590a707d"></script><script src="store.js?v=301a590a707d"></script><script>PagesStore.install();</script><script defer src="vault-ui.js?v=301a590a707d"></script><script defer src="experience.js?v=301a590a707d"></script><link rel="stylesheet" href="history.css?v=301a590a707d"><script defer src="history.js?v=301a590a707d"></script><link rel="stylesheet" href="workflows.css?v=301a590a707d"><script defer src="workflows.js?v=301a590a707d"></script>
+<script src="data.js?v=ecf04c2e739d"></script><script src="release_analysis.js?v=ecf04c2e739d"></script><script src="vault.js?v=ecf04c2e739d"></script><script src="storage.js?v=ecf04c2e739d"></script><script src="store.js?v=ecf04c2e739d"></script><script>PagesStore.install();</script><script defer src="vault-ui.js?v=ecf04c2e739d"></script><script defer src="experience.js?v=ecf04c2e739d"></script><link rel="stylesheet" href="history.css?v=ecf04c2e739d"><script defer src="history.js?v=ecf04c2e739d"></script><link rel="stylesheet" href="workflows.css?v=ecf04c2e739d"><script defer src="workflows.js?v=ecf04c2e739d"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -3769,9 +3769,12 @@ function configValue(release,key,doc){
  return '';
 }
 /* 表里没有被发布信息用到的行（源分支、依赖、开关、权限等）同样展示，提取到的配置不再遗漏。 */
+function normalizeConfigLabel(label){return String(label||'').replace(/\*\*/g,'').replace(/[\s_：:（）()·•/.-]/g,'').toLowerCase();}
 function documentConfigExtras(doc,usedLabels){
- const extras=[];
- for(const [label,value] of doc){if(!value||usedLabels.has(label)||/^(配置项|配置项目|项目|名称|字段|发布信息字段)$/.test(label)||/^Firebase\./.test(label)||/^iOS Info\.plist\s*[·•]/.test(label)||/[·•]\s*lib\/.*:\d+$/.test(label)||RELEASE_CONFIG_FIELDS.some(field=>field.key===label)||label==='adjustTokenSource')continue;extras.push([label,value]);}
+ const aliases=new Map();for(const [key,labels] of Object.entries(RELEASE_DOC_LABELS))for(const label of [key,...labels,...(RELEASE_KEY_ALIASES[key]||[])])aliases.set(normalizeConfigLabel(label),key);
+ const canonical=label=>aliases.get(normalizeConfigLabel(label))||normalizeConfigLabel(label);
+ const used=new Set([...usedLabels].map(canonical)),seen=new Set(),extras=[];
+ for(const [label,value] of doc){if(!value||used.has(canonical(label))||/^(配置项|配置项目|项目|名称|字段|发布信息字段)$/.test(label)||/^Firebase\./.test(label)||/^iOS Info\.plist\s*[·•]/.test(label)||/[·•]\s*lib\/.*:\d+$/.test(label)||RELEASE_CONFIG_FIELDS.some(field=>field.key===label)||label==='adjustTokenSource')continue;const identity=canonical(label)+'\0'+String(value).trim();if(seen.has(identity))continue;seen.add(identity);extras.push([label,value]);}
  return extras;
 }
 function refresh(){
@@ -3780,8 +3783,8 @@ function refresh(){
  const doc=documentConfigValues();
  const entries=[['应用名称',configValue(release,'app',doc)||DATA.title],['发布平台',configValue(release,'platform',doc)],['版本 / 构建',[configValue(release,'version',doc),configValue(release,'build',doc)].filter(Boolean).join(' / ')],['iOS 应用标识',configValue(release,'appIdIOS',doc)],['Android 应用标识',configValue(release,'appIdAndroid',doc)],['发布环境',configValue(release,'environment',doc)],['API 基础地址',configValue(release,'apiBaseUrl',doc)],['隐私政策地址',configValue(release,'privacyPolicyUrl',doc)],['用户协议地址',configValue(release,'termsUrl',doc)],['用户支持地址',configValue(release,'supportUrl',doc)],['反馈地址',configValue(release,'feedbackUrl',doc)],['Firebase projectId',configValue(release,'firebaseProjectId',doc)],['Firebase appId',configValue(release,'firebaseAppId',doc)],['Firebase 配置信息',configValue(release,'firebaseConfig',doc)],['Firebase',features.hasFirebase||configValue(release,'firebaseProjectId',doc)||configValue(release,'firebaseConfig',doc)?(configValue(release,'firebaseProjectId',doc)&&configValue(release,'firebaseAppId',doc)?'配置已记录 · 运行结果待验证':'已启用 · 配置待补全'):'未启用'],['AnalysisApi 地址',configValue(release,'analysisApiUrl',doc)],['AnalysisApi projectId',configValue(release,'analysisApiProjectId',doc)],['Adjust Token 配置位置',configValue(release,'adjustTokenSource',doc)],['Adjust appToken',release.adjustAppToken||ADJUST_TOKEN_LABELS.map(label=>doc.get(label)).find(Boolean)||''],['最低 Android SDK',configValue(release,'minAndroidSdk',doc)],['compileSdk',configValue(release,'compileSdk',doc)],['targetSdk',configValue(release,'targetSdk',doc)],['负责人',configValue(release,'owner',doc)],['目标发布日期',configValue(release,'targetDate',doc)],['发布时区',configValue(release,'timeZone',doc)],['订阅商品',features.hasSubscriptions?'已启用':'未启用'],['Adjust 广告归因',features.hasAdjust?'已启用':'未启用'],['AnalysisApi 自有统计',features.hasAnalysisApi?'已启用':'未启用'],['初始化流程核对',features.hasAdjust||features.hasAnalysisApi?'已启用':'未启用'],['账号系统',features.hasAccountSystem?'已启用':'未启用'],['推送',features.hasPush?'已启用':'未启用'],['反馈系统',features.hasFeedbackSystem?'已启用':'未启用'],['面向未成年用户',features.targetMinors?'是':'否'],['权限',(DATA.permSelected||[]).map(id=>names.get(id)||id).join('、')]];
  for(const product of reviewData.subscriptions||[])entries.push(['订阅商品 ID',[product.iosProductId,product.androidProductId].filter(Boolean).join(' / ')]);
- const usedLabels=new Set([...Object.values(RELEASE_DOC_LABELS).flat(),...Object.values(RELEASE_DOC_SPLIT).map(option=>option.label),...ADJUST_TOKEN_LABELS]);
- const grouped=[];let previous='';for(const entry of entries){const label=entry[0];const group=/Firebase/.test(label)?'Firebase':/Adjust|AnalysisApi|统计|初始化/.test(label)?'统计与归因':/订阅/.test(label)?'订阅商品':/SDK|compileSdk|targetSdk|构建/.test(label)?'构建配置':/权限|账号|推送|反馈系统|未成年/.test(label)?'功能与权限':'应用与发布';if(group!==previous){grouped.push([group,undefined]);previous=group;}grouped.push(entry);}entries.splice(0,entries.length,...grouped);
+ const usedLabels=new Set([...Object.values(RELEASE_DOC_LABELS).flat(),...Object.values(RELEASE_DOC_SPLIT).map(option=>option.label),...ADJUST_TOKEN_LABELS,...entries.map(([label])=>label),'Firebase 项目','Firebase iOS 应用']);
+ const groups=new Map();for(const entry of entries){const label=entry[0];const group=/Firebase/.test(label)?'Firebase':/Adjust|AnalysisApi|统计|初始化/.test(label)?'统计与归因':/订阅/.test(label)?'订阅商品':/SDK|compileSdk|targetSdk|构建/.test(label)?'构建配置':/权限|账号|推送|反馈系统|未成年/.test(label)?'功能与权限':'应用与发布';if(!groups.has(group))groups.set(group,[]);const rows=groups.get(group);if(!rows.some(([label,value])=>normalizeConfigLabel(label)===normalizeConfigLabel(entry[0])&&value===entry[1]))rows.push(entry);}entries.splice(0,entries.length,...[...groups].flatMap(([group,rows])=>[[group,undefined],...rows]));
  for(const [key,source] of Object.entries(reviewData.configSources||{})){const label=RELEASE_DOC_LABELS[key]?.[0]||key;entries.push([label+' · 配置来源',(source.source||'导入')+' · '+new Date(source.importedAt).toLocaleString()+(release[key]!==source.value?' · 已手动修改，与导入值不同':' · 当前采用导入值')]);}
  const extras=documentConfigExtras(doc,usedLabels);
  if(extras.length)entries.push(['清单中提取的其他配置',undefined],...extras);
@@ -3874,5 +3877,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=301a590a707d"></script></body>
+<script defer src="bootstrap.js?v=ecf04c2e739d"></script></body>
 </html>
