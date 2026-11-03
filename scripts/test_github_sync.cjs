@@ -50,8 +50,18 @@ const server=http.createServer((req,res)=>{
  await page.locator('#githubSyncDisconnect').click();await page.locator('#githubSyncConnect').click();assert.equal(await page.locator('#githubOwner').inputValue(),'Example-Team');await fill('OtherUser','another-backup');await page.waitForFunction(()=>!document.getElementById('githubSyncPush').disabled);assert.doesNotMatch(await page.locator('#githubSyncStatus').textContent(),/上次同步/);await upload();
  const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('release-desk-github-sync:v1')));assert.equal(stored.repo,'OtherUser/another-backup');assert.ok(stored.repositories['example-team/release.private-data'].lastSyncedAt);assert.ok(stored.repositories['otheruser/another-backup'].lastSyncedAt);
  const beforeReload=requests.length;await page.reload();await page.waitForFunction(()=>!document.getElementById('githubSyncPush').disabled);await page.waitForFunction(()=>document.getElementById('githubSyncStatus').textContent.includes('OtherUser/another-backup'));assert.equal(requests.slice(beforeReload).every(r=>r.name==='OtherUser/another-backup'),true);assert.equal(repos.get('Example-Team/release.private-data').writes,1);
+ // Deleting cloud data removes only the sync file and leaves local projects untouched.
+ await page.locator('#openDataManager').click();await page.waitForFunction(()=>!document.getElementById('githubSyncDeleteRemote').disabled);
+ await page.locator('#githubSyncDeleteRemote').click();await page.waitForFunction(()=>document.getElementById('githubReviewDialog').open);
+ assert.match(await page.locator('#githubReviewTitle').textContent(),/删除云端数据/);
+ page.once('dialog',dialog=>dialog.accept('DELETE'));
+ await page.locator('#githubReviewConfirm').click();
+ await page.waitForFunction(()=>document.getElementById('githubSyncStatus').textContent.includes('云端同步文件已删除'));
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('release-desk-github-sync:v1')).fileSha),null);
+ assert.equal(await page.evaluate(()=>PagesStore.list().length>=1),true,'本机项目不受影响');
+ assert.equal(repos.get('OtherUser/another-backup').writes,1,'删除不写入工作台内容');
  // Existing token-only sessions retain the original repository, with no new default for fresh users.
  const legacy=await context.newPage();await legacy.addInitScript(()=>{sessionStorage.clear();sessionStorage.setItem('release-desk-github-token:session:v1','legacy_mock_token');});await legacy.goto(url);await legacy.waitForFunction(()=>document.getElementById('githubSyncStatus').textContent.includes('Arise903/APPdata'));assert.equal(await legacy.evaluate(()=>JSON.parse(sessionStorage.getItem('release-desk-github-connection:session:v2')).repo),'APPdata');assert.equal(await legacy.evaluate(()=>sessionStorage.getItem('release-desk-github-token:session:v1')),null);
- assert.deepEqual(unexpected,[]);assert.deepEqual(errors,[]);await context.close();console.log('Custom GitHub sync passed: blank setup, input validation, private-only verification, custom owner/repo/default branch, empty upload, history scope, repository switching, per-repo status, reload and legacy session migration.');
+ assert.deepEqual(unexpected,[]);assert.deepEqual(errors,[]);await context.close();console.log('Custom GitHub sync passed: blank setup, input validation, private-only verification, custom owner/repo/default branch, empty upload, history scope, repository switching, per-repo status, reload, remote deletion and legacy session migration.');
  }finally{if(browser)await browser.close();await new Promise(r=>server.close(r));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
