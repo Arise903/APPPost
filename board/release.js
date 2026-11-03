@@ -44,7 +44,34 @@ function updateSummaryReleaseOptions(){
     select.add(new Option(version+(date?" · "+date:""),"history:"+index));
   });
   if([...select.options].some(option=>option.value===previous))select.value=previous;
+  updateReleaseDeleteButton();
 }
+function updateReleaseDeleteButton(){
+  const button=document.getElementById("releaseDelete"),select=document.getElementById("summaryVersion");
+  if(!button)return;
+  const archived=String(select?.value||"").startsWith("history:");
+  button.disabled=!archived;
+  button.title=archived?"删除所选历史版本（不可恢复，当前发布不受影响）":"先在导出版本里选择一个已归档的历史版本";
+}
+function archiveLabel(snapshot,index){
+  const version=snapshot.release?.version||snapshot.version||("历史发布 "+(index+1));
+  return version+(snapshot.date?" · "+new Date(snapshot.date).toLocaleDateString():"");
+}
+document.getElementById("summaryVersion").addEventListener("change",updateReleaseDeleteButton);
+document.getElementById("releaseDelete").onclick=async()=>{
+  const select=document.getElementById("summaryVersion"),selection=select.value;
+  if(!selection.startsWith("history:")){toast("当前发布不能删除；请先在发布里归档，再删除历史版本");return;}
+  if(!online||!gateDone){toast("请先连接存储服务并确认使用说明");return;}
+  if(dirty||featureHasChanges()||permDirty||savingOperations>0){toast("请先保存检查进度、项目设置和权限配置，再删除历史版本");return;}
+  const index=Number(selection.split(":")[1]),history=reviewData.history||[],snapshot=history[index];
+  if(!snapshot){toast("找不到所选发布记录");return;}
+  const label=archiveLabel(snapshot,index);
+  if(!confirm("删除历史版本「"+label+"」？\n\n删除后不可恢复，当前发布与检查进度不受影响。如果还需要这份记录，请先“导出发布摘要”。"))return;
+  const next=JSON.parse(JSON.stringify(reviewData));
+  next.history=history.filter((_,position)=>position!==index);
+  select.value="current";
+  if(await persistReview(next))toast("已删除历史版本 "+label);
+};
 updateSummaryReleaseOptions();
 document.getElementById("releaseSummary").onclick = () => {
   const selection=document.getElementById("summaryVersion").value;
