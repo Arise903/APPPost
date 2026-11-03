@@ -42,7 +42,7 @@ function configValue(release,key,doc){
 /* 表里没有被发布信息用到的行（源分支、依赖、开关、权限等）同样展示，提取到的配置不再遗漏。 */
 function documentConfigExtras(doc,usedLabels){
  const extras=[];
- for(const [label,value] of doc){if(!value||usedLabels.has(label)||/^(配置项|配置项目|项目|名称|字段)$/.test(label))continue;extras.push([label,value]);}
+ for(const [label,value] of doc){if(!value||usedLabels.has(label)||/^(配置项|配置项目|项目|名称|字段|发布信息字段)$/.test(label)||/^Firebase\./.test(label)||/^iOS Info\.plist\s*[·•]/.test(label)||/[·•]\s*lib\/.*:\d+$/.test(label)||RELEASE_CONFIG_FIELDS.some(field=>field.key===label)||label==='adjustTokenSource')continue;extras.push([label,value]);}
  return extras;
 }
 function refresh(){

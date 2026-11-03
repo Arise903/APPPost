@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=c36a309e413c"></script><script src="release_analysis.js?v=c36a309e413c"></script><script src="vault.js?v=c36a309e413c"></script><script src="storage.js?v=c36a309e413c"></script><script src="store.js?v=c36a309e413c"></script><script>PagesStore.install();</script><script defer src="vault-ui.js?v=c36a309e413c"></script><script defer src="experience.js?v=c36a309e413c"></script><link rel="stylesheet" href="history.css?v=c36a309e413c"><script defer src="history.js?v=c36a309e413c"></script><link rel="stylesheet" href="workflows.css?v=c36a309e413c"><script defer src="workflows.js?v=c36a309e413c"></script>
+<script src="data.js?v=301a590a707d"></script><script src="release_analysis.js?v=301a590a707d"></script><script src="vault.js?v=301a590a707d"></script><script src="storage.js?v=301a590a707d"></script><script src="store.js?v=301a590a707d"></script><script>PagesStore.install();</script><script defer src="vault-ui.js?v=301a590a707d"></script><script defer src="experience.js?v=301a590a707d"></script><link rel="stylesheet" href="history.css?v=301a590a707d"><script defer src="history.js?v=301a590a707d"></script><link rel="stylesheet" href="workflows.css?v=301a590a707d"><script defer src="workflows.js?v=301a590a707d"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -3771,7 +3771,7 @@ function configValue(release,key,doc){
 /* 表里没有被发布信息用到的行（源分支、依赖、开关、权限等）同样展示，提取到的配置不再遗漏。 */
 function documentConfigExtras(doc,usedLabels){
  const extras=[];
- for(const [label,value] of doc){if(!value||usedLabels.has(label)||/^(配置项|配置项目|项目|名称|字段)$/.test(label))continue;extras.push([label,value]);}
+ for(const [label,value] of doc){if(!value||usedLabels.has(label)||/^(配置项|配置项目|项目|名称|字段|发布信息字段)$/.test(label)||/^Firebase\./.test(label)||/^iOS Info\.plist\s*[·•]/.test(label)||/[·•]\s*lib\/.*:\d+$/.test(label)||RELEASE_CONFIG_FIELDS.some(field=>field.key===label)||label==='adjustTokenSource')continue;extras.push([label,value]);}
  return extras;
 }
 function refresh(){
@@ -3874,5 +3874,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=c36a309e413c"></script></body>
+<script defer src="bootstrap.js?v=301a590a707d"></script></body>
 </html>
