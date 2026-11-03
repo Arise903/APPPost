@@ -13,6 +13,7 @@ function boardPendingDetails(){
 function itemReviewDirty(){const dialog=document.getElementById('itemReviewDialog');return !!dialog?.open&&(dialog.dataset.baseline!==JSON.stringify(itemReviewValues())||document.getElementById('itemAttachmentUpload').files.length>0);}
 function itemReviewValues(){const f=document.getElementById('itemReviewForm');return {attachmentIds:f.elements.attachmentIds.value,...Object.fromEntries(['evidenceExpiresAt','exceptionType','exceptionOwner','reviewDue','reviewStatus','reviewedAt','approvalStatus','approvalBy','approvalDate'].map(k=>[k,f.elements[k].value])),reason:f.elements.reason.value,notes:f.elements.notes.value,evidence:f.elements.evidence.value,required:f.elements.required.checked?'on':'off',evidenceRequired:f.elements.evidenceRequired.checked?'on':'off'};}
 function openItemReview(item){
+ if(historyView){toast('正在查看历史版本 · 切回「当前发布」后才能修改');return;}
  if(!online){toast('请先连接存储服务');return;}
  const dialog=document.getElementById('itemReviewDialog'),form=document.getElementById('itemReviewForm'),old=reviewData.items?.[item.id]||{};
  dialog.dataset.id=item.id;document.getElementById('itemReviewText').textContent=item.text;

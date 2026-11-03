@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=604648322677"></script><script src="release_analysis.js?v=604648322677"></script><script src="storage.js?v=604648322677"></script><script src="store.js?v=604648322677"></script><script>PagesStore.install();</script><script defer src="experience.js?v=604648322677"></script><link rel="stylesheet" href="history.css?v=604648322677"><script defer src="history.js?v=604648322677"></script><link rel="stylesheet" href="workflows.css?v=604648322677"><script defer src="workflows.js?v=604648322677"></script>
+<script src="data.js?v=3eed0f72c705"></script><script src="release_analysis.js?v=3eed0f72c705"></script><script src="storage.js?v=3eed0f72c705"></script><script src="store.js?v=3eed0f72c705"></script><script>PagesStore.install();</script><script defer src="experience.js?v=3eed0f72c705"></script><link rel="stylesheet" href="history.css?v=3eed0f72c705"><script defer src="history.js?v=3eed0f72c705"></script><link rel="stylesheet" href="workflows.css?v=3eed0f72c705"><script defer src="workflows.js?v=3eed0f72c705"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -581,6 +581,9 @@ li.item.gateitem>.item-evidence-summary{grid-column:1 / -1}
 .subscription-grid .field-caption{display:block}.required-mark{color:var(--danger);font-weight:700}.subscription-grid .subscription-readonly input,.subscription-grid .subscription-readonly select,.subscription-grid .subscription-readonly textarea{background:var(--surface-2);color:var(--text-3);cursor:default;opacity:1;-webkit-text-fill-color:var(--text-3)}
 
 /* Release priorities remain visible before the full checklist. */
+.history-view-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 0;padding:10px 14px;border:1px solid #e6cf9c;border-radius:10px;background:#fff8e8;color:#7a5a12;font-size:13px}
+.history-view-banner[hidden]{display:none}
+body.history-view #list{opacity:.92}
 .release-priorities{margin:18px 0 10px;padding:16px;border:1px solid var(--line,#dce2df);border-radius:12px;background:#f5f8f6}
 .release-priorities strong{display:block;font-size:15px;color:#244a39}
 .priority-metrics{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
@@ -608,6 +611,7 @@ li.item.gateitem>.item-evidence-summary{grid-column:1 / -1}
   <header class="card board-header">
     <div class="hrow"><div class="board-heading"><h1 id="ttl"></h1><p id="boardReleaseLabel" class="board-release-label"></p></div><span class="grow"></span><button type="button" class="pill warn hidden" id="featPill" aria-label="打开项目设置并查看隐藏检查项">已隐藏 <b>0</b> 项</button><span class="mode" id="mode"><span class="dot"></span><span id="modeTxt">离线模式</span></span></div>
     <div class="board-overview"><div class="board-progress"><div class="hprog"><div class="track" role="progressbar" aria-label="项目检查进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill" id="fill"></div></div><span class="pct" id="pct" aria-hidden="true">0%</span><span class="cnt" id="cnt" role="status" aria-live="polite"></span></div><div id="saveStatus" role="status" aria-live="polite"></div></div><div class="primary-actions"><button class="btn" id="continueCheck">继续检查</button><button class="btn primary" id="btnSave" disabled>保存进度</button><button class="btn" id="saveAll" disabled>保存全部</button></div></div>
+    <div id="historyViewBanner" class="history-view-banner" role="status" hidden><span id="historyViewText"></span><button class="btn" id="historyViewExit">返回当前发布</button></div>
     <section id="releasePriorities" class="release-priorities" aria-label="发布待办概览"></section><details class="release-readiness" id="readinessPanel"><summary id="readinessSummary">发布就绪检查</summary><p>必需项、证据和例外期限统一在条目详情维护。</p><ul id="readinessIssues"></ul></details>
     <nav class="board-commands" aria-label="项目操作">
       <details class="board-menu workflow-menu" id="configMenu"><summary>项目配置</summary><div class="board-menu-content"><button class="btn" id="btnFeat">项目设置</button><button class="btn" id="btnSubscriptions">订阅商品</button><button class="btn" id="btnPerm">权限配置</button><button class="btn" id="aiReviewExport">导出 AI 排查文档（.md）</button><p id="aiReviewExportHint" class="ai-export-hint" role="status"></p><div id="configTools"></div></div></details>
@@ -1487,6 +1491,7 @@ function boardPendingDetails(){
 function itemReviewDirty(){const dialog=document.getElementById('itemReviewDialog');return !!dialog?.open&&(dialog.dataset.baseline!==JSON.stringify(itemReviewValues())||document.getElementById('itemAttachmentUpload').files.length>0);}
 function itemReviewValues(){const f=document.getElementById('itemReviewForm');return {attachmentIds:f.elements.attachmentIds.value,...Object.fromEntries(['evidenceExpiresAt','exceptionType','exceptionOwner','reviewDue','reviewStatus','reviewedAt','approvalStatus','approvalBy','approvalDate'].map(k=>[k,f.elements[k].value])),reason:f.elements.reason.value,notes:f.elements.notes.value,evidence:f.elements.evidence.value,required:f.elements.required.checked?'on':'off',evidenceRequired:f.elements.evidenceRequired.checked?'on':'off'};}
 function openItemReview(item){
+ if(historyView){toast('正在查看历史版本 · 切回「当前发布」后才能修改');return;}
  if(!online){toast('请先连接存储服务');return;}
  const dialog=document.getElementById('itemReviewDialog'),form=document.getElementById('itemReviewForm'),old=reviewData.items?.[item.id]||{};
  dialog.dataset.id=item.id;document.getElementById('itemReviewText').textContent=item.text;
@@ -1538,6 +1543,14 @@ let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=EMBEDD
 function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush','hasAdjust','hasAnalysisApi'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
+ if(historyView){
+  const label="只读：正在查看历史版本 "+historyView.label;
+  el.textContent=label;el.dataset.state="saved";
+  const mobile=document.getElementById("mobileStatus");if(mobile)mobile.textContent=label;
+  for(const id of ["btnSave","saveAll","mobileSave"]){const button=document.getElementById(id);if(button)button.disabled=true;}
+  window.BoardRecovery?.refresh();
+  return;
+ }
  const permissionPending=typeof permDirty!=="undefined"&&permDirty;
  const extraPending=boardPendingDetails();
  const pending=extraPending.length>0||(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
@@ -1560,6 +1573,7 @@ let dirty = false;        // 有未保存的改动
 let online = false;       // 是否连上本地服务
 let gen = 0;              // 世代号
 let ORDER = [];           // 按全文顺序排列的条目 id
+let historyView = null;   // 非空时正在查看某份历史归档（只读，不落盘）
 // Storage scopes: cloud isolates per user+project, Pages per project, local per file.
 const STORAGE_SCOPE = window.RELEASE_PAGES ? "pages:" + PagesStore.projectId()
   : window.RELEASE_CLOUD ? window.RELEASE_CLOUD.userId + ":" + window.RELEASE_CLOUD.projectId
@@ -1582,6 +1596,7 @@ function loadState(g){
   }catch(e){ return {}; }
 }
 function saveState(){
+  if(historyView) return false; // 历史版本视图只读，不能覆盖本机草稿
   try{ localStorage.setItem(LS_KEY, JSON.stringify({__gen: gen, state: state, revision: baseRevision})); localDraftFailure=""; return true; }
   catch(e){ localDraftFailure="本机草稿保存失败。请勿关闭页面，并尽快导出项目备份。"; updateSaveStatus(); return false; }
 }
@@ -2218,13 +2233,14 @@ function refreshAll(){
   updateSaveStatus();
   refreshReadiness();
   // 先按顺序计算锁定，再统一应用
-  const firstOpen = computeLocks();
+  if(historyView)document.querySelectorAll("li.item").forEach(li => { li.dataset.locked = "0"; });
+  const firstOpen = historyView ? "" : computeLocks();
   document.querySelectorAll("li.item").forEach(li => {
     const id = li.dataset.id;
     const s = st(id);
     const cb = li.querySelector("input[type=checkbox]");
     cb.checked = s === "done";
-    cb.disabled = li.dataset.locked === "1";
+    cb.disabled = historyView ? true : li.dataset.locked === "1";
     li.classList.toggle("done", s === "done");
     li.classList.toggle("skip", s === "skip");
     li.classList.toggle("locked", li.dataset.locked === "1");
@@ -2363,6 +2379,7 @@ function mergeItems(d){
 document.getElementById("list").addEventListener("change", async e => {
   const cb = e.target;
   if(cb.type !== "checkbox") return;
+  if(historyView){ cb.checked = st(cb.closest("li.item").dataset.id) === "done"; toast("正在查看历史版本 · 切回「当前发布」后才能修改"); return; }
   const li = cb.closest("li.item");
   const id = li.dataset.id;
   if(li.dataset.locked === "1"){
@@ -2397,6 +2414,7 @@ document.getElementById("list").addEventListener("click", e => {
   if(!sb) return;
   e.preventDefault();
   e.stopPropagation();
+  if(historyView){ toast("正在查看历史版本 · 切回「当前发布」后才能修改"); return; }
   const id = sb.dataset.id;
   const li = sb.closest("li.item");
   if(li.dataset.locked === "1"){
@@ -3276,25 +3294,74 @@ function updateReleaseDeleteButton(){
   const button=document.getElementById("releaseDelete"),select=document.getElementById("summaryVersion");
   if(!button)return;
   const archived=String(select?.value||"").startsWith("history:");
-  button.disabled=!archived;
-  button.title=archived?"删除所选历史版本（不可恢复，当前发布不受影响）":"先在导出版本里选择一个已归档的历史版本";
+  button.disabled=false;
+  button.title=archived?"删除所选历史版本（不可恢复，当前发布不受影响）":"清空当前发布的发布信息（检查进度、备注与证据保留）";
 }
 function archiveLabel(snapshot,index){
   const version=snapshot.release?.version||snapshot.version||("历史发布 "+(index+1));
   return version+(snapshot.date?" · "+new Date(snapshot.date).toLocaleDateString():"");
 }
-document.getElementById("summaryVersion").addEventListener("change",updateReleaseDeleteButton);
+function updateHistoryBanner(){
+  const banner=document.getElementById("historyViewBanner");if(!banner)return;
+  banner.hidden=!historyView;
+  document.body.classList.toggle("history-view",!!historyView);
+  if(historyView)document.getElementById("historyViewText").textContent="正在查看历史版本 · "+historyView.label+"（只读，不含当前未保存改动）";
+}
+/* 切换下拉时真正切换页面数据：历史版本只读展示，返回当前发布时恢复现场。 */
+function enterHistoryView(index){
+  const snapshot=(reviewData.history||[])[index];if(!snapshot)return false;
+  if(!historyView)historyView={state:{...state},reviewData,features:{...DATA.features},label:""};
+  const items=Array.isArray(snapshot.items)?snapshot.items:[];
+  const saved={};
+  for(const item of items)if(item&&item.state&&item.state!=="todo")saved[item.id]=item.state;
+  const itemMap={};for(const item of items)if(item&&item.id)itemMap[item.id]=item;
+  const base=historyView.reviewData;
+  state=saved;
+  reviewData={...base,release:snapshot.release||{},items:itemMap,subscriptions:Array.isArray(snapshot.subscriptions)?snapshot.subscriptions:(base.subscriptions||[]),evidenceFiles:snapshot.evidenceFiles||base.evidenceFiles||{}};
+  if(snapshot.features)DATA.features={...DATA.features,...snapshot.features};
+  historyView.label=archiveLabel(snapshot,index);
+  build();refreshAll();refreshFeatUI?.();updateHistoryBanner();
+  return true;
+}
+function exitHistoryView(){
+  if(!historyView)return false;
+  const saved=historyView;historyView=null;
+  state=saved.state;reviewData=saved.reviewData;DATA.features=saved.features;
+  build();setMode(online);refreshAll();refreshFeatUI?.();updateHistoryBanner();
+  return true;
+}
+document.getElementById("summaryVersion").addEventListener("change",event=>{
+  const select=event.target,value=String(select.value||"");
+  if(value.startsWith("history:")){
+    if(!enterHistoryView(Number(value.split(":")[1])))select.value="current";
+  }else exitHistoryView();
+  updateReleaseDeleteButton();
+});
+document.getElementById("historyViewExit").onclick=()=>{
+  document.getElementById("summaryVersion").value="current";
+  exitHistoryView();updateReleaseDeleteButton();
+};
 document.getElementById("releaseDelete").onclick=async()=>{
   const select=document.getElementById("summaryVersion"),selection=select.value;
-  if(!selection.startsWith("history:")){toast("当前发布不能删除；请先在发布里归档，再删除历史版本");return;}
   if(!online||!gateDone){toast("请先连接存储服务并确认使用说明");return;}
-  if(dirty||featureHasChanges()||permDirty||savingOperations>0){toast("请先保存检查进度、项目设置和权限配置，再删除历史版本");return;}
+  if(dirty||featureHasChanges()||permDirty||savingOperations>0){toast("请先保存检查进度、项目设置和权限配置，再删除版本");return;}
+  if(!selection.startsWith("history:")){
+    const version=reviewData.release?.version||"未填写版本";
+    if(!confirm("删除当前发布的发布信息（"+version+"）？\n\n将清空版本号、包名、地址等发布信息；检查进度、备注、证据、订阅与权限设置保留。需要留底请先“导出发布摘要”或“归档本次发布”。"))return;
+    const next=JSON.parse(JSON.stringify(reviewData));
+    next.release={};
+    select.value="current";
+    if(await persistReview(next))toast("已删除当前发布的发布信息");
+    return;
+  }
   const index=Number(selection.split(":")[1]),history=reviewData.history||[],snapshot=history[index];
   if(!snapshot){toast("找不到所选发布记录");return;}
   const label=archiveLabel(snapshot,index);
   if(!confirm("删除历史版本「"+label+"」？\n\n删除后不可恢复，当前发布与检查进度不受影响。如果还需要这份记录，请先“导出发布摘要”。"))return;
+  const wasViewing=!!historyView;
+  if(wasViewing)exitHistoryView();
   const next=JSON.parse(JSON.stringify(reviewData));
-  next.history=history.filter((_,position)=>position!==index);
+  next.history=(reviewData.history||[]).filter((_,position)=>position!==index);
   select.value="current";
   if(await persistReview(next))toast("已删除历史版本 "+label);
 };
@@ -3764,5 +3831,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=604648322677"></script></body>
+<script defer src="bootstrap.js?v=3eed0f72c705"></script></body>
 </html>

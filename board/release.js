@@ -50,25 +50,74 @@ function updateReleaseDeleteButton(){
   const button=document.getElementById("releaseDelete"),select=document.getElementById("summaryVersion");
   if(!button)return;
   const archived=String(select?.value||"").startsWith("history:");
-  button.disabled=!archived;
-  button.title=archived?"删除所选历史版本（不可恢复，当前发布不受影响）":"先在导出版本里选择一个已归档的历史版本";
+  button.disabled=false;
+  button.title=archived?"删除所选历史版本（不可恢复，当前发布不受影响）":"清空当前发布的发布信息（检查进度、备注与证据保留）";
 }
 function archiveLabel(snapshot,index){
   const version=snapshot.release?.version||snapshot.version||("历史发布 "+(index+1));
   return version+(snapshot.date?" · "+new Date(snapshot.date).toLocaleDateString():"");
 }
-document.getElementById("summaryVersion").addEventListener("change",updateReleaseDeleteButton);
+function updateHistoryBanner(){
+  const banner=document.getElementById("historyViewBanner");if(!banner)return;
+  banner.hidden=!historyView;
+  document.body.classList.toggle("history-view",!!historyView);
+  if(historyView)document.getElementById("historyViewText").textContent="正在查看历史版本 · "+historyView.label+"（只读，不含当前未保存改动）";
+}
+/* 切换下拉时真正切换页面数据：历史版本只读展示，返回当前发布时恢复现场。 */
+function enterHistoryView(index){
+  const snapshot=(reviewData.history||[])[index];if(!snapshot)return false;
+  if(!historyView)historyView={state:{...state},reviewData,features:{...DATA.features},label:""};
+  const items=Array.isArray(snapshot.items)?snapshot.items:[];
+  const saved={};
+  for(const item of items)if(item&&item.state&&item.state!=="todo")saved[item.id]=item.state;
+  const itemMap={};for(const item of items)if(item&&item.id)itemMap[item.id]=item;
+  const base=historyView.reviewData;
+  state=saved;
+  reviewData={...base,release:snapshot.release||{},items:itemMap,subscriptions:Array.isArray(snapshot.subscriptions)?snapshot.subscriptions:(base.subscriptions||[]),evidenceFiles:snapshot.evidenceFiles||base.evidenceFiles||{}};
+  if(snapshot.features)DATA.features={...DATA.features,...snapshot.features};
+  historyView.label=archiveLabel(snapshot,index);
+  build();refreshAll();refreshFeatUI?.();updateHistoryBanner();
+  return true;
+}
+function exitHistoryView(){
+  if(!historyView)return false;
+  const saved=historyView;historyView=null;
+  state=saved.state;reviewData=saved.reviewData;DATA.features=saved.features;
+  build();setMode(online);refreshAll();refreshFeatUI?.();updateHistoryBanner();
+  return true;
+}
+document.getElementById("summaryVersion").addEventListener("change",event=>{
+  const select=event.target,value=String(select.value||"");
+  if(value.startsWith("history:")){
+    if(!enterHistoryView(Number(value.split(":")[1])))select.value="current";
+  }else exitHistoryView();
+  updateReleaseDeleteButton();
+});
+document.getElementById("historyViewExit").onclick=()=>{
+  document.getElementById("summaryVersion").value="current";
+  exitHistoryView();updateReleaseDeleteButton();
+};
 document.getElementById("releaseDelete").onclick=async()=>{
   const select=document.getElementById("summaryVersion"),selection=select.value;
-  if(!selection.startsWith("history:")){toast("当前发布不能删除；请先在发布里归档，再删除历史版本");return;}
   if(!online||!gateDone){toast("请先连接存储服务并确认使用说明");return;}
-  if(dirty||featureHasChanges()||permDirty||savingOperations>0){toast("请先保存检查进度、项目设置和权限配置，再删除历史版本");return;}
+  if(dirty||featureHasChanges()||permDirty||savingOperations>0){toast("请先保存检查进度、项目设置和权限配置，再删除版本");return;}
+  if(!selection.startsWith("history:")){
+    const version=reviewData.release?.version||"未填写版本";
+    if(!confirm("删除当前发布的发布信息（"+version+"）？\n\n将清空版本号、包名、地址等发布信息；检查进度、备注、证据、订阅与权限设置保留。需要留底请先“导出发布摘要”或“归档本次发布”。"))return;
+    const next=JSON.parse(JSON.stringify(reviewData));
+    next.release={};
+    select.value="current";
+    if(await persistReview(next))toast("已删除当前发布的发布信息");
+    return;
+  }
   const index=Number(selection.split(":")[1]),history=reviewData.history||[],snapshot=history[index];
   if(!snapshot){toast("找不到所选发布记录");return;}
   const label=archiveLabel(snapshot,index);
   if(!confirm("删除历史版本「"+label+"」？\n\n删除后不可恢复，当前发布与检查进度不受影响。如果还需要这份记录，请先“导出发布摘要”。"))return;
+  const wasViewing=!!historyView;
+  if(wasViewing)exitHistoryView();
   const next=JSON.parse(JSON.stringify(reviewData));
-  next.history=history.filter((_,position)=>position!==index);
+  next.history=(reviewData.history||[]).filter((_,position)=>position!==index);
   select.value="current";
   if(await persistReview(next))toast("已删除历史版本 "+label);
 };

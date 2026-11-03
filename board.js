@@ -22,6 +22,14 @@ let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=EMBEDD
 function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush','hasAdjust','hasAnalysisApi'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
+ if(historyView){
+  const label="只读：正在查看历史版本 "+historyView.label;
+  el.textContent=label;el.dataset.state="saved";
+  const mobile=document.getElementById("mobileStatus");if(mobile)mobile.textContent=label;
+  for(const id of ["btnSave","saveAll","mobileSave"]){const button=document.getElementById(id);if(button)button.disabled=true;}
+  window.BoardRecovery?.refresh();
+  return;
+ }
  const permissionPending=typeof permDirty!=="undefined"&&permDirty;
  const extraPending=boardPendingDetails();
  const pending=extraPending.length>0||(typeof dirty!=="undefined"&&dirty)||featureHasChanges()||permissionPending;
@@ -44,6 +52,7 @@ let dirty = false;        // 有未保存的改动
 let online = false;       // 是否连上本地服务
 let gen = 0;              // 世代号
 let ORDER = [];           // 按全文顺序排列的条目 id
+let historyView = null;   // 非空时正在查看某份历史归档（只读，不落盘）
 // Storage scopes: cloud isolates per user+project, Pages per project, local per file.
 const STORAGE_SCOPE = window.RELEASE_PAGES ? "pages:" + PagesStore.projectId()
   : window.RELEASE_CLOUD ? window.RELEASE_CLOUD.userId + ":" + window.RELEASE_CLOUD.projectId
@@ -66,6 +75,7 @@ function loadState(g){
   }catch(e){ return {}; }
 }
 function saveState(){
+  if(historyView) return false; // 历史版本视图只读，不能覆盖本机草稿
   try{ localStorage.setItem(LS_KEY, JSON.stringify({__gen: gen, state: state, revision: baseRevision})); localDraftFailure=""; return true; }
   catch(e){ localDraftFailure="本机草稿保存失败。请勿关闭页面，并尽快导出项目备份。"; updateSaveStatus(); return false; }
 }
@@ -702,13 +712,14 @@ function refreshAll(){
   updateSaveStatus();
   refreshReadiness();
   // 先按顺序计算锁定，再统一应用
-  const firstOpen = computeLocks();
+  if(historyView)document.querySelectorAll("li.item").forEach(li => { li.dataset.locked = "0"; });
+  const firstOpen = historyView ? "" : computeLocks();
   document.querySelectorAll("li.item").forEach(li => {
     const id = li.dataset.id;
     const s = st(id);
     const cb = li.querySelector("input[type=checkbox]");
     cb.checked = s === "done";
-    cb.disabled = li.dataset.locked === "1";
+    cb.disabled = historyView ? true : li.dataset.locked === "1";
     li.classList.toggle("done", s === "done");
     li.classList.toggle("skip", s === "skip");
     li.classList.toggle("locked", li.dataset.locked === "1");
@@ -820,6 +831,7 @@ function mergeItems(d){
 document.getElementById("list").addEventListener("change", async e => {
   const cb = e.target;
   if(cb.type !== "checkbox") return;
+  if(historyView){ cb.checked = st(cb.closest("li.item").dataset.id) === "done"; toast("正在查看历史版本 · 切回「当前发布」后才能修改"); return; }
   const li = cb.closest("li.item");
   const id = li.dataset.id;
   if(li.dataset.locked === "1"){
@@ -854,6 +866,7 @@ document.getElementById("list").addEventListener("click", e => {
   if(!sb) return;
   e.preventDefault();
   e.stopPropagation();
+  if(historyView){ toast("正在查看历史版本 · 切回「当前发布」后才能修改"); return; }
   const id = sb.dataset.id;
   const li = sb.closest("li.item");
   if(li.dataset.locked === "1"){

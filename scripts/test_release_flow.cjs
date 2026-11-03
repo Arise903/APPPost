@@ -50,12 +50,29 @@ const server=http.createServer((req,res)=>{
   const conclusion=await page.evaluate(()=>reviewData.history[0].conclusion);assert.equal(conclusion.ready,false);assert.equal(conclusion.owner,'Tester');assert.ok(conclusion.confirmedAt);assert.equal(conclusion.issues[0].id,'second');
   await page.locator('#publishMenu > summary').click();await page.locator('#summaryVersion').selectOption('history:0');const downloading=page.waitForEvent('download');await page.locator('#releaseSummary').click();const download=await downloading;const report=fs.readFileSync(await download.path(),'utf8');assert.match(report,/## 发布结论/);assert.match(report,/暂不发布/);assert.match(report,/### 证据缺口/);
   const restored=await page.evaluate(async()=>{const bundle=PagesStore.export(PagesStore.projectId()),copy=await PagesStore.create({requireGuideConfirmation:false,name:'备份恢复验证',...bundle});return PagesStore.export(copy);});assert.deepEqual(restored.assets,saved.assets);assert.equal(restored.review.history[0].conclusion.owner,'Tester');
+  // 切换导出版本会切到该版本的只读视图，返回当前发布后恢复现场。
+  await page.evaluate(()=>{document.getElementById('publishMenu').open=true;});
+  const currentState=await page.evaluate(()=>({...state}));
+  await page.evaluate(()=>{reviewData.history[0].items=reviewData.history[0].items.map(item=>({...item,state:'done'}));});
+  await page.locator('#summaryVersion').selectOption('history:0');
+  await page.waitForFunction(()=>!!historyView);
+  assert.equal(await page.locator('#historyViewBanner').isVisible(),true,'历史版本要有只读提示');
+  assert.equal(await page.locator('#btnSave').isDisabled(),true,'历史版本不能保存');
+  assert.equal(await page.locator('#pct').innerText(),'100%','页面要切到该版本的进度');
+  assert.match(await page.locator('#boardReleaseLabel').innerText(),/版本 1/);
+  const lockedState=await page.evaluate(()=>({...state}));
+  await page.evaluate(()=>{document.querySelector('li.item input[type=checkbox]').click();});
+  assert.equal(await page.evaluate(()=>dirty),false,'历史视图里的勾选不应产生改动');
+  assert.deepEqual(await page.evaluate(()=>({...state})),lockedState);
+  await page.locator('#historyViewExit').click();
+  await page.waitForFunction(()=>!historyView);
+  assert.equal(await page.locator('#historyViewBanner').isVisible(),false);
+  assert.equal(await page.locator('#btnSave').isDisabled(),false,'返回后可以继续保存');
+  assert.deepEqual(await page.evaluate(()=>({...state})),currentState,'返回当前发布要恢复原有进度');
+  assert.equal(await page.locator('#pct').innerText(),'50%','返回后进度恢复为当前页面的值');
   // 多个历史版本时可以删除其中一个；删除只影响归档记录。
   await page.evaluate(()=>{document.getElementById('publishMenu').open=true;});
-  await page.locator('#summaryVersion').selectOption('current');
-  assert.equal(await page.locator('#releaseDelete').isDisabled(),true,'未选中历史版本时不可删除');
   await page.locator('#summaryVersion').selectOption('history:0');
-  assert.equal(await page.locator('#releaseDelete').isDisabled(),false);
   await page.evaluate(()=>{reviewData.history.push({...JSON.parse(JSON.stringify(reviewData.history[0])),release:{...reviewData.release,version:'0.9'},date:'2026/10/1'});updateSummaryReleaseOptions();});
   assert.equal(await page.locator('#summaryVersion option').count(),3);
   await page.locator('#summaryVersion').selectOption('history:1');
@@ -64,12 +81,21 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>reviewData.history.length===1);
   assert.equal(await page.locator('#summaryVersion option').count(),2);
   assert.equal(await page.locator('#summaryVersion').inputValue(),'current');
-  assert.equal(await page.locator('#releaseDelete').isDisabled(),true);
   assert.equal(await page.evaluate(()=>PagesStore.get(PagesStore.projectId()).review.history.length),1,'删除结果已保存');
   assert.equal(await page.evaluate(()=>reviewData.history[0].release.version),'1','保留的是另一个版本');
   await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);
   await page.evaluate(()=>{document.getElementById('publishMenu').open=true;});
   assert.equal(await page.locator('#summaryVersion option').count(),2,'刷新后仍是删除后的版本');
+  // 当前发布也支持删除：只清空发布信息，历史版本与检查进度保留。
+  await page.evaluate(()=>{document.getElementById('publishMenu').open=true;});
+  await page.locator('#summaryVersion').selectOption('current');
+  assert.equal(await page.locator('#releaseDelete').isDisabled(),false,'当前发布也可以删除');
+  page.once('dialog',dialog=>dialog.accept());
+  await page.locator('#releaseDelete').click();
+  await page.waitForFunction(()=>Object.keys(reviewData.release||{}).length===0);
+  assert.equal(await page.evaluate(()=>reviewData.history.length),1,'删除当前发布不影响历史版本');
+  assert.equal(await page.evaluate(()=>PagesStore.get(PagesStore.projectId()).review.release.version),undefined,'清空结果已保存');
+  assert.match(await page.locator('#boardReleaseLabel').innerText(),/尚未填写版本/);
   // A second browser tab makes the first tab stale; save-all must retain its draft.
   const other=await context.newPage();await other.goto(url+'board.html?id='+id);await other.waitForFunction(()=>typeof online!=='undefined'&&online);await other.evaluate(async()=>{const p=PagesStore.get(PagesStore.projectId());await PagesStore.mutate(p.id,p.version,'another tab',p=>p.review.release.build='2');});await page.evaluate(()=>{state.second='done';markDirty();render();});await page.locator(width<600?'#mobileSave':'#saveAll').click();await page.waitForFunction(()=>saveConflict||saveFailure);assert.equal(await page.evaluate(()=>dirty),true);assert.equal(await page.evaluate(()=>state.second),'done');await other.close();
   fs.mkdirSync(path.resolve(__dirname,'../artifacts/release-flow'),{recursive:true});await page.screenshot({path:path.resolve(__dirname,'../artifacts/release-flow/'+label+'.png'),fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);await context.close();

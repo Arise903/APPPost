@@ -573,6 +573,9 @@ li.item.gateitem>.item-evidence-summary{grid-column:1 / -1}
 .subscription-grid .field-caption{display:block}.required-mark{color:var(--danger);font-weight:700}.subscription-grid .subscription-readonly input,.subscription-grid .subscription-readonly select,.subscription-grid .subscription-readonly textarea{background:var(--surface-2);color:var(--text-3);cursor:default;opacity:1;-webkit-text-fill-color:var(--text-3)}
 
 /* Release priorities remain visible before the full checklist. */
+.history-view-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 0;padding:10px 14px;border:1px solid #e6cf9c;border-radius:10px;background:#fff8e8;color:#7a5a12;font-size:13px}
+.history-view-banner[hidden]{display:none}
+body.history-view #list{opacity:.92}
 .release-priorities{margin:18px 0 10px;padding:16px;border:1px solid var(--line,#dce2df);border-radius:12px;background:#f5f8f6}
 .release-priorities strong{display:block;font-size:15px;color:#244a39}
 .priority-metrics{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
