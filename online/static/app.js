@@ -69,7 +69,7 @@ async function showTeam(id){
 }
 bindForm('inviteForm',async form=>{
  const result=await api('/api/projects/'+selectedProject+'/invite',formObject(form));
- $('inviteLink').value=location.origin+result.path; $('inviteResult').hidden=false;
+ $('inviteLink').value=location.origin+result.path; $('inviteResult').hidden=false;$('teamDialog').close();notify('邀请链接已生成，请复制并发送给受邀人');
 });
 bindForm('passwordForm',async form=>{
  account=await api('/api/auth/password',formObject(form));
@@ -87,7 +87,7 @@ async function startDashboard(){
  $('search').oninput=renderProjects;
  $('logout').onclick=async()=>{try{await api('/api/auth/logout',{});location.href='/login';}catch(e){notify(e.message);}};
  $('passwordButton').onclick=()=>$('passwordDialog').showModal();
- $('copyInvite').onclick=async()=>{try{await navigator.clipboard.writeText($('inviteLink').value);notify('邀请链接已复制');}catch(_){$('inviteLink').select();notify('请复制已选中的邀请链接');}};
+ $('copyInvite').onclick=async()=>{try{await navigator.clipboard.writeText($('inviteLink').value);$('teamDialog').close();notify('邀请链接已复制');}catch(_){$('inviteLink').select();notify('请复制已选中的邀请链接');}};
  $('projectGrid').onclick=async event=>{
   try{
    const team=event.target.closest('[data-team]');if(team){await showTeam(team.dataset.team);return;}
@@ -102,7 +102,7 @@ async function startDashboard(){
  $('memberList').onchange=async event=>{
   const select=event.target.closest('[data-member]');if(!select)return;
   if(!confirm(select.value==='remove'?'移除该成员的项目访问权限？':'更新该成员的项目角色？')){await showTeam(selectedProject);return;}
-  try{await api('/api/projects/'+selectedProject+'/members',{userId:select.dataset.member,role:select.value});await showTeam(selectedProject);notify('成员权限已更新');}catch(e){notify(e.message);}
+  try{await api('/api/projects/'+selectedProject+'/members',{userId:select.dataset.member,role:select.value});$('teamDialog').close();notify('成员权限已更新');}catch(e){notify(e.message);}
  };
 }
 if(document.body.dataset.page==='dashboard')startDashboard();

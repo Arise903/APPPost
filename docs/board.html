@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="data.js?v=5ec0d0638c35"></script><script src="release_analysis.js?v=5ec0d0638c35"></script><script src="vault.js?v=5ec0d0638c35"></script><script src="storage.js?v=5ec0d0638c35"></script><script src="store.js?v=5ec0d0638c35"></script><script>PagesStore.install();</script><script defer src="vault-ui.js?v=5ec0d0638c35"></script><script defer src="experience.js?v=5ec0d0638c35"></script><link rel="stylesheet" href="history.css?v=5ec0d0638c35"><script defer src="history.js?v=5ec0d0638c35"></script><link rel="stylesheet" href="workflows.css?v=5ec0d0638c35"><script defer src="workflows.js?v=5ec0d0638c35"></script>
+<script src="data.js?v=9e0f43d116dc"></script><script src="release_analysis.js?v=9e0f43d116dc"></script><script src="vault.js?v=9e0f43d116dc"></script><script src="storage.js?v=9e0f43d116dc"></script><script src="store.js?v=9e0f43d116dc"></script><script>PagesStore.install();</script><script defer src="vault-ui.js?v=9e0f43d116dc"></script><script defer src="experience.js?v=9e0f43d116dc"></script><link rel="stylesheet" href="history.css?v=9e0f43d116dc"><script defer src="history.js?v=9e0f43d116dc"></script><link rel="stylesheet" href="workflows.css?v=9e0f43d116dc"><script defer src="workflows.js?v=9e0f43d116dc"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>检查项目 · Pages 个人版</title>
@@ -3591,7 +3591,7 @@ subscriptionForm.onsubmit=async event=>{
  event.preventDefault();if(subscriptionSaving)return;
  try{const products=subscriptionRead();if(subscriptionEnabled.checked)subscriptionValidate(products);if(!online)throw Error('请先连接存储服务');subscriptionSaving=true;subscriptionForm.querySelectorAll('button,input,select,textarea').forEach(input=>input.disabled=true);
   const d=await api('/api/subscriptions',{enabled:subscriptionEnabled.checked,products});
-  reviewData=d.review;DATA=mergeItems(d);serverBaseline=baselineFromData(d);updateSummaryReleaseOptions();render();refreshFeatUI();markDirty();saveState();subscriptionDraft=JSON.parse(JSON.stringify(products));subscriptionBaseline=JSON.stringify(subscriptionState());subscriptionUpdateStatus();toast('订阅设置与商品已保存');
+  reviewData=d.review;DATA=mergeItems(d);serverBaseline=baselineFromData(d);updateSummaryReleaseOptions();render();refreshFeatUI();markDirty();saveState();subscriptionDraft=JSON.parse(JSON.stringify(products));subscriptionBaseline=JSON.stringify(subscriptionState());subscriptionUpdateStatus();subscriptionDialog.close();subscriptionFocus?.focus();toast('订阅设置与商品已保存');
  }catch(error){showFormSaveFailure(document.getElementById('subscriptionError'),subscriptionForm,error.message);}
  finally{subscriptionSaving=false;subscriptionForm.querySelectorAll('button,input,select,textarea').forEach(input=>input.disabled=false);subscriptionConditions();updateSaveStatus();}
 };
@@ -3881,5 +3881,5 @@ refresh();
 
 
 </script>
-<script defer src="bootstrap.js?v=5ec0d0638c35"></script></body>
+<script defer src="bootstrap.js?v=9e0f43d116dc"></script></body>
 </html>

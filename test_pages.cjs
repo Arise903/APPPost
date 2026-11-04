@@ -417,3 +417,27 @@ test('Optional modules are not injected when the checklist already has that sect
 });
 test('Recycle bin preserves and restores project records and backups',async()=>{const {S}=setup();const id=await S.create({name:'Recoverable'});const before=S.get(id).document;await S.remove(id);assert.equal(S.list().length,0);assert.equal(S.listDeleted().length,1);assert.equal(S.exportAll().projects.length,1);await S.restoreDeleted(id);assert.equal(S.list().length,1);assert.equal(S.get(id).document,before);assert.equal(S.listDeleted().length,0);});
 test('Configuration import preserves progress, notes and supports selective conflict resolution',async()=>{const {S}=setup();const id=await S.create({name:'Keep progress'});const item=S.payload(S.get(id)).items.find(i=>!i.gate);await S.mutate(id,1,'prepare',p=>{p.document=S.apply(p.document,{[item.id]:'done'});p.review.items[item.id]={notes:'keep evidence'};p.review.release.version='manual';});const before=S.get(id);const incoming={document:'# Source\n## Tasks\n- [ ] Import <!-- task:source -->\n',name:'feature-iOS',review:{release:{firebaseProjectId:'new-project',version:'incoming'},items:{},history:[]}};await S.updateConfiguration(id,before.version,incoming,['firebaseProjectId']);const after=S.get(id);assert.equal(after.document,before.document);assert.equal(after.review.items[item.id].notes,'keep evidence');assert.equal(after.review.release.version,'manual');assert.equal(after.review.release.firebaseProjectId,'new-project');assert.equal(after.review.configSources.firebaseProjectId.source,'feature-iOS');assert.ok(after.snapshots.length);await assert.rejects(S.updateConfiguration(id,before.version,incoming,['version']),/另一个页面/);});
+
+
+test('AI source Markdown imports release, features, permissions and subscriptions without exposing metadata in the checklist',async()=>{
+ const I=require('./pages/project-import.js'),{S,context}=setup(),data=vm.runInContext('PAGES_DATA',context);
+ const prompt=I.prompt(data),example=JSON.parse(prompt.match(/<!-- RELEASE_DESK_IMPORT\n([\s\S]*?)\n-->/)[1]);
+ example.release={app:'已有工程',platform:'Android',version:'2.1',build:'42',apiBaseUrl:'https://example.org/api',strictValidation:'on'};
+ example.features.hasSubscriptions=true;example.permissions={selected:['camera'],descs:{camera:'扫描二维码'},descsEn:{camera:'Scan QR codes'}};
+ example.subscriptions=[{id:'year',name:'年订阅',platform:'android',androidProductId:'demo.year',period:'year',periodCount:'1',currency:'CNY',price:'39',status:'draft'}];
+ const document='# 已有工程\n<!-- RELEASE_DESK_IMPORT\n'+JSON.stringify(example)+'\n-->\n## 工程配置与源码依据\n| 配置项 | 实际值 | 源码依据 | 确认状态 |\n| --- | --- | --- | --- |\n| Android 应用标识 | org.example.app | app/build.gradle:12 | 已确认 |\n## 上架检查清单\n- [ ] 核对发布构建\n';
+ const input=I.read(document,data),id=await S.create({name:'已有工程',...input}),project=S.get(id);
+ assert.equal(project.review.release.version,'2.1');assert.equal(project.review.release.build,'42');assert.equal(project.review.subscriptions[0].androidProductId,'demo.year');assert.equal(S.parse(project.document).features.hasSubscriptions,true);assert.equal(project.permissions.descs.camera,'扫描二维码');assert.doesNotMatch(project.document,/RELEASE_DESK_IMPORT/);assert.equal(S.payload(project).gateDone,false);assert.ok(S.parse(project.document).items.every(i=>i.state==='todo'));
+ const target=await S.create({name:'现有记录',document:'# 原有清单\n## 检查\n- [x] 原有检查\n',review:{release:{version:'1'},items:{keep:{notes:'保留备注'}},history:[]}}),before=S.get(target);
+ await S.updateConfiguration(target,before.version,input,['version']);const after=S.get(target);assert.equal(after.review.release.version,'2.1');assert.equal(after.document,before.document);assert.equal(after.review.items.keep.notes,'保留备注');assert.equal(after.review.subscriptions?.length||0,0);
+});
+
+test('AI source Markdown rejects malformed metadata and preserves plain Markdown compatibility',()=>{
+ const I=require('./pages/project-import.js'),{context}=setup(),data=vm.runInContext('PAGES_DATA',context),example=JSON.parse(I.prompt(data).match(/<!-- RELEASE_DESK_IMPORT\n([\s\S]*?)\n-->/)[1]);
+ const wrap=value=>'# App\n<!-- RELEASE_DESK_IMPORT\n'+JSON.stringify(value)+'\n-->\n## Checks\n- [ ] Check\n';
+ assert.deepEqual(I.read('# App\n## Checks\n- [ ] Old',data),{document:'# App\n## Checks\n- [ ] Old'});
+ assert.throws(()=>I.read('<!-- RELEASE_DESK_IMPORT {bad} -->',data),/JSON/);assert.throws(()=>I.read('<!-- RELEASE_DESK_IMPORT {',data),/未闭合/);assert.throws(()=>I.read(wrap(example)+wrap(example),data),/一份/);
+ const bad=mutate=>{const value=JSON.parse(JSON.stringify(example));mutate(value);return ()=>I.read(wrap(value),data);};
+ assert.throws(bad(v=>v.release.unknown='x'),/不支持/);assert.throws(bad(v=>v.release.build=42),/格式无效/);assert.throws(bad(v=>v.release.platform='web'),/平台/);assert.throws(bad(v=>v.features.hasPush='true'),/八项功能/);assert.throws(bad(v=>v.permissions.selected=['invented']),/权限/);assert.throws(bad(v=>v.subscriptions=[{price:39}]),/商品/);
+ assert.match(I.prompt(data),/相对文件路径:行号/);assert.match(I.prompt(data),/所有发布检查项保持 - \[ \]/);assert.match(I.prompt(data),/不输出私钥/);
+});

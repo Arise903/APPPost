@@ -34,11 +34,11 @@ function render(){
   else{
    if(event.type==='snapshot')card.append(node('p','此快照保存于上方操作发生前；内容最后修改于 '+date(event.value.state.updatedAt),'history-hint'));
    const details=node('details');details.append(node('summary','查看记录'));details.addEventListener('toggle',()=>{if(details.open&&!details.dataset.loaded){details.dataset.loaded='1';try{details.append(preview(event.type==='snapshot'?event.value.state:event.value));}catch(e){details.append(node('p','无法预览：'+e.message));}}});card.append(details);
-   const actions=node('div',undefined,'history-tools'),download=node('button','下载这份记录','button secondary btn');download.type='button';download.onclick=()=>S.download('release-history-'+(event.date||'legacy')+'.json',JSON.stringify(event.type==='snapshot'?{format:'release-desk/v1',...event.value.state}:event.value,null,2));actions.append(download);
+   const actions=node('div',undefined,'history-tools'),download=node('button','下载这份记录','button secondary btn');download.type='button';download.onclick=async()=>{const result=await S.download('release-history-'+(event.date||'legacy')+'.json',JSON.stringify(event.type==='snapshot'?{format:'release-desk/v1',...event.value.state}:event.value,null,2));if(result!==false)dialog.close();};actions.append(download);
    if(event.type==='snapshot'){const restore=node('button','恢复此快照','button secondary btn');restore.type='button';restore.onclick=async()=>{
     try{if(pending())throw Error('当前有未保存内容，请先保存或取消修改，再恢复历史快照。');if(!confirm('恢复此快照？当前项目会先保留快照，随后恢复检查、配置和备注。'))return;restore.disabled=true;
      await S.mutate(projectId,p.version,'restore',current=>{const selected=current.snapshots.find(s=>s.id===event.value.id);if(!selected)throw Error('快照已变化，请重新打开历史记录');const version=current.version,generation=current.generation;Object.assign(current,JSON.parse(JSON.stringify(selected.state)));current.version=version;current.generation=Math.max(generation,current.generation)+1;});
-     if(window.RELEASE_PAGES){location.reload();return;}window.dispatchEvent(new Event('storage'));render();
+     if(window.RELEASE_PAGES){location.reload();return;}window.dispatchEvent(new Event('storage'));dialog.close();
     }catch(e){error.textContent=e.message;}finally{restore.disabled=false;}
    };actions.append(restore);}card.append(actions);
   }

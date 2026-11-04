@@ -26,19 +26,19 @@ PAGES_STRINGS={
 
 def build():
     OUT.mkdir(exist_ok=True)
-    inputs=[ROOT/'checklist_modules.json',ROOT/'board.js',ROOT/'release_readiness.js',ROOT/'release_analysis.js',*sorted((ROOT/'board').glob('*.js')),ROOT/'board.css',ROOT/'board_template.html',ROOT/'permission_rules.json',ROOT/'permission_visibility.js',ROOT/'permission_profiles.json',ROOT/'online/default_checklist.md',ROOT/'online/static/app.css',Path(__file__),*sorted(path for path in (ROOT/'pages').glob('*') if path.suffix in ('.js','.html','.css'))]
+    inputs=[ROOT/'release_config_fields.json',ROOT/'checklist_modules.json',ROOT/'board.js',ROOT/'release_readiness.js',ROOT/'release_analysis.js',*sorted((ROOT/'board').glob('*.js')),ROOT/'board.css',ROOT/'board_template.html',ROOT/'permission_rules.json',ROOT/'permission_visibility.js',ROOT/'permission_profiles.json',ROOT/'online/default_checklist.md',ROOT/'online/static/app.css',Path(__file__),*sorted(path for path in (ROOT/'pages').glob('*') if path.suffix in ('.js','.html','.css'))]
     digest=hashlib.sha256()
     for path in inputs:
         if path.is_file(): digest.update(path.read_bytes())
     version=digest.hexdigest()[:12]
     template_version=hashlib.sha256((ROOT/'online/default_checklist.md').read_bytes()).hexdigest()[:10]
-    for name in ('index.html','dashboard.js','store.js','vault.js','vault-ui.js','github-sync.js','guide.html','guide.js','experience.js','history.js','history.css','enhancements.css','storage.js','bootstrap.js','templates.js','workflows.js','workflows.css'):
+    for name in ('index.html','dashboard.js','store.js','vault.js','vault-ui.js','github-sync.js','guide.html','guide.js','experience.js','history.js','history.css','enhancements.css','storage.js','bootstrap.js','templates.js','workflows.js','workflows.css','project-import.js'):
         shutil.copyfile(ROOT/'pages'/name,OUT/name)
     shutil.copyfile(ROOT/'online/static/app.css',OUT/'app.css')
     shutil.copyfile(ROOT/'permission_visibility.js',OUT/'permission_visibility.js')
     shutil.copyfile(ROOT/'release_readiness.js',OUT/'release_readiness.js')
     shutil.copyfile(ROOT/'release_analysis.js',OUT/'release_analysis.js')
-    data={'modules':c.load_checklist_modules(),'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles(),'rules':json.loads((ROOT/'permission_rules.json').read_text(encoding='utf-8')),'version':version,'templateVersion':template_version,'permissionsVersion':hashlib.sha256((ROOT/'permission_profiles.json').read_bytes()).hexdigest()[:10]}
+    data={'configFields':json.loads((ROOT/'release_config_fields.json').read_text(encoding='utf-8')),'modules':c.load_checklist_modules(),'document':(ROOT/'online/default_checklist.md').read_text(encoding='utf-8'),'profiles':c.load_profiles(),'rules':json.loads((ROOT/'permission_rules.json').read_text(encoding='utf-8')),'version':version,'templateVersion':template_version,'permissionsVersion':hashlib.sha256((ROOT/'permission_profiles.json').read_bytes()).hexdigest()[:10]}
     (OUT/'data.js').write_text('const PAGES_DATA = '+json.dumps(data,ensure_ascii=False).replace('</','<\\/')+';\n',encoding='utf-8')
     page=(ROOT/'board_template.html').read_text(encoding='utf-8')
     # 版本差异走运行时开关：文案与存储作用域都在源码内，构建只做注入。

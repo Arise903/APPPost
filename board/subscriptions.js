@@ -107,7 +107,7 @@ subscriptionForm.onsubmit=async event=>{
  event.preventDefault();if(subscriptionSaving)return;
  try{const products=subscriptionRead();if(subscriptionEnabled.checked)subscriptionValidate(products);if(!online)throw Error('请先连接存储服务');subscriptionSaving=true;subscriptionForm.querySelectorAll('button,input,select,textarea').forEach(input=>input.disabled=true);
   const d=await api('/api/subscriptions',{enabled:subscriptionEnabled.checked,products});
-  reviewData=d.review;DATA=mergeItems(d);serverBaseline=baselineFromData(d);updateSummaryReleaseOptions();render();refreshFeatUI();markDirty();saveState();subscriptionDraft=JSON.parse(JSON.stringify(products));subscriptionBaseline=JSON.stringify(subscriptionState());subscriptionUpdateStatus();toast('订阅设置与商品已保存');
+  reviewData=d.review;DATA=mergeItems(d);serverBaseline=baselineFromData(d);updateSummaryReleaseOptions();render();refreshFeatUI();markDirty();saveState();subscriptionDraft=JSON.parse(JSON.stringify(products));subscriptionBaseline=JSON.stringify(subscriptionState());subscriptionUpdateStatus();subscriptionDialog.close();subscriptionFocus?.focus();toast('订阅设置与商品已保存');
  }catch(error){showFormSaveFailure(document.getElementById('subscriptionError'),subscriptionForm,error.message);}
  finally{subscriptionSaving=false;subscriptionForm.querySelectorAll('button,input,select,textarea').forEach(input=>input.disabled=false);subscriptionConditions();updateSaveStatus();}
 };

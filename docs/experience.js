@@ -22,7 +22,7 @@ function boot(){
  label.style.cssText='font-size:10px;color:#859087;padding:12px 24px;';document.body.append(label);
  checkVersion();document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkVersion();});setInterval(checkVersion,300000);
  if(document.getElementById('workspaceBackup')){
-  document.getElementById('workspaceBackup').onclick=async()=>{try{await backup();showBackup();}catch(e){releaseDialog(e.message);}};
+  document.getElementById('workspaceBackup').onclick=async()=>{try{await backup();showBackup();document.getElementById('dataManager')?.close();}catch(e){releaseDialog(e.message);}};
   document.getElementById('workspaceImport').onchange=async event=>{
    const file=event.target.files[0];if(!file)return;
    try{

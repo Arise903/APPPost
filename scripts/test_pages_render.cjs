@@ -45,7 +45,7 @@ const server=http.createServer((req,res)=>{
   for(const [index,card] of (await page.locator('[data-subscription-product]').all()).entries()){await card.locator('[data-field="iosProductId"]').fill('ios.'+index);await card.locator('[data-field="androidProductId"]').fill('android.'+index);await card.locator('[data-field="price"]').fill(index?'39.90':'18.50');}
   await page.locator('#subscriptionSave').click();await page.waitForFunction(()=>document.getElementById('subscriptionStatus').textContent.includes('已保存'));
   assert.equal(await product.locator('[data-field="basePlanId"]').isDisabled(),true,'Save must not unlock read-only controls');
-  await page.locator('#subscriptionClose').click();await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);
+  await page.locator('#subscriptionDialog').waitFor({state:'hidden'});await page.reload();await page.waitForFunction(()=>typeof online!=='undefined'&&online);
   const preserved=await page.evaluate(()=>reviewData.subscriptions[0]);assert.equal(preserved.basePlanId,'original-plan');assert.equal(preserved.trialCount,'7');assert.equal(preserved.offerCycles,'3');assert.equal(preserved.offerStart,'2026-11-29T08:00');assert.equal(preserved.offerEnd,'2026-10-28T08:00');assert.equal(preserved.benefits,'<script>alert(1)</script>');assert.equal(preserved.customMetadata,'保留未显示字段');
   await clickCommand('#btnSubscriptions');assert.equal(await page.locator('[data-subscription-product]').count(),3);
   await page.locator('[data-field="price"]').first().fill('999');page.once('dialog',dialog=>dialog.accept());await page.locator('#subscriptionCancel').click();
