@@ -21,7 +21,23 @@
         "module_adjust_links",
         "Adjust 深度链接、归因回调和安装事件已在真机及后台验证"
       ]
-    ]
+    ],
+    "headingPattern": "^#{2,4}\\s+.*[Aa]djust",
+    "legacyCoverage": {
+      "module_adjust_tokens": [
+        "t_8867619d"
+      ],
+      "module_adjust_consent": [
+        "t_d1a80cfd",
+        "t_4cc4f45c"
+      ],
+      "module_adjust_init": [
+        "t_47f7c871"
+      ],
+      "module_adjust_links": [
+        "t_3205c930"
+      ]
+    }
   },
   {
     "id": "analysis_api",
@@ -49,7 +65,27 @@
         "module_analysis_parallel",
         "AnalysisApi 与 Adjust 归因链路独立，按适用的隐私同意策略启动，不等待 Adjust 初始化"
       ]
-    ]
+    ],
+    "headingPattern": "^#{2,4}\\s+.*(?:AnalysisApi|自有统计)",
+    "legacyCoverage": {
+      "module_analysis_environment": [
+        "t_69393d68",
+        "t_2375cc14",
+        "t_092c4082"
+      ],
+      "module_analysis_identity": [
+        "t_cf56707f"
+      ],
+      "module_analysis_reports": [
+        "t_2b5552a2"
+      ],
+      "module_analysis_fallback": [
+        "t_6c4ae52f"
+      ],
+      "module_analysis_parallel": [
+        "t_da6459c0"
+      ]
+    }
   },
   {
     "id": "initialization",
@@ -113,6 +149,122 @@
         "hasInitialization"
       ]
     ],
-    "intro": "### 目标时序\n\n```text\nApp 启动\n  ↓\n初始化 Flutter\n  ↓\n初始化 AnalysisApi：读取/生成 UUID，加载用户、token、行为队列状态\n  ↓\n完成订阅基础配置 → runApp()\n  ↓\n首帧渲染完成 → 独立启动统计流程\n  ↓\n并行执行两条链路：\n  ├─ Adjust 链路（阻塞等待 ATT）\n  │    等待 App 前台 + 界面就绪\n  │      ↓\n  │    检查并按需请求 ATT\n  │      ↓\n  │    等待明确结果：允许 / 拒绝 / 受限\n  │      ↓\n  │    关联 UUID → 初始化 Adjust（只执行一次）\n  │\n  └─ 自有统计链路（不等待 ATT、不等待 Adjust）\n       尝试获取 AttributionToken（最多等待 3 秒）\n         ↓\n       上报用户\n         ├─ 有有效 token：随用户一起提交\n         └─ 无 token：先上报用户，后续单独补传\n```\n\n### 逐条验收"
+    "intro": "### 目标时序\n\n```text\nApp 启动\n  ↓\n初始化 Flutter\n  ↓\n初始化 AnalysisApi：读取/生成 UUID，加载用户、token、行为队列状态\n  ↓\n完成订阅基础配置 → runApp()\n  ↓\n首帧渲染完成 → 独立启动统计流程\n  ↓\n并行执行两条链路：\n  ├─ Adjust 链路（阻塞等待 ATT）\n  │    等待 App 前台 + 界面就绪\n  │      ↓\n  │    检查并按需请求 ATT\n  │      ↓\n  │    等待明确结果：允许 / 拒绝 / 受限\n  │      ↓\n  │    关联 UUID → 初始化 Adjust（只执行一次）\n  │\n  └─ 自有统计链路（不等待 ATT、不等待 Adjust）\n       尝试获取 AttributionToken（最多等待 3 秒）\n         ↓\n       上报用户\n         ├─ 有有效 token：随用户一起提交\n         └─ 无 token：先上报用户，后续单独补传\n```\n\n### 逐条验收",
+    "legacyCoverage": {}
+  },
+  {
+    "id": "subscriptions",
+    "feature": "hasSubscriptions",
+    "title": "订阅管理必检",
+    "legacyTaskId": "t_278d76f1",
+    "items": [
+      [
+        "module_subscriptions_config",
+        "订阅商品的平台 ID、币种、价格、周期与商店后台一致，生产环境及商品加载配置已核对"
+      ],
+      [
+        "module_subscriptions_purchase",
+        "购买、恢复购买、重复回调和权益发放已验证，订单校验与权益变更可追溯"
+      ],
+      [
+        "module_subscriptions_lifecycle",
+        "订阅续费、取消续费、到期及退款后的权益处理已验证"
+      ],
+      [
+        "module_subscriptions_failure",
+        "购买失败、用户取消、断网和待处理订单不误发权益，恢复流程可重试"
+      ]
+    ],
+    "headingPattern": "^#{2,4}\\s+.*(?:订阅|[Ss]ubscription)",
+    "legacyCoverage": {
+      "module_subscriptions_config": [
+        "t_1e030895",
+        "t_07b2558b",
+        "t_5cc6822e"
+      ],
+      "module_subscriptions_purchase": [
+        "t_d207883b",
+        "t_59a647f8"
+      ],
+      "module_subscriptions_lifecycle": [
+        "t_189e7fc0"
+      ],
+      "module_subscriptions_failure": [
+        "t_189e7fc0",
+        "t_9c18ce64"
+      ]
+    }
+  },
+  {
+    "id": "firebase",
+    "feature": "hasFirebase",
+    "title": "Firebase 必检",
+    "legacyTaskId": "module_firebase_config",
+    "items": [
+      [
+        "module_firebase_config",
+        "Firebase projectId、appId、双平台配置文件及构建环境与目标应用一致，初始化读取实际生产配置"
+      ],
+      [
+        "module_firebase_init",
+        "Firebase 初始化顺序、重复初始化保护、错误降级及所用产品开关已验证"
+      ],
+      [
+        "module_firebase_privacy",
+        "Firebase 数据采集与用户同意策略、权限和隐私说明一致，调试开关及敏感字段已核对"
+      ],
+      [
+        "module_firebase_delivery",
+        "实际使用的 Firebase 产品已端到端验证，事件或消息可在对应后台核对，不把依赖存在视为验证通过"
+      ]
+    ],
+    "headingPattern": "^#{2,4}\\s+.*[Ff]irebase",
+    "legacyCoverage": {}
+  },
+  {
+    "id": "subscription_events",
+    "feature": "hasSubscriptionEvents",
+    "title": "订阅事件统计必检",
+    "legacyTaskId": "module_subscription_events_mapping",
+    "items": [
+      [
+        "module_subscription_events_mapping",
+        "订阅事件名称、触发点、目标 SDK 或接口、商品 ID、金额、币种与订单标识的映射已记录并核对"
+      ],
+      [
+        "module_subscription_events_outcomes",
+        "购买成功、失败、取消及恢复购买的上报分支已验证；续费、到期、退款按实际客户端或服务端来源核对"
+      ],
+      [
+        "module_subscription_events_dedup",
+        "订阅事件有去重和幂等保护，重试与恢复购买不重复计算收入，不将待处理或失败订单上报为成功"
+      ],
+      [
+        "module_subscription_events_delivery",
+        "订阅事件在已启用的 Adjust、Firebase 或 AnalysisApi 后台逐一可查，隐私同意、离线补报和失败降级已验证"
+      ]
+    ],
+    "legacyCoverage": {}
+  },
+  {
+    "id": "permissions",
+    "feature": "hasPermissions",
+    "title": "权限说明与配置必检",
+    "legacyTaskId": "module_permissions_purpose",
+    "items": [
+      [
+        "module_permissions_purpose",
+        "已选权限的通用用途说明已逐项对照真实功能核对；特殊用途已编辑并同步到对应平台声明"
+      ],
+      [
+        "module_permissions_request",
+        "已选权限声明与实际类型一致；需要运行时授权的权限已验证请求时机、拒绝与受限分支，不需要的权限已关闭"
+      ],
+      [
+        "module_permissions_disclosure",
+        "权限使用、SDK 数据流和实际隐私文档一致，通用文档中的待填写项与特殊处理已补齐"
+      ]
+    ],
+    "legacyCoverage": {}
   }
 ]

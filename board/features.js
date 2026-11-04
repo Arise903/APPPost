@@ -38,7 +38,7 @@ function refreshFeatUI(){
   const pv = document.getElementById("featPreview");
   if(pv){
     const visible = (DATA.sections || []).flatMap(sec => sec.blocks || []).filter(it => it.type === "item" && !it.gate && it.visible !== false);
-    const label = {hasAdjust:"未使用 Adjust",hasAnalysisApi:"未使用 AnalysisApi",hasAccountSystem:"无用户账号系统",hasFeedbackSystem:"无用户反馈系统",hasSubscriptions:"无订阅商品",hasPush:"无推送功能",targetMinors:"不面向未成年用户"};
+    const label = {hasFirebase:"未使用 Firebase",hasSubscriptionEvents:"未同时启用订阅与统计 SDK",hasPermissions:"未选择权限",hasAdjust:"未使用 Adjust",hasAnalysisApi:"未使用 AnalysisApi",hasAccountSystem:"无用户账号系统",hasFeedbackSystem:"无用户反馈系统",hasSubscriptions:"无订阅商品",hasPush:"无推送功能",targetMinors:"不面向未成年用户"};
     const clean = value => escapeHtml(String(value).replace(/<[^>]+>/g, "").replace(/\*\*/g, "").replace(/`/g, ""));
     const grouped = {};
     hidden.forEach(it => { (grouped[it.cond] = grouped[it.cond] || []).push(it.text); });
@@ -47,20 +47,25 @@ function refreshFeatUI(){
     pv.innerHTML = "<b>按当前开关预览（保存后生效）</b>" +
       "<details class=\"feature-preview-group\"><summary>将显示 " + visible.length + " 项" + (visible.length > 12 ? "（先列出 12 项）" : "") + "</summary><span class=\"fx\">" + (shown || "当前没有适用条目") + "</span></details>" +
       "<details class=\"feature-preview-group\"><summary>将隐藏 " + hidden.length + " 项</summary>" + (hiddenHtml || "<span class=\"fx\">没有隐藏检查项；权限相关条目由「权限配置」单独控制。</span>") + "</details>" +
-      "<span class=\"feature-preview-foot\">权限相关项目仍由「权限配置」控制。" + (featureHasChanges() ? "当前预览尚未保存。" : "") + "</span>";
+      "<span class=\"feature-preview-foot\">已启用模块及其配置为必检项；订阅与 Adjust、Firebase 或 AnalysisApi 同时启用时，自动加入订阅事件统计。权限说明默认通用，特殊用途可编辑。" + (featureHasChanges() ? "当前预览尚未保存。" : "") + "</span>";
   }
 }
+const featureControls={hasAccountSystem:'featAcc',hasAdjust:'featAdjust',hasFirebase:'featFirebase',hasAnalysisApi:'featAnalysisApi',hasPush:'featPush',hasFeedbackSystem:'featFeedback',targetMinors:'featMinor'};
+let featureStateSnapshot=null;
+function featureStatesFromForm(){return {...DATA.featureStates,...Object.fromEntries(Object.entries(featureControls).map(([key])=>[key,document.getElementById('state_'+key)?.value||(DATA.features[key]?'on':'off')]))};}
+function prepareFeatureStates(){for(const [key,id] of Object.entries(featureControls)){let select=document.getElementById('state_'+key);if(!select){select=document.createElement('select');select.id='state_'+key;select.setAttribute('aria-label',document.getElementById(id).closest('label').innerText+' 使用情况');for(const [value,label] of [['on','已启用'],['off','未使用'],['unknown','待确认']])select.add(new Option(label,value));document.getElementById(id).closest('label').append(select);select.onchange=()=>{document.getElementById(id).checked=select.value!=='off';onFeatToggle();};document.getElementById(id).addEventListener('change',()=>{select.value=document.getElementById(id).checked?'on':'off';});}select.value=DATA.featureStates?.[key]||(DATA.features[key]?'on':'off');}}
 let featureSnapshot = null;
 let featFocusReturn = null;
 function openFeatPanel(){
   featFocusReturn=document.activeElement;
   featureSnapshot = JSON.parse(JSON.stringify(DATA.features));
+  featureStateSnapshot={...DATA.featureStates};prepareFeatureStates();
   refreshFeatUI();
   document.getElementById("featPanel").classList.add("on");
   document.getElementById("featClose").focus();
 }
 function closeFeatPanel(){
-  if(featureSnapshot){ DATA.features=featureSnapshot; featureSnapshot=null; render(); refreshFeatUI(); updateSaveStatus(); }
+  if(featureSnapshot){ DATA.features=featureSnapshot;DATA.featureStates=featureStateSnapshot;featureStateSnapshot=null; featureSnapshot=null; render(); refreshFeatUI(); updateSaveStatus(); }
   document.getElementById("featPanel").classList.remove("on");
   if(featFocusReturn&&featFocusReturn.isConnected){if(window.BoardForms)BoardForms.returnFocus(featFocusReturn);else featFocusReturn.focus();}
   featFocusReturn=null;
@@ -71,7 +76,8 @@ document.getElementById("featCancel").addEventListener("click", closeFeatPanel);
 document.getElementById("featPill").addEventListener("click", openFeatPanel);
 
 // 切换开关 -> 立即预览
-function onFeatToggle(){
+function onFeatToggle(event){
+ if(event?.target?.type==='checkbox'){const key=Object.keys(featureControls).find(key=>featureControls[key]===event.target.id),select=document.getElementById('state_'+key);if(select)select.value=event.target.checked?'on':'off';}
   saveFailure="";
   if(!DATA) return;
   DATA.features = {
@@ -79,7 +85,7 @@ function onFeatToggle(){
     hasAccountSystem: featAcc.checked,
     targetMinors: featMinor.checked
   };
-  applyFeatures();
+  DATA.featureStates=featureStatesFromForm();applyFeatures();
   render();
   refreshFeatUI();
   updateSaveStatus();
@@ -99,12 +105,12 @@ document.getElementById("featSave").addEventListener("click", async () => {
   }
   try{
     const revealInitialization=f.hasAdjust&&!featureSnapshot?.hasAdjust;
-    const d = await api("/api/features", {features: f});
+    const d = await api("/api/features", {features: f,featureStates:featureStatesFromForm()});
     baseRevision = d.revision;
     DATA = mergeItems(d);
     render();
     refreshFeatUI();
-    featureSnapshot=null;
+    featureSnapshot=null;featureStateSnapshot=null;
     closeFeatPanel();
     if(revealInitialization)revealInitializationChecks();
     updateSaveStatus();

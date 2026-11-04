@@ -4,7 +4,8 @@ function api(path,body){
  if(!writing)return apiRequest(path,body);
  queuedWrites++;updateSaveStatus();
  const observedRevision=baseRevision;
- const result=saveQueue.catch(()=>{}).then(()=>apiRequest(path,{...body,revision:body.revision===undefined||body.revision===observedRevision?baseRevision:body.revision}));
+ const snapshot=JSON.parse(JSON.stringify(body));
+ const result=saveQueue.catch(()=>{}).then(()=>apiRequest(path,{...snapshot,revision:snapshot.revision===undefined||snapshot.revision===observedRevision?baseRevision:snapshot.revision}));
  saveQueue=result.finally(()=>{queuedWrites--;setTimeout(updateSaveStatus,0);});saveQueue.catch(()=>{});return result;
 }
 async function apiRequest(path, body){

@@ -5,7 +5,8 @@ let PROFILES = null;         // 权限元数据
 let permFocusReturn = null;
 let permSelected = [];       // 选中的权限 id
 let permDescs = {};          // {permId: 中文用途描述}
-let permDescsEn = {};        // {permId: 英文用途描述}
+let permDescsEn = {};
+let permReviews = {};        // {permId: 英文用途描述}
 let permLang = "zh";         // 当前描述编辑语言
 let permDirty = false;       // 面板内是否有未写入的改动
 let gateDone = false;         // 是否已确认阅读使用说明（门禁）
@@ -43,8 +44,6 @@ function renderScenarios(){
     b.innerHTML = "<b>" + escapeHtml(s.name) + "</b><span>" + escapeHtml(s.desc || "") + "</span>";
     b.addEventListener("click", () => {
       permSelected = (s.permissions || []).slice();
-      permDescs = {};
-      permDescsEn = {};
       permDirty = true;
       renderPerms();
       refreshPermGen();
@@ -146,18 +145,25 @@ function renderDescs(){
         (en ? "Describe the purpose in English" : "填写用途描述") + '">' +
       '<span style="font-size:11px;color:var(--text-3);flex:0 0 auto">' + escapeHtml(label) + "</span>";
     const input = row.querySelector("input");
+    input.setAttribute('aria-label',(en?(p.name_en||p.id):p.name)+(en?' purpose':'用途说明'));
+    const reset=document.createElement('button');reset.type='button';reset.className='btn';reset.textContent=en?'Use general text':'恢复通用说明';reset.onclick=()=>{delete (en?permDescsEn:permDescs)[pid];permReviews[pid]=permReviews[pid]||{};permReviews[pid][en?'en':'zh']={state:'template',source:permReviews[pid][en?'en':'zh']?.source||''};permDirty=true;renderDescs();refreshPermGen();};row.append(reset);
+    const language=en?'en':'zh',record=permReviews[pid]?.[language]||{},status=document.createElement('span'),source=document.createElement('input'),verify=document.createElement('button');
+    source.type='text';source.value=record.source||'';source.placeholder=en?'Verification source':'核对依据：文件:行号或测试记录';source.setAttribute('aria-label',(en?(p.name_en||p.id):p.name)+(en?' verification source':'核对依据'));source.maxLength=4000;
+    function showStatus(){const current=permReviews[pid]?.[language],custom=!!(en?permDescsEn[pid]:permDescs[pid]);status.textContent=current?.state==='verified'&&current.text===input.value?(en?'Verified · ':'已核对 · ')+new Date(current.checkedAt).toLocaleString():(custom?(en?'Project-specific · unverified':'项目自定义 · 未核对'):(en?'General template · unverified':'通用模板 · 未核对'));}
+    function invalidate(){permReviews[pid]=permReviews[pid]||{};permReviews[pid][language]={state:(en?permDescsEn[pid]:permDescs[pid])?'custom':'template',source:source.value};showStatus();}
+    source.oninput=()=>{source.setCustomValidity('');invalidate();permDirty=true;refreshPermGen();};verify.type='button';verify.className='btn';verify.textContent=en?'Confirm verified':'确认已核对';verify.onclick=()=>{if(!input.value.trim()){input.setCustomValidity(en?'Enter the purpose':'请填写用途说明');input.reportValidity();return;}if(!source.value.trim()){source.setCustomValidity(en?'Enter the verification source':'请填写核对依据');source.reportValidity();return;}permReviews[pid]=permReviews[pid]||{};permReviews[pid][language]={state:'verified',source:source.value.trim(),checkedAt:new Date().toISOString(),text:input.value};permDirty=true;showStatus();refreshPermGen();};row.append(status,source,verify);showStatus();
     input.addEventListener("input", () => {
+      input.setCustomValidity('');
       if(en) permDescsEn[pid] = input.value;
       else permDescs[pid] = input.value;
-      permDirty = true;
+      invalidate();permDirty = true;
       refreshPermGen();
     });
     list.appendChild(row);
   });
   document.getElementById("langHint").textContent = en
-    ? "English strings are used in the generated privacy policy and the English document. "
-      + "Leave a field empty to fall back to the built-in wording."
-    : "中文文案用于生成的中文隐私政策与 Info.plist；英文版请切到 English 标签填写。";
+    ? "General wording is provided by default. Edit it for project-specific purposes; custom wording is retained and included in generated documents."
+    : "默认使用通用权限说明；特殊用途可直接编辑，已编辑内容会保留并写入生成文档。恢复通用说明仅重置当前语言的这一项，不改其他文案。";
 }
 
 function refreshPermissionVisibilityNote(){
@@ -287,7 +293,8 @@ function genLocally(){
       if(!appstore.includes(entry)) appstore.push(entry);
     });
     const pname = en ? (p.name_en || p.id) : p.name;
-    const ptext = en ? (p.policy_text_en || p.policy_text) : p.policy_text;
+    let ptext = en ? (p.policy_text_en || p.policy_text) : p.policy_text;
+    const custom=(en?permDescsEn[pid]:permDescs[pid])?.trim();if(ptext&&custom)ptext+=(en?' Project-specific purpose: ':' 项目特殊用途：')+custom;
     if(ptext) policy.push("- **" + pname + "**：" + ptext);
     const notes = en ? (p.review_notes_en || p.review_notes) : p.review_notes;
     (notes || []).forEach(n => checks.push("〔" + pname + "〕" + n));
@@ -297,6 +304,7 @@ function genLocally(){
 }
 
 async function openPermPanel(){
+  if(!permDirty)permReviews=JSON.parse(JSON.stringify(reviewData.permissionReviews||{}));
   permFocusReturn=document.activeElement;
   await loadProfiles();
   document.getElementById("permHint").textContent = "权限资料待逐项核验；请核对目标平台版本与官方文档。";
@@ -395,28 +403,27 @@ function setPermSaveState(kind, text){
   el.className = "savestate " + kind;
   el.textContent = text || "";
 }
+let permSavePromise=null;
+function permissionDraft(){return {selected:[...permSelected],descs:{...permDescs},descsEn:{...permDescsEn},reviews:JSON.parse(JSON.stringify(permReviews))};}
+async function savePermChanges(){
+ clearTimeout(permSaveTimer);
+ if(permSavePromise){await permSavePromise;if(!permDirty)return;return savePermChanges();}
+ const draft=permissionDraft(),signature=JSON.stringify(draft);
+ setPermSaveState('saving','正在保存权限说明…');
+ permSavePromise=(async()=>{try{
+  const d=await api('/api/perm-write',draft);
+  permDirty=JSON.stringify(permissionDraft())!==signature;
+  reviewData.permissionReviews=d.review?.permissionReviews||{};DATA=mergeItems(d);DATA.permSelected=[...permSelected];DATA.permDescs={...permDescs};DATA.permDescsEn={...permDescsEn};render();
+  setPermSaveState(permDirty?'saving':'saved',permDirty?'有新修改，继续保存…':'✓ 已写入 md 附录');
+ }catch(error){permDirty=true;setPermSaveState('error','保存失败：'+error.message);throw error;}finally{permSavePromise=null;updateSaveStatus();}})();
+ await permSavePromise;
+ if(permDirty)schedulePermSave();
+}
 function schedulePermSave(){
-  updateSaveStatus();
-  if(!permDirty) return;               // 打开面板时的初始预览不算改动
-  if(!online){
-    setPermSaveState("offline", "离线模式：改动只在本机，不会写入文件");
-    return;
-  }
-  setPermSaveState("saving", "正在写入 md…");
-  clearTimeout(permSaveTimer);
-  permSaveTimer = setTimeout(async () => {
-    try{
-      const d = await api("/api/perm-write", {
-        selected: permSelected, descs: permDescs, descsEn: permDescsEn
-      });
-      permDirty = false;
-      setPermSaveState("saved", "✓ 已写入 md 附录");
-      DATA = mergeItems(d);
-      render();
-    }catch(e){
-      setPermSaveState("error", "写入失败：" + e.message);
-    }
-  }, 900);
+ updateSaveStatus();if(!permDirty)return;
+ if(!online){setPermSaveState('offline','离线模式：改动只在本机，不会写入文件');return;}
+ setPermSaveState('saving','等待保存权限说明…');clearTimeout(permSaveTimer);
+ permSaveTimer=setTimeout(()=>savePermChanges().catch(()=>{}),900);
 }
 
 document.getElementById("permSave").addEventListener("click", async () => {
@@ -431,13 +438,9 @@ document.getElementById("permSave").addEventListener("click", async () => {
     if(!ok) return;
   }
   try{
-    const d = await api("/api/perm-write", {selected: permSelected, descs: permDescs, descsEn: permDescsEn});
+    do{await savePermChanges();}while(permDirty);
     toast("已写入 md 附录（已自动备份原文件）");
     closePermPanel();
-    baseRevision = d.revision;
-    gen = d.generation;
-    DATA = mergeItems(d);
-    render();
   }catch(e){
     toast("写入失败：" + e.message);
   }

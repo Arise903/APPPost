@@ -63,7 +63,7 @@ function compare(before,after){
  const objects=(area,left,right)=>{for(const id of new Set([...Object.keys(left||{}),...Object.keys(right||{})]))if(!same(left?.[id],right?.[id]))add(area,id,!(id in (left||{}))?'added':!(id in (right||{}))?'removed':'changed',left?.[id],right?.[id]);};
  objects('发布信息',before.release,after.release);objects('功能',before.features,after.features);
  const permissions=s=>Object.fromEntries((s.selectedPermissions||s.permissions?.selected||[]).map(id=>[id,{selected:true,description:s.permissions?.descs?.[id]||'',descriptionEn:s.permissions?.descsEn?.[id]||''}]));objects('权限',permissions(before),permissions(after));
- const items=s=>Object.fromEntries((s.items||[]).map(i=>[i.id,Object.fromEntries(['text','state','applicable','required','evidenceRequired','evidence','attachmentIds','evidenceExpiresAt','reason','notes','exceptionType','exceptionOwner','reviewDue','approvalStatus','approvalBy','reviewStatus'].filter(k=>i[k]!==undefined).map(k=>[k,i[k]]))]));objects('检查项',items(before),items(after));
+ const items=s=>Object.fromEntries((s.items||[]).map(i=>[i.id,Object.fromEntries(['text','state','applicable','required','evidenceRequired','evidence','attachmentIds','evidenceExpiresAt','reason','notes','exceptionType','exceptionOwner','reviewDue','approvalStatus','approvalBy','reviewStatus'].filter(k=>i[k]!==undefined).map(k=>[k,i[k]]))]));objects('检查项',items(before),items(after));objects('SDK 配置明细',Object.fromEntries((before.integrations||[]).map(r=>[r.id,r])),Object.fromEntries((after.integrations||[]).map(r=>[r.id,r])));objects('订阅事件映射',Object.fromEntries((before.subscriptionEvents||[]).map(r=>[r.id,r])),Object.fromEntries((after.subscriptionEvents||[]).map(r=>[r.id,r])));
  const products=s=>Object.fromEntries((s.subscriptions||[]).map((p,index)=>[p.id||p.iosProductId||p.androidProductId||String(index),p]));objects('订阅商品',products(before),products(after));objects('证据附件',before.evidenceFiles,after.evidenceFiles);objects('配置预检',before.preflight?{result:before.preflight}: {},after.preflight?{result:after.preflight}:{});
  return {format:'release-desk-diff/v1',date:new Date().toISOString(),changes};
 }
@@ -87,7 +87,7 @@ function decisionLines(snapshot,previous){
 }
 function configurationLines(snapshot,profiles={}){
  const features=snapshot.features||{},release=snapshot.release||{},selected=snapshot.selectedPermissions||snapshot.permissions?.selected||[];
- const enabled=[['hasAccountSystem','账号系统'],['hasAdjust','Adjust 广告归因'],['hasAnalysisApi','AnalysisApi 自有统计'],['hasFirebase','Firebase'],['hasPush','推送'],['hasFeedbackSystem','反馈系统'],['targetMinors','面向未成年用户'],['hasInitialization','初始化流程核对']].filter(([key])=>features[key]===true).map(([,label])=>label);
+ const enabled=[['hasAccountSystem','账号系统'],['hasAdjust','Adjust 广告归因'],['hasAnalysisApi','AnalysisApi 自有统计'],['hasFirebase','Firebase'],['hasSubscriptionEvents','订阅事件统计（自动必检）'],['hasPush','推送'],['hasFeedbackSystem','反馈系统'],['targetMinors','面向未成年用户'],['hasInitialization','初始化流程核对']].filter(([key])=>features[key]===true).map(([,label])=>label);
  const names=new Map((profiles.permissions||[]).map(p=>[p.id,p.name]));
  const firebaseStatus=!features.hasFirebase?'未启用':!release.firebaseProjectId||!release.firebaseAppId?'已启用 · 配置待补全':'已记录 · 待验证';
  return ['Firebase：'+firebaseStatus,'平台：'+(release.platform||'未指定'),'订阅商品：'+(features.hasSubscriptions===true?'已启用':'未启用'),'功能：'+(enabled.join('、')||'未启用附加功能'),'权限（'+selected.length+'）：'+(selected.map(id=>names.get(id)||id).join('、')||'未选择')];
@@ -95,7 +95,7 @@ function configurationLines(snapshot,profiles={}){
 function aiReviewSnapshot(payload,profiles){
  const review=payload.review||{},features=payload.features||{},selected=payload.permSelected||[],permissions={selected,descs:payload.permDescs||{},descsEn:payload.permDescsEn||{}};
  const sections=new Map((payload.sections||[]).flatMap(section=>(section.blocks||[]).filter(b=>b.type==='item').map(b=>[b.id,section.title])));
- const featureLabels={hasAccountSystem:'账号系统',hasSubscriptions:'订阅商品',hasAdjust:'Adjust',hasAnalysisApi:'AnalysisApi',hasInitialization:'初始化流程',hasPush:'推送',hasFeedbackSystem:'反馈系统',targetMinors:'未成年用户'};
+ const featureLabels={hasAccountSystem:'账号系统',hasSubscriptions:'订阅商品',hasAdjust:'Adjust',hasAnalysisApi:'AnalysisApi',hasInitialization:'初始化流程',hasFirebase:'Firebase',hasSubscriptionEvents:'订阅事件统计',hasPermissions:'权限说明与配置',hasPush:'推送',hasFeedbackSystem:'反馈系统',targetMinors:'未成年用户'};
  const items=(payload.items||[]).filter(item=>!item.gate).map(item=>{
   const reasons=[];
   if(features[item.cond]===false)reasons.push('未启用'+(featureLabels[item.cond]||item.cond));
@@ -103,7 +103,7 @@ function aiReviewSnapshot(payload,profiles){
   if(!root.PermissionVisibility.visible(item.permissionRule,selected,profiles))reasons.push('未选择对应权限');
   return {...review.items?.[item.id],...item,section:sections.get(item.id)||'通用检查',applicable:!reasons.length,hiddenReason:reasons.join('；')};
  });
- return {document:payload.mdText||'',release:review.release||{},features,permissions,selectedPermissions:selected,subscriptions:review.subscriptions||[],evidenceFiles:review.evidenceFiles||{},assetIds:payload.assetIds||[],preflight:review.preflight||null,items,guideDone:payload.gateDone,revision:payload.revision,generation:payload.generation,projectName:review.release?.app||payload.mdName?.replace(/\.md$/i,'')||payload.title||'未命名项目'};
+ return {integrations:review.integrations||[],subscriptionEvents:review.subscriptionEvents||[],permissionReviews:review.permissionReviews||{},permissionTexts:root.ReleaseReadiness.permissionTexts(profiles,permissions),featureStates:payload.featureStates||{},document:payload.mdText||'',release:review.release||{},features,permissions,selectedPermissions:selected,subscriptions:review.subscriptions||[],evidenceFiles:review.evidenceFiles||{},assetIds:payload.assetIds||[],preflight:review.preflight||null,items,guideDone:payload.gateDone,revision:payload.revision,generation:payload.generation,projectName:review.release?.app||payload.mdName?.replace(/\.md$/i,'')||payload.title||'未命名项目'};
 }
 function aiReviewProgress(snapshot){
  const items=(snapshot.items||[]).filter(item=>!item.gate&&item.applicable!==false),total=items.length,done=items.filter(item=>item.state==='done').length,complete=total>0&&done===total;
@@ -193,7 +193,7 @@ function aiReviewMarkdown(snapshot,profiles={},metadata={}){
  lines.push('', '权限资料库版本与核验状态（仅供参考）：',...json({version:profiles.version||'',maintenance:profiles.maintenance||{}}),'',...privacyAuditLines(snapshot,profiles));
  lines.push('', '未选中的权限（仍需对照实际实现）：',quote(known.filter(p=>!selected.has(p.id)).map(p=>p.name+' ['+p.id+']').join('、')||'无'),
  '', '## 订阅商品配置','',...json(snapshot.subscriptions||[]),
- '', '## 当前发布阻塞与证据缺口','', '检查结论：'+(readiness.ready?'清单已就绪（仍需代码核验）':'未就绪')+'；阻塞 '+readiness.blockers+' 项。',...readiness.issues.flatMap(i=>[quote(i.reason+' · '+i.id+' · '+i.text)]),
+ '', '## SDK 配置明细与核验记录','',...json(snapshot.integrations||[]),'','## 订阅事件映射与核验记录','',...json(snapshot.subscriptionEvents||[]),'','## 权限文档核对记录','',...json(snapshot.permissionReviews||{}),'','## 当前发布阻塞与证据缺口','', '检查结论：'+(readiness.ready?'清单已就绪（仍需代码核验）':'未就绪')+'；阻塞 '+readiness.blockers+' 项。',...readiness.issues.flatMap(i=>[quote(i.reason+' · '+i.id+' · '+i.text)]),
  '', '## 完整检查清单（含不适用项）','', '完成状态来自人工记录；隐藏或不适用项同样导出，供 AI 识别错误配置及遗漏。尤其逐项核对“二、初始化流程核对”的真实实现与证据。验证证据应填写项目实际值及文件路径或地址，模板示例不能作为通过依据。');
  for(const item of items){lines.push('', '### '+item.id,quote(item.section||'通用检查'),quote(item.text),...json({state:item.state||'todo',applicable:item.applicable!==false,hiddenReason:item.hiddenReason||'',required:item.required!=='off',evidenceRequired:item.evidenceRequired==='on',notes:item.notes||'',evidence:item.evidence||'',evidenceExpiresAt:item.evidenceExpiresAt||'',attachmentIds:item.attachmentIds||'[]',reason:item.reason||'',exceptionType:item.exceptionType||'',exceptionOwner:item.exceptionOwner||'',reviewDue:item.reviewDue||'',reviewStatus:item.reviewStatus||'',reviewedAt:item.reviewedAt||'',approvalStatus:item.approvalStatus||'',approvalBy:item.approvalBy||'',approvalDate:item.approvalDate||''}));}
  lines.push('', '## 证据附件索引','', '仅包含附件元信息，不嵌入附件内容；核验实际文件时请另行提供。',...json(snapshot.evidenceFiles||{}),

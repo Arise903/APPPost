@@ -58,7 +58,7 @@ bindForm('createForm',async form=>{
    Object.assign(data,{document:imported.document,permissions:imported.permissions,review:imported.review,assets:imported.assets});
   }else data.document=text;
  }
- if(!file){data.setup={platform:form.elements.platform.value,features:Object.fromEntries(['hasAccountSystem','hasSubscriptions','hasPush','hasFeedbackSystem','targetMinors','hasAdjust','hasAnalysisApi'].map(key=>[key,form.elements[key].checked])),selected:[...document.querySelectorAll('#cloudCreatePermissions input:checked')].map(input=>input.value)};}
+ if(!file){data.setup={platform:form.elements.platform.value,features:Object.fromEntries(['hasAccountSystem','hasSubscriptions','hasPush','hasFeedbackSystem','targetMinors','hasAdjust','hasAnalysisApi','hasFirebase'].map(key=>[key,form.elements[key].checked])),selected:[...document.querySelectorAll('#cloudCreatePermissions input:checked')].map(input=>input.value)};}
  const result=await api('/api/projects',data);location.href='/projects/'+result.id;
 },'createError');
 async function showTeam(id){

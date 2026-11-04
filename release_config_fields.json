@@ -241,5 +241,14 @@
       "targetSdk"
     ],
     "maxLength": 30
+  },
+  {
+    "key": "subscriptionEventConfig",
+    "label": "订阅事件统计配置",
+    "group": "订阅事件统计",
+    "aliases": [
+      "订阅事件统计配置"
+    ],
+    "maxLength": 8000
   }
 ]

@@ -31,7 +31,7 @@ class PersistenceTests(unittest.TestCase):
         self.assertIn('Cross-App Tracking (ATT)', text)
         self.assertIn('Measure campaigns & improve ads.', text)
         self.assertIn('Measure campaigns &amp; improve ads.', text)
-        self.assertIn('Cross-app tracking permission is used', text)
+        self.assertIn('General guidance: this permission supports', text)
         self.assertIn('中文用途', text)
 
     def test_xml_escaping(self):

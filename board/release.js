@@ -1,7 +1,7 @@
 async function persistReview(next,extra={}){
   try{
     const previousPlatform=reviewData.release?.platform;
-    const d = await api("/api/review", {revision:baseRevision, review:next,...extra});
+    const d = await api("/api/review", {revision:baseRevision, review:next,reviewPatch:ReleaseReadiness.reviewDiff(reviewData,next)||{},...extra});
     baseRevision = d.revision;
     reviewData = d.review;DATA.assetIds=d.assetIds||DATA.assetIds;
     updateSummaryReleaseOptions();
@@ -12,7 +12,7 @@ async function persistReview(next,extra={}){
 }
 document.getElementById('releaseEdit').onclick=openReleaseEditor;
 function releaseSnapshot(){
-  const snapshot={evidenceFiles:JSON.parse(JSON.stringify(reviewData.evidenceFiles||{})),assetIds:DATA.assetIds||[],preflight:reviewData.preflight||null,permissions:{selected:DATA.permSelected||[],descs:DATA.permDescs||{},descsEn:DATA.permDescsEn||{}},subscriptions:JSON.parse(JSON.stringify(reviewData.subscriptions||[])), release:reviewData.release || {}, date:new Date().toISOString(), features:{...DATA.features}, selectedPermissions:[...(DATA.permSelected||[])], items:[...(DATA.preamble||[]),...DATA.sections.flatMap(s => s.blocks)].filter(b => b.type === "item" && !b.gate).map(b => ({...reviewData.items?.[b.id],id:b.id,text:b.text,state:st(b.id), applicable:b.visible !== false}))};
+  const snapshot={evidenceFiles:JSON.parse(JSON.stringify(reviewData.evidenceFiles||{})),assetIds:DATA.assetIds||[],preflight:reviewData.preflight||null,permissions:{selected:DATA.permSelected||[],descs:DATA.permDescs||{},descsEn:DATA.permDescsEn||{}},subscriptions:JSON.parse(JSON.stringify(reviewData.subscriptions||[])), release:reviewData.release || {}, date:new Date().toISOString(), integrations:reviewData.integrations||[],subscriptionEvents:reviewData.subscriptionEvents||[],permissionReviews:reviewData.permissionReviews||{},permissionTexts:ReleaseReadiness.permissionTexts(EMBEDDED_PROFILES,{selected:DATA.permSelected||[],descs:DATA.permDescs||{},descsEn:DATA.permDescsEn||{}}),features:{...DATA.features},featureStates:{...DATA.featureStates}, selectedPermissions:[...(DATA.permSelected||[])], items:[...(DATA.preamble||[]),...DATA.sections.flatMap(s => s.blocks)].filter(b => b.type === "item" && !b.gate).map(b => ({...reviewData.items?.[b.id],id:b.id,text:b.text,cond:b.cond,permissionRule:b.permissionRule,state:st(b.id), applicable:b.visible !== false}))};
   snapshot.readiness=ReleaseReadiness.assess(snapshot);return snapshot;
 }
 document.getElementById("releaseArchive").onclick = async () => {

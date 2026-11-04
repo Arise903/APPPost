@@ -13,7 +13,7 @@ test('Permission appendix includes custom English copy and English policy',async
  context.location.search='?id='+id;context.window.fetch=async()=>{throw Error('Unexpected network request');};S.install();
  const response=await context.window.fetch('/api/perm-write',{method:'POST',body:JSON.stringify({revision:'1',selected:['tracking'],descs:{tracking:'中文用途'},descsEn:{tracking:'Measure campaigns & improve ads.'}})});
  assert.equal(response.status,200);const data=await response.json();
- assert.match(data.mdText,/英文权限用途说明/);assert.match(data.mdText,/Measure campaigns & improve ads\./);assert.match(data.mdText,/Measure campaigns &amp; improve ads\./);assert.match(data.mdText,/Cross-app tracking permission is used/);assert.match(data.mdText,/中文用途/);
+ assert.match(data.mdText,/英文权限用途说明/);assert.match(data.mdText,/Measure campaigns & improve ads\./);assert.match(data.mdText,/Measure campaigns &amp; improve ads\./);assert.match(data.mdText,/General guidance: this permission supports/);assert.match(data.mdText,/中文用途/);
  const count=S.parse(data.mdText).items.length;assert.equal(count,S.parse(S.export(id).document).items.length);
 });
 
@@ -125,7 +125,7 @@ test('Subscription setting persists, hides checks and retains progress and notes
  context.location.search='?id='+id;context.window.fetch=async()=>{throw Error('Unexpected network');};S.install();
  for(const enabled of [false,true]){
   const project=S.get(id);const response=await context.window.fetch('/api/features',{method:'POST',body:JSON.stringify({revision:String(project.version),features:{...S.payload(project).features,hasSubscriptions:enabled}})});assert.equal(response.status,200);
-  const saved=S.get(id),data=S.payload(saved);assert.equal(data.features.hasSubscriptions,enabled);assert.equal(data.total,initial.total-(enabled?0:tasks.length));assert.equal(data.items.find(i=>i.id===task.id).state,'done');assert.equal(saved.review.items[task.id].notes,'Keep evidence');
+  const saved=S.get(id),data=S.payload(saved);assert.equal(data.features.hasSubscriptions,enabled);assert.equal(data.total,initial.total-(enabled?0:tasks.length+initial.items.filter(i=>i.cond==='hasSubscriptionEvents').length));assert.equal(data.items.find(i=>i.id===task.id).state,'done');assert.equal(saved.review.items[task.id].notes,'Keep evidence');
  }
 });
 
@@ -269,11 +269,11 @@ test('Optional Adjust and AnalysisApi modules work in every template without dup
   let d=S.payload(S.get(id));const moduleIds=d.items.filter(i=>/^module_(adjust|analysis)_/.test(i.id)).map(i=>i.id);assert.equal(moduleIds.length,9);
   const task=moduleIds[0];await S.mutate(id,1,'done',p=>{p.document=S.apply(p.document,{[task]:'done'});p.review.items[task]={notes:'保留'};});
   await S.mutate(id,2,'off',p=>p.document=S.configureDocument(p.document,{...features,hasAdjust:false,hasAnalysisApi:false}));
-  d=S.payload(S.get(id));assert.equal(d.features.hasAdjust,false);assert.equal(d.total,template.document.match(/^- \[ /gm).length);
+  d=S.payload(S.get(id));assert.equal(d.features.hasAdjust,false);assert.equal(d.total,template.document.match(/^- \[ /gm).length+(features.hasSubscriptions?4:0));assert.equal(d.features.hasSubscriptionEvents,false);
   await S.mutate(id,3,'on',p=>p.document=S.configureDocument(p.document,features));d=S.payload(S.get(id));assert.equal(d.items.filter(i=>moduleIds.includes(i.id)).length,9);assert.equal(d.items.find(i=>i.id===task).state,'done');assert.equal(d.review.items[task].notes,'保留');
   const python=execFileSync(process.env.PYTHON||'python3',['-c',"import checklist_tool as c,sys,json;print(c.configure_document_features(sys.argv[1],json.loads(sys.argv[2])),end='')",template.document,JSON.stringify(features)],{encoding:'utf8'});assert.equal(python,S.configureDocument(template.document,features));
  }
- const full=fs.readFileSync('online/default_checklist.md','utf8');const configured=S.configureDocument(full,{...S.parse(full).features,hasAdjust:true,hasAnalysisApi:true});assert.equal(S.parse(configured).items.length,S.parse(full).items.length);assert.equal(configured.includes('module_adjust_tokens'),false);
+ const full=fs.readFileSync('online/default_checklist.md','utf8');const configured=S.configureDocument(full,{...S.parse(full).features,hasAdjust:true,hasAnalysisApi:true});assert.equal(S.parse(configured).items.length,S.parse(full).items.length+4);assert.equal(S.parse(configured).features.hasSubscriptionEvents,true);assert.equal(configured.includes('module_adjust_tokens'),false);
 });
 
 test('Initialization chapter uses OR for Adjust and AnalysisApi in original and generic templates',()=>{
@@ -375,6 +375,7 @@ print(json.dumps([[rule,[bool(v.visible(rule,selected,profiles)) for selected in
 
 test('Checklist diff only reports rows that really changed',()=>{
  const context=vm.createContext({});
+ vm.runInContext(fs.readFileSync('release_readiness.js','utf8'),context);
  vm.runInContext(fs.readFileSync('board/modules.js','utf8').replace('__OPTIONAL_MODULES__','[]'),context);
  const diff=(state,baseline)=>JSON.parse(JSON.stringify(context.stateDiff(state,baseline)));
  assert.deepEqual(diff({}, {a:'todo', b:'done'}), {b:'todo'}, 'untouched rows and reversions');
@@ -388,7 +389,7 @@ test('Saving an optional module item adds its section to a legacy document',asyn
  const legacy='# App\n\n<!-- FEATURES hasAccountSystem=1 targetMinors=1 hasFeedbackSystem=0 hasSubscriptions=1 hasPush=0 hasAdjust=1 hasAnalysisApi=0 -->\n\n## 一、确认\n<!-- GATE -->\n- [ ] 我已阅读使用说明 <!-- task:t_gate -->\n\n## 二、检查\n- [ ] One <!-- task:t_one -->\n';
  const id=await S.create({name:'Legacy',document:legacy,requireGuideConfirmation:false});
  const before=S.payload(S.get(id));
- assert.ok(!before.items.some(x=>x.id==='module_adjust_tokens'),'legacy document has no module rows');
+ assert.ok(!S.parse(S.get(id).document).items.some(x=>x.id==='module_adjust_tokens'),'legacy storage has no module rows');assert.ok(before.items.some(x=>x.id==='module_adjust_tokens'),'payload supplies missing required module rows');
  context.location.search='?id='+id;context.window.fetch=async()=>{throw Error('Unexpected network request');};S.install();
  const response=await context.window.fetch('/api/write',{method:'POST',body:JSON.stringify({revision:String(before.revision),states:{t_gate:'done',module_adjust_tokens:'done'}})});
  const body=await response.json();
@@ -399,6 +400,7 @@ test('Saving an optional module item adds its section to a legacy document',asyn
 test('Optional modules are not injected when the checklist already has that section',()=>{
  const modules=JSON.parse(fs.readFileSync('checklist_modules.json','utf8'));
  const context=vm.createContext({});
+ vm.runInContext(fs.readFileSync('release_readiness.js','utf8'),context);
  vm.runInContext(fs.readFileSync('board/modules.js','utf8').replace('__OPTIONAL_MODULES__',JSON.stringify(modules)),context);
  const ids=()=>JSON.parse(JSON.stringify(vm.runInContext('DATA.sections.map(s=>s.id)',context)));
  const load=sections=>{
@@ -440,4 +442,74 @@ test('AI source Markdown rejects malformed metadata and preserves plain Markdown
  const bad=mutate=>{const value=JSON.parse(JSON.stringify(example));mutate(value);return ()=>I.read(wrap(value),data);};
  assert.throws(bad(v=>v.release.unknown='x'),/不支持/);assert.throws(bad(v=>v.release.build=42),/格式无效/);assert.throws(bad(v=>v.release.platform='web'),/平台/);assert.throws(bad(v=>v.features.hasPush='true'),/八项功能/);assert.throws(bad(v=>v.permissions.selected=['invented']),/权限/);assert.throws(bad(v=>v.subscriptions=[{price:39}]),/商品/);
  assert.match(I.prompt(data),/相对文件路径:行号/);assert.match(I.prompt(data),/所有发布检查项保持 - \[ \]/);assert.match(I.prompt(data),/不输出私钥/);
+});
+
+
+test('Enabled module checks and configuration are mandatory regardless of optional flags or strict mode, with Python parity',()=>{
+ const {context}=setup(),R=context.window.ReleaseReadiness,now='2026-11-04T00:00:00Z';
+ const release={app:'Demo',platform:'Android',appIdAndroid:'org.example.demo',environment:'production',strictValidation:'off',adjustAppToken:'public-app-token',firebaseProjectId:'demo',firebaseAppId:'1:demo',firebaseConfig:'android: google-services.json:5',analysisApiUrl:'https://example.org/events',analysisApiProjectId:'demo',subscriptionEventConfig:'purchase_success -> all enabled targets; transactionId dedup',privacyPolicyUrl:'https://example.org/privacy'};
+ const product={id:'year',platform:'android',androidProductId:'demo.year',period:'year',periodCount:'1',currency:'CNY',price:'39'};
+ const scenarios=[];
+ for(const cond of ['hasSubscriptions','hasAdjust','hasFirebase','hasAnalysisApi','hasInitialization','hasSubscriptionEvents','hasPermissions'])for(const state of ['todo','skip','done']){
+  const features={hasSubscriptions:cond==='hasSubscriptions'||cond==='hasSubscriptionEvents',hasAdjust:cond==='hasAdjust'||cond==='hasInitialization',hasFirebase:cond==='hasFirebase'||cond==='hasSubscriptionEvents',hasAnalysisApi:cond==='hasAnalysisApi',hasInitialization:false,hasSubscriptionEvents:false};
+  const snapshot={release,features,permissionReviews:{camera:{zh:{state:'verified',text:'Camera',source:'test:1',checkedAt:'2026-11-04T00:00:00Z'}}},selectedPermissions:cond==='hasPermissions'?['camera']:[],subscriptions:[product],items:[{id:'check',text:cond,cond,required:'off',state,reason:'attempt to bypass'}]};
+  const result=R.assess(snapshot,now);assert.equal(result.ready,state==='done',cond+' '+state);if(state==='skip')assert.equal(result.issues[0].reason,'启用模块的必检项不可跳过');scenarios.push(snapshot);
+ }
+ const missing={release:{strictValidation:'off'},features:{hasFirebase:true,hasSubscriptions:true},subscriptions:[],items:[{id:'ok',text:'Done',state:'done'}]};const result=R.assess(missing,now);assert.ok(result.issues.some(i=>i.text==='Firebase 配置信息'));assert.ok(result.issues.some(i=>i.text==='订阅事件统计配置'));assert.ok(result.issues.some(i=>i.id==='__subscriptions'));scenarios.push(missing);
+ const expected=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,sys;from release_policy import assess;print(json.dumps([assess(s,sys.argv[2]) for s in json.loads(sys.argv[1])],ensure_ascii=False))",JSON.stringify(scenarios),now],{encoding:'utf8'}));assert.deepEqual(JSON.parse(JSON.stringify(scenarios.map(s=>R.assess(s,now)))),expected);
+});
+
+test('Subscription events are derived from subscriptions plus any statistics SDK and missing required modules appear before opening the board',async()=>{
+ const {S,context}=setup(),R=context.window.ReleaseReadiness;
+ for(const subscription of [false,true])for(const sdk of ['none','hasAdjust','hasFirebase','hasAnalysisApi']){
+  const features={hasSubscriptions:subscription,hasAdjust:false,hasFirebase:false,hasAnalysisApi:false,...(sdk==='none'?{}:{[sdk]:true})};
+  const id=await S.create({name:'组合 '+subscription+sdk,document:'# Custom\n## Tasks\n- [ ] Base\n',features});const payload=S.payload(S.get(id)),active=subscription&&sdk!=='none';assert.equal(payload.features.hasSubscriptionEvents,active);assert.equal(R.subscriptionEvents(features),active);assert.equal(payload.items.filter(i=>i.cond==='hasSubscriptionEvents'&&payload.features[i.cond]).length,active?4:0);
+  if(sdk==='hasFirebase')assert.equal(payload.items.filter(i=>i.cond==='hasFirebase').length,4);
+ }
+ const raw='# Existing\n<!-- FEATURES hasSubscriptions=1 hasAdjust=0 hasFirebase=1 hasAnalysisApi=0 -->\n## Tasks\n- [x] Existing\n';const id=await S.create({name:'旧项目',document:raw,permissions:{selected:['camera'],descs:{camera:'扫描文档'},descsEn:{camera:'Scan documents'}}});const d=S.payload(S.get(id));assert.equal(d.items.filter(i=>i.cond==='hasPermissions').length,3);assert.equal(d.items.filter(i=>i.cond==='hasFirebase').length,4);assert.equal(d.items.filter(i=>i.cond==='hasSubscriptionEvents').length,4);assert.equal(S.get(id).permissions.descs.camera,'扫描文档');assert.ok(d.items.some(i=>i.state==='done'));
+ const py=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,sys,checklist_tool as c;p=json.loads(sys.argv[1]);print(json.dumps(c.document_payload(p['document'],p['name'],1,(p['permissions']['selected'],p['permissions']['descs'],p['permissions']['descsEn']),p['review'],'1'),ensure_ascii=False))",JSON.stringify(S.get(id))],{encoding:'utf8'}));assert.equal(py.total,d.total);assert.deepEqual(py.items.map(i=>i.id),JSON.parse(JSON.stringify(d.items.map(i=>i.id))));
+});
+
+test('Permission documents use general wording and retain per-language project-specific purposes',()=>{
+ const {S,context}=setup(),data=vm.runInContext('PAGES_DATA',context);
+ for(const permission of data.profiles.permissions){const text=JSON.stringify([permission.policy_text,permission.policy_text_en,permission.ios,permission.android]);assert.doesNotMatch(text,/卡牌|卡店|卡包|trading cards|collection progress/);assert.match(permission.policy_text,/通用说明/);}
+ const value=S.config({selected:['camera'],descs:{camera:'扫描文档中的编号'},descsEn:{camera:'Scan document identifiers.'}});assert.match(value.iosPlist,/扫描文档中的编号/);assert.match(value.privacyPolicy,/项目特殊用途：扫描文档中的编号/);
+ const english=S.config({selected:['camera'],descs:{camera:'扫描文档中的编号'},descsEn:{camera:'Scan document identifiers.'},lang:'en'});assert.match(english.privacyPolicy,/Project-specific purpose: Scan document identifiers/);assert.doesNotMatch(english.privacyPolicy,/扫描文档/);
+ const prompt=require('./pages/project-import.js').prompt(data);for(const word of ['订阅管理','Adjust','Firebase','AnalysisApi','订阅事件统计','权限说明','subscriptionEventConfig','去重','退款'])assert.ok(prompt.includes(word),word);assert.match(prompt,/未确认开关暂填 true/);
+});
+
+
+test('Legacy custom module headings retain enabled checks unless the user explicitly disables them',()=>{
+ const {S}=setup();for(const [heading,feature] of [['订阅管理','hasSubscriptions'],['Firebase 配置','hasFirebase'],['Adjust 配置','hasAdjust'],['AnalysisApi 自有统计','hasAnalysisApi']]){const text='# App\n## '+heading+'\n- [ ] 核对实际配置\n';assert.equal(S.parse(text).features[feature],true);assert.equal(S.parse('<!-- FEATURES '+feature+'=0 -->\n'+text).features[feature],false);}
+});
+
+
+test('Partial modules are completed per item without replacing custom text, state or section identities',async()=>{
+ const {S,context}=setup(),module=JSON.parse(fs.readFileSync('checklist_modules.json')).find(m=>m.id==='firebase');
+ const original='# App\n<!-- FEATURES hasFirebase=1 hasSubscriptions=0 -->\n## Custom Firebase <!-- section:module_firebase -->\n- [x] 自定义核对文字 <!-- if:hasFirebase --> <!-- task:module_firebase_config -->\n';const id=await S.create({name:'Partial',document:original,requireGuideConfirmation:false,review:{guideAcknowledged:'on',release:{},items:{module_firebase_config:{notes:'原有依据'}},history:[]}}),before=S.get(id),payload=S.payload(before);
+ assert.equal(payload.sections.filter(s=>s.id==='module_firebase').length,1);assert.equal(payload.items.filter(i=>i.cond==='hasFirebase').length,4);assert.equal(payload.items.find(i=>i.id==='module_firebase_config').state,'done');assert.equal(S.get(id).document,before.document);
+ const fixed=S.configureDocument(before.document,{hasFirebase:true}),twice=S.configureDocument(fixed,{hasFirebase:true});assert.equal(fixed,twice);assert.equal((fixed.match(/section:module_firebase/g)||[]).length,1);assert.match(fixed,/\[x\] 自定义核对文字/);
+ const py=execFileSync(process.env.PYTHON||'python3',['-c',"import checklist_tool as c,sys;print(c.configure_document_features(sys.argv[1],{'hasFirebase':True}),end='')",before.document],{encoding:'utf8'});assert.equal(py,fixed);
+ context.location.search='?id='+id;context.window.fetch=async()=>{};S.install();const response=await context.window.fetch('/api/write',{method:'POST',body:JSON.stringify({revision:'1',states:{[module.items[2][0]]:'done'}})});assert.equal(response.status,200);assert.equal(S.parse(S.get(id).document).items.find(i=>i.id===module.items[2][0]).state,'done');assert.equal(S.get(id).review.items.module_firebase_config.notes,'原有依据');
+});
+
+test('Unknown feature states preserve checks and block readiness until explicitly confirmed, with Python parity',()=>{
+ const {S,context}=setup(),original='# App\n## Checks\n- [x] Done\n',document=S.configureDocument(original,{hasFirebase:true},{hasFirebase:'unknown'});assert.equal(S.parse(document).features.hasFirebase,true);assert.equal(S.parse(document).featureStates.hasFirebase,'unknown');assert.ok(!S.parse(document).preamble.some(b=>String(b.text).includes('FEATURE_STATES')));
+ const snapshot={features:{hasFirebase:true},featureStates:{hasFirebase:'unknown'},items:[{id:'ok',text:'Done',state:'done'}],release:{}};assert.ok(context.window.ReleaseReadiness.assess(snapshot).issues.some(i=>i.id==='__features'));
+ const off=S.configureDocument(document,{hasFirebase:false},{hasFirebase:'off'});assert.equal(S.parse(off).features.hasFirebase,false);assert.equal(S.parse(off).featureStates.hasFirebase,'off');
+ const py=execFileSync(process.env.PYTHON||'python3',['-c',"import checklist_tool as c,sys;print(c.configure_document_features(sys.argv[1],{'hasFirebase':True},{'hasFirebase':'unknown'}),end='')",original],{encoding:'utf8'});assert.equal(py,document);assert.throws(()=>S.configureDocument(original,{},{hasFirebase:'maybe'}),/状态无效/);
+});
+
+test('Queued requests snapshot mutable input and review patches retain unrelated concurrent changes',async()=>{
+ const requests=[],context=vm.createContext({Promise,JSON,setTimeout:fn=>fn(),Response,Date});vm.runInContext('let baseRevision="1",savingOperations=0,saveFailure="",lastSavedAt,saveConflict=false;function updateSaveStatus(){}function saveState(){};const window={};',context);
+ let release;context.boardFetch=async(path,opt)=>{const body=JSON.parse(opt.body);requests.push(body);if(requests.length===1)await new Promise(resolve=>release=resolve);return new Response(JSON.stringify({revision:String(requests.length+1)}),{status:200});};vm.runInContext(fs.readFileSync('board/persistence.js','utf8'),context);
+ const first=vm.runInContext("api('/api/write',{states:{a:'done'}})",context);await new Promise(resolve=>setTimeout(resolve,0));context.mutable={reviewPatch:{items:{a:{notes:'original'}}}};const next=vm.runInContext("api('/api/review',mutable)",context);context.mutable.reviewPatch.items.a.notes='mutated later';release();await first;await next;assert.equal(requests[1].reviewPatch.items.a.notes,'original');assert.equal(requests[1].revision,'2');
+ const {S,context:ctx}=setup(),R=ctx.window.ReleaseReadiness,id=await S.create({name:'Patch',document:'# App\n## Checks\n- [ ] One <!-- task:one -->\n'}),before=JSON.parse(JSON.stringify(S.get(id).review)),after=JSON.parse(JSON.stringify(before));after.items.one={notes:'new note'};const patch=R.reviewDiff(before,after);await S.mutate(id,1,'other save',p=>{p.review.permissionReviews={camera:{zh:{state:'verified',text:'purpose',source:'source:1',checkedAt:'2026-11-04T00:00:00Z'}}};});ctx.location.search='?id='+id;ctx.window.fetch=async()=>{};S.install();const response=await ctx.window.fetch('/api/review',{method:'POST',body:JSON.stringify({revision:'2',review:after,reviewPatch:patch})});assert.equal(response.status,200);assert.equal(S.get(id).review.permissionReviews.camera.zh.source,'source:1');assert.equal(S.get(id).review.items.one.notes,'new note');
+});
+
+test('Structured SDK/event rows and permission verification are checked independently of legacy text',()=>{
+ const {context}=setup(),R=context.window.ReleaseReadiness,release={platform:'iOS / Android',environment:'production',adjustAppToken:'legacy'},features={hasAdjust:true},items=[{id:'ok',text:'Done',state:'done'}];
+ const snapshot={release,features,items,integrations:[{id:'i',provider:'Adjust',platform:'ios',environment:'production',key:'appToken',value:'ios-token',source:'ios/config:1',verification:'verified'}]};assert.ok(R.assess(snapshot).issues.some(i=>i.id==='__integrations'&&i.text.includes('android')));snapshot.integrations.push({id:'a',provider:'Adjust',platform:'android',environment:'production',key:'appToken',value:'android-token',source:'android/config:1',verification:'verified'});assert.equal(R.assess(snapshot).issues.some(i=>i.id==='__integrations'),false);snapshot.integrations.push({...snapshot.integrations[0],id:'duplicate'});assert.ok(R.assess(snapshot).issues.some(i=>i.reason==='存在重复配置'));
+ const permission={items,selectedPermissions:['camera'],permissionTexts:{camera:{zh:'current'}},permissionReviews:{camera:{zh:{state:'verified',text:'old',source:'test:1',checkedAt:'2026-11-04T00:00:00Z'}}}};assert.ok(R.assess(permission).issues.some(i=>i.id==='__permissions'));permission.permissionReviews.camera.zh.text='current';assert.equal(R.assess(permission).issues.some(i=>i.id==='__permissions'),false);
+ const snapshots=[snapshot,permission,{...snapshot,features:{hasSubscriptions:true,hasAdjust:true},subscriptionEvents:[{id:'event',kind:'purchase_success',target:'Adjust',event:'revenue',trigger:'buy:10',source:'buy:10',dedup:'transactionId',verification:'verified'}]}];const expected=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',"import json,sys;from release_policy import assess;print(json.dumps([assess(s,'2026-11-04T01:00:00Z') for s in json.loads(sys.argv[1])],ensure_ascii=False))",JSON.stringify(snapshots)],{encoding:'utf8'}));assert.deepEqual(JSON.parse(JSON.stringify(snapshots.map(s=>R.assess(s,'2026-11-04T01:00:00Z')))),expected);
 });

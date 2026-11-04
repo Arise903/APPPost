@@ -44,7 +44,7 @@ def configuration_lines(payload):
     features = payload.get('features', {})
     names = {p['id']: p['name'] for p in checklist.load_profiles()['permissions']}
     selected = payload.get('permSelected', [])
-    enabled = [label for key, label in [('hasAccountSystem', '账号系统'), ('hasAdjust', 'Adjust 广告归因'), ('hasAnalysisApi', 'AnalysisApi 自有统计'), ('hasPush', '推送'), ('hasFeedbackSystem', '反馈系统'), ('targetMinors', '面向未成年用户'), ('hasInitialization', '初始化流程核对')] if features.get(key) is True]
+    enabled = [label for key, label in [('hasAccountSystem', '账号系统'), ('hasAdjust', 'Adjust 广告归因'), ('hasAnalysisApi', 'AnalysisApi 自有统计'), ('hasFirebase', 'Firebase'), ('hasSubscriptionEvents', '订阅事件统计（自动必检）'), ('hasPush', '推送'), ('hasFeedbackSystem', '反馈系统'), ('targetMinors', '面向未成年用户'), ('hasInitialization', '初始化流程核对')] if features.get(key) is True]
     return ['平台：' + (payload['review'].get('release', {}).get('platform') or '未指定'),
             '订阅商品：' + ('已启用' if features.get('hasSubscriptions') else '未启用'),
             '功能：' + ('、'.join(enabled) or '未启用附加功能'),
@@ -303,7 +303,9 @@ def create_app(overrides=None):
             if not isinstance(setup, dict) or data.get('document') is not None or setup.get('platform') not in ('iOS', 'Android', 'iOS / Android'):
                 abort(400, '新建项目配置无效')
             features = setup.get('features')
-            keys = ('hasAccountSystem', 'hasSubscriptions', 'hasPush', 'hasFeedbackSystem', 'targetMinors', 'hasAdjust', 'hasAnalysisApi')
+            if isinstance(features, dict):
+                features = {**features, 'hasFirebase': features.get('hasFirebase', False)}
+            keys = ('hasFirebase', 'hasAccountSystem', 'hasSubscriptions', 'hasPush', 'hasFeedbackSystem', 'targetMinors', 'hasAdjust', 'hasAnalysisApi')
             if not isinstance(features, dict) or any(type(features.get(key)) is not bool for key in keys):
                 abort(400, '项目特征无效')
             document = checklist.configure_document_features(document, features)
@@ -445,7 +447,7 @@ def create_app(overrides=None):
                 validate_review(review)
                 features = checklist.parse_md(project['document'])['features']
                 features['hasSubscriptions'] = data['enabled']
-                project['document'] = checklist.configure_document_features(project['document'], features)
+                project['document'] = checklist.configure_document_features(project['document'], features, {'hasSubscriptions':data['featureState']} if data.get('featureState') else None)
                 project['review'] = encode(review)
             elif operation == 'features':
                 features = data.get('features')
@@ -455,11 +457,12 @@ def create_app(overrides=None):
                 features = {**checklist.parse_md(project['document'])['features'], **features}
                 if any(type(features.get(key)) is not bool for key in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush', 'hasAdjust', 'hasAnalysisApi')):
                     abort(400, '项目特征无效')
-                project['document'] = checklist.configure_document_features(project['document'], features)
+                project['document'] = checklist.configure_document_features(project['document'], features, data.get('featureStates'))
             elif operation == 'review':
-                validate_review(data.get('review'))
-                review = dict(data['review'])
                 previous = json.loads(project['review'])
+                review = __import__('release_policy').merge_review(previous, data['reviewPatch']) if 'reviewPatch' in data else data.get('review')
+                validate_review(review)
+                review = dict(review)
                 if 'guideAcknowledged' in previous:
                     review['guideAcknowledged'] = previous['guideAcknowledged']
                 project['review'] = encode(review)
@@ -472,6 +475,11 @@ def create_app(overrides=None):
                     extra['appendix'] = checklist.write_appendix(path, permissions['selected'], permissions['descs'], permissions['descsEn'])
                     project['document'] = path.read_text(encoding='utf-8')
                 project['permissions'] = encode(permissions)
+                if 'reviews' in data:
+                    review = json.loads(project['review'])
+                    review['permissionReviews'] = data['reviews']
+                    validate_review(review)
+                    project['review'] = encode(review)
             elif operation == 'new-release':
                 if not project_payload(project)['gateDone']:
                     abort(403, '请先阅读并确认使用说明')
@@ -480,7 +488,7 @@ def create_app(overrides=None):
                     abort(400, '请填写新版本号和保留选项')
                 review = json.loads(project['review'])
                 before = project_payload(project)
-                review.setdefault('history', []).append({'preflight': review.get('preflight'), 'evidenceFiles': review.get('evidenceFiles', {}), 'subscriptions': review.get('subscriptions', []), 'release': review.get('release', {}), 'date': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'features': before['features'], 'permissions': json.loads(project['permissions']), 'items': [{**review.get('items', {}).get(item['id'], {}), **item, 'applicable': before['features'].get(item.get('cond'), True) and checklist.permission_visibility.visible(item.get('permissionRule'), json.loads(project['permissions'])['selected'], checklist.load_profiles()) and checklist.permission_visibility.platform_visible(item, review.get('release', {}).get('platform'))} for item in before['items'] if not item['gate']]})
+                review.setdefault('history', []).append({'preflight': review.get('preflight'), 'evidenceFiles': review.get('evidenceFiles', {}), 'subscriptions': review.get('subscriptions', []), 'release': review.get('release', {}), 'date': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'features': before['features'], 'featureStates': before.get('featureStates', {}), 'integrations':review.get('integrations', []),'subscriptionEvents':review.get('subscriptionEvents', []),'permissionReviews':review.get('permissionReviews', {}), 'permissionTexts':__import__('release_policy').permission_texts(checklist.load_profiles(), json.loads(project['permissions'])), 'permissions': json.loads(project['permissions']), 'items': [{**review.get('items', {}).get(item['id'], {}), **item, 'applicable': before['features'].get(item.get('cond'), True) and checklist.permission_visibility.visible(item.get('permissionRule'), json.loads(project['permissions'])['selected'], checklist.load_profiles()) and checklist.permission_visibility.platform_visible(item, review.get('release', {}).get('platform'))} for item in before['items'] if not item['gate']]})
                 review['history'][-1]['readiness'] = assess_release(review['history'][-1])
                 parsed = checklist.parse_md(project['document'])
                 gate = checklist.find_gate_item(parsed)

@@ -1,3 +1,4 @@
+const unlockVault=require('./vault-test-helper.cjs');
 /* Real DOM regression: visibility must remain correct on initial load and every rebuild. */
 const assert=require('node:assert/strict');
 const http=require('node:http');
@@ -22,7 +23,7 @@ const server=http.createServer((req,res)=>{
   browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{})});
   const page=await browser.newPage({viewport:{width:820,height:900}}),errors=[];page.on('pageerror',error=>errors.push(error.message));page.on('dialog',async dialog=>{if(dialog.type()!=='prompt')return;try{dialog.accept(await page.evaluate(()=>window.ReleaseVault.secret()));}catch(_){try{dialog.dismiss();}catch(_){}}});
   async function openCommand(selector){const control=page.locator(selector),id=await control.evaluate(el=>el.closest('details.board-menu')?.id);if(id&&!await page.locator('#'+id).evaluate(el=>el.open))await page.locator('#'+id+' > summary').click();}
-  await page.goto(url);await page.waitForFunction(()=>document.getElementById('projectCount').textContent==='0');
+  await page.goto(url);await unlockVault(page);await page.waitForFunction(()=>document.getElementById('projectCount').textContent==='0');
   const id=await page.evaluate(()=>PagesStore.create({requireGuideConfirmation:false,name:'检查项排版验证',document:ReleaseTemplates.find(t=>t.id==='base').document,review:{guideAcknowledged:'on',release:{platform:'iOS / Android'},items:{base_test:{required:'on',evidenceRequired:'on'}},history:[]}}));
   await page.goto(url+'board.html?id='+id);await page.waitForFunction(()=>typeof online!=='undefined'&&online);
   const proof=page.locator('li.item[data-id="base_test"]');assert.equal(await page.locator('.item-evidence-summary').count(),0,'只有要求设置的条目不应生成空备注区');

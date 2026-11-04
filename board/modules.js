@@ -14,14 +14,17 @@ function stateDiff(state, baseline){
 }
 function ensureFeatureModules(){
  DATA.features.hasInitialization=!!(DATA.features.hasAdjust||DATA.features.hasAnalysisApi);
+ DATA.features.hasSubscriptionEvents=!!(DATA.features.hasSubscriptions&&(DATA.features.hasAdjust||DATA.features.hasFirebase||DATA.features.hasAnalysisApi));
+ DATA.features.hasPermissions=!!DATA.permSelected?.length;
  const ids=new Set((DATA.sections||[]).flatMap(s=>s.blocks||[]).filter(b=>b.type==='item').map(b=>b.id));
  for(const module of OPTIONAL_MODULES){
   if(DATA.features[module.feature]===undefined)DATA.features[module.feature]=[module.legacyTaskId,...module.items.map(item=>item[0])].some(id=>ids.has(id));
-  if(!DATA.features[module.feature]||[module.legacyTaskId,...module.items.map(item=>item[0])].some(id=>ids.has(id)))continue;
-  // 导入或旧模板的清单可能已用自己的条目实现了同一模块；有同名章节就不再重复注入，
-  // 否则同一节会出现两次，改动会落在文件里根本不存在的那一份上。
-  if((DATA.sections||[]).some(section=>section.id==='module_'+module.id||String(section.title||'').trim()===module.title))continue;
-  DATA.sections.push({id:'module_'+module.id,title:module.title,blocks:module.items.map(([id,text,condition])=>({type:'item',id,text,level:0,state:st(id),checked:st(id)==='done',cond:condition||module.feature}))});
+  const missing=DATA.features[module.feature]?ReleaseReadiness.missingModuleItems(module,ids):[];
+  if(!missing.length)continue;
+  let section=DATA.sections.find(section=>section.id==='module_'+module.id||String(section.title||'').trim()===module.title);
+  if(!section){section={id:'module_'+module.id,title:module.title,blocks:[]};DATA.sections.push(section);}
+  section.blocks.push(...missing.map(([id,text,condition])=>({type:'item',id,text,level:0,state:st(id),checked:st(id)==='done',cond:condition||module.feature})));
+  missing.forEach(item=>ids.add(item[0]));
  }
 }
 

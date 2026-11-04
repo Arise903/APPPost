@@ -19,7 +19,7 @@ function boardFetch(path, options){
  * ------------------------------------------------------------------ */
 let saveConflict=false;
 let savingOperations=0, saveFailure="", localDraftFailure="", lastSavedAt=EMBEDDED.updatedAt||null;
-function featureHasChanges(){return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush','hasAdjust','hasAnalysisApi','hasFirebase'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
+function featureHasChanges(){if(typeof featureStateSnapshot!=='undefined'&&featureStateSnapshot&&JSON.stringify(featureStateSnapshot)!==JSON.stringify(DATA.featureStates))return true;return typeof featureSnapshot!=="undefined" && featureSnapshot && ['hasAccountSystem','targetMinors','hasFeedbackSystem','hasSubscriptions','hasPush','hasAdjust','hasAnalysisApi','hasFirebase'].some(key=>!!featureSnapshot[key]!==!!DATA.features[key]);}
 function updateSaveStatus(){
  const el=document.getElementById("saveStatus");if(!el)return;
  if(historyView){
@@ -808,6 +808,7 @@ function mergeItems(d){
     permDescs:d.permDescs||em?.permDescs||{},permDescsEn:d.permDescsEn||em?.permDescsEn||{},
     assetIds:d.assetIds||em?.assetIds||[],
     permSelected: Array.isArray(d.permSelected) ? d.permSelected : ((em && em.permSelected) || []),
+    featureStates:d.featureStates||em?.featureStates||{},
     features: d.features || (em && em.features) || {hasAccountSystem:true, targetMinors:true}
   };
   const secSrc = d.sections && d.sections.length ? d.sections : ((em && em.sections) || []);
@@ -1204,3 +1205,5 @@ loadFromServer().then(ok => {
 installBoardExperience();
 
 // @include board/productivity.js
+
+// @include board/structured.js

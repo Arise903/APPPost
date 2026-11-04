@@ -21,6 +21,7 @@
   python3 checklist_tool.py serve --port 8899 --no-browser
 """
 
+from release_policy import missing_module_items
 from storage_utils import atomic_write, revision, load_review, save_review
 import copy
 import functools
@@ -133,40 +134,58 @@ def _module_section_text(module) -> str:
     return text
 
 
-def ensure_module_sections(text: str, ids) -> str:
-    """Append an optional module section when its items are written but missing.
+def append_module_items(text, module, items):
+    if not items:
+        return text
+    lines = text.split('\n')
+    heading = next((i for i, line in enumerate(lines) if re.match(r'^##\s+', line) and ('section:module_' + module['id'] + ' -->' in line or re.sub(r'\s*<!--.*?-->\s*$', '', line[3:]).strip() == module['title'])), None)
+    body = '\n'.join('- [ ] ' + item[1] + ' <!-- if:' + (item[2] if len(item) > 2 else module['feature']) + ' --> <!-- task:' + item[0] + ' -->' for item in items)
+    if heading is None:
+        return text.rstrip() + '\n\n' + _module_section_text({**module, 'items': items})
+    end = next((i for i in range(heading + 1, len(lines)) if re.match(r'^##\s+', lines[i])), len(lines))
+    lines[end:end] = [body, '']
+    return '\n'.join(lines)
 
-    The board renders optional modules client-side, so a project created from an
-    older template can show rows that its file does not contain yet. Saving those
-    rows used to be rejected; materialise the section first instead.
-    """
+
+def ensure_module_sections(text: str, ids) -> str:
     wanted = set(ids or ())
-    if not wanted:
-        return text
     known = {item['id'] for item in parse_md(text)['items']}
-    if wanted <= known:
-        return text
     for module in load_checklist_modules():
-        module_ids = [item[0] for item in module['items']]
-        if not any(item_id in wanted and item_id not in known for item_id in module_ids):
-            continue
-        if any(item_id in known for item_id in module_ids):
-            continue
-        text = text.rstrip() + '\n\n' + _module_section_text(module)
+        if any(item[0] in wanted and item[0] not in known for item in module['items']):
+            text = append_module_items(text, module, missing_module_items(module, known))
+            known = {item['id'] for item in parse_md(text)['items']}
     return text
 
 
-def configure_document_features(text, features):
-    current = parse_md(text)['features']
+def configure_document_features(text, features, feature_states=None):
+    parsed = parse_md(text)
+    current = parsed['features']
+    states = dict(parsed.get('featureStates', {}))
     current.setdefault('hasFirebase', False)
     current.update(features)
+    if isinstance(feature_states, dict):
+        for key, value in feature_states.items():
+            current[key] = value != 'off'
     current['hasInitialization'] = current['hasAdjust'] or current['hasAnalysisApi']
+    current['hasSubscriptionEvents'] = bool(current.get('hasSubscriptions') and any(current.get(k) for k in ('hasAdjust', 'hasFirebase', 'hasAnalysisApi')))
     for module in load_checklist_modules():
-        if current.get(module['feature']) and not any(('task:' + task_id) in text for task_id in [module['legacyTaskId'], *[item[0] for item in module['items']]]):
-            text = text.rstrip() + '\n\n' + _module_section_text(module)
+        if current.get(module['feature']):
+            text = append_module_items(text, module, missing_module_items(module, {item['id'] for item in parse_md(text)['items']}))
     keys = ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush', 'hasAdjust', 'hasAnalysisApi', 'hasFirebase')
     if any(type(current.get(k)) is not bool for k in keys):
         raise ValueError('项目特征无效')
+    if feature_states is not None:
+        if not isinstance(feature_states, dict) or any(key not in keys or value not in ('on', 'off', 'unknown') for key, value in feature_states.items()):
+            raise ValueError('功能确认状态无效')
+        states.update(feature_states)
+    for key in keys:
+        if feature_states is not None and key in feature_states:
+            current[key] = states[key] != 'off'
+        elif current[key] != (states.get(key) != 'off') or key not in states:
+            states[key] = 'on' if current[key] else 'off'
+    states = {key: states[key] for key in keys}
+    state_line = '<!-- FEATURE_STATES ' + json.dumps(states, ensure_ascii=False, separators=(',', ':')) + ' -->'
+    text = re.sub(r'<!--\s*FEATURE_STATES\s+.*?-->', lambda _: state_line, text, flags=re.DOTALL) if re.search(r'<!--\s*FEATURE_STATES\s+', text) else state_line + '\n' + text
     line = '<!-- FEATURES ' + ' '.join(k + '=' + str(int(current[k])) for k in keys) + ' -->'
     return RE_FEATURES.sub(line, text) if RE_FEATURES.search(text) else line + '\n' + text
 
@@ -191,13 +210,22 @@ def _parse_md(text: str) -> dict:
 
     # 项目特征（决定哪些条目显示）
     features = {"hasFirebase": False, "hasAccountSystem": True, "targetMinors": True, "hasFeedbackSystem": False, "hasSubscriptions": True, "hasPush": False}
-    features.update({module['feature']: any(('task:' + task_id) in text for task_id in [module['legacyTaskId'], *[item[0] for item in module['items']]]) for module in load_checklist_modules()})
+    features.update({module['feature']: any(('task:' + task_id) in text for task_id in [module['legacyTaskId'], *[item[0] for item in module['items']]]) or bool(module.get('headingPattern') and re.search(module['headingPattern'], text, re.MULTILINE)) for module in load_checklist_modules()})
     fm = RE_FEATURES.search(text)
     if fm:
         for k, v in RE_FEATURE_KV.findall(fm.group(1)):
             features[k] = (v == "1")
 
+    feature_states = {key: 'on' if value else 'off' for key, value in features.items() if key in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush', 'hasAdjust', 'hasAnalysisApi', 'hasFirebase')}
+    sm = re.search(r'<!--\s*FEATURE_STATES\s+([\s\S]*?)-->', text)
+    if sm:
+        explicit = json.loads(sm.group(1))
+        if not isinstance(explicit, dict) or any(key not in ('hasAccountSystem', 'targetMinors', 'hasFeedbackSystem', 'hasSubscriptions', 'hasPush', 'hasAdjust', 'hasAnalysisApi', 'hasFirebase') or value not in ('on', 'off', 'unknown') for key, value in explicit.items()):
+            raise ValueError('功能确认状态无效')
+        feature_states.update(explicit)
+        features.update({key: value != 'off' for key, value in explicit.items()})
     features['hasInitialization'] = features['hasAdjust'] or features['hasAnalysisApi']
+    features['hasSubscriptionEvents'] = bool(features.get('hasSubscriptions') and any(features.get(k) for k in ('hasAdjust', 'hasFirebase', 'hasAnalysisApi')))
 
     in_fence = False
     fence_lang = ""
@@ -231,6 +259,9 @@ def _parse_md(text: str) -> dict:
             i += 1
             continue
 
+        if stripped.startswith("<!-- FEATURE_STATES "):
+            i += 1
+            continue
         if not stripped:
             i += 1
             continue
@@ -390,7 +421,7 @@ def _parse_md(text: str) -> dict:
         "preamble": preamble,
         "sections": sections,
         "items": items,
-        "features": features,
+        "features": features, "featureStates": feature_states,
     }
 
 
@@ -558,6 +589,9 @@ def generate_config(profiles: dict, selected: list, descs: dict, descs_en: dict 
         if not ptext and lang == "en":
             ptext = p.get("policy_text")
         if ptext:
+            custom = (descs_en if lang == 'en' else descs).get(pid, '').strip()
+            if custom:
+                ptext += (' Project-specific purpose: ' if lang == 'en' else ' 项目特殊用途：') + custom
             policy.append(f"- **{pname}**：{ptext}")
 
         # --- 审核注意事项（按语言切换） ---
@@ -740,7 +774,7 @@ def recover_subscription_settings(md_path):
     journal.unlink()
 
 
-def save_subscription_settings(md_path, enabled, products):
+def save_subscription_settings(md_path, enabled, products, feature_state=None):
     from storage_utils import review_path
     if type(enabled) is not bool or not isinstance(products, list) or len(products) > 100 or any(not isinstance(p, dict) or any(not isinstance(v, str) or len(v) > 4000 for v in p.values()) for p in products):
         raise ValueError('订阅设置无效')
@@ -753,7 +787,10 @@ def save_subscription_settings(md_path, enabled, products):
         features['hasSubscriptions'] = enabled
         next_review = load_review(md_path)
         next_review['subscriptions'] = products
-        write_features(md_path, features)
+        if feature_state:
+            atomic_write(md_path, configure_document_features(md_path.read_text(encoding='utf-8'), features, {'hasSubscriptions': feature_state}))
+        else:
+            write_features(md_path, features)
         save_review(md_path, next_review)
         journal.unlink()
     except Exception:
@@ -1855,6 +1892,19 @@ def document_payload(text, md_name, generation, permissions, review, version):
     """Pure payload construction shared by local files and cloud database records."""
     parsed = parse_md(text)
     perm_sel, perm_descs, perm_descs_en = permissions
+    parsed['features']['hasPermissions'] = bool(perm_sel)
+    known = {item['id'] for item in parsed['items']}
+    for module in load_checklist_modules():
+        missing = missing_module_items(module, known) if parsed['features'].get(module['feature']) else []
+        if missing:
+            extra = parse_md(_module_section_text({**module, 'items': missing}))
+            target = next((section for section in parsed['sections'] if section['id'] == 'module_' + module['id'] or section['title'] == module['title']), None)
+            if target is not None:
+                target['blocks'].extend(extra['sections'][0]['blocks'])
+            else:
+                parsed['sections'].extend(extra['sections'])
+            parsed['items'].extend(extra['items'])
+            known.update(item['id'] for item in extra['items'])
     permission_visibility.annotate(parsed["sections"])
     permission_profiles = load_profiles()
 
@@ -1938,7 +1988,7 @@ def document_payload(text, md_name, generation, permissions, review, version):
         "gateDone": (gate["state"] == "done" if gate else review.get("guideAcknowledged") == "on"),
         # todo=从未确认（允许从本机补写） / skip=明确取消过（不复活）
         "gateState": (gate["state"] if gate else "done" if review.get("guideAcknowledged") == "on" else "skip" if review.get("guideAcknowledged") == "off" else "todo"),
-        "features": feats,
+        "features": feats, "featureStates": parsed.get("featureStates", {}),
     }
 
 
@@ -2108,7 +2158,9 @@ def make_handler():
 
         def _op_review(self, payload):
             self._require_revision(payload)
-            save_review(self.server.md_path, payload.get("review"))
+            current = load_review(self.server.md_path)
+            review = __import__('release_policy').merge_review(current, payload['reviewPatch']) if 'reviewPatch' in payload else payload.get('review')
+            save_review(self.server.md_path, review)
             return 200, _board_payload(self.server.md_path)
         def _op_write(self, payload):
             md_path = self.server.md_path
@@ -2148,13 +2200,23 @@ def make_handler():
         def _op_subscriptions(self, payload):
             md_path = self.server.md_path
             self._require_revision(payload)
-            save_subscription_settings(md_path, payload.get("enabled"), payload.get("products"))
+            save_subscription_settings(md_path, payload.get("enabled"), payload.get("products"), payload.get("featureState"))
             return 200, _board_payload(md_path)
 
         def _op_features(self, payload):
             md_path = self.server.md_path
             self._require_revision(payload)
-            changed = write_features(md_path, payload.get("features") or {})
+            features = payload.get("features") or {}
+            states = payload.get('featureStates')
+            if states is None:
+                changed = write_features(md_path, features)
+            else:
+                original = md_path.read_text(encoding='utf-8')
+                next_text = configure_document_features(original, features, states)
+                changed = original != next_text
+                if changed:
+                    backup_md(md_path)
+                    atomic_write(md_path, next_text)
             out = _board_payload(md_path)
             out["changed"] = changed
             return 200, out
@@ -2187,7 +2249,23 @@ def make_handler():
             md_path = self.server.md_path
             self._require_revision(payload)
             backup_md(md_path)
-            appendix = write_appendix(md_path, payload.get("selected") or [], payload.get("descs") or {}, payload.get("descsEn") or {})
+            from storage_utils import review_path
+            targets = (md_path, perm_state_file(md_path), review_path(md_path))
+            originals = {target: target.read_text(encoding='utf-8') if target.exists() else None for target in targets}
+            try:
+                if 'reviews' in payload:
+                    review = load_review(md_path)
+                    review['permissionReviews'] = payload['reviews']
+                    __import__('release_policy').validate_review_record(review)
+                    save_review(md_path, review)
+                appendix = write_appendix(md_path, payload.get("selected") or [], payload.get("descs") or {}, payload.get("descsEn") or {})
+            except Exception:
+                for target, original in originals.items():
+                    if original is None:
+                        target.unlink(missing_ok=True)
+                    else:
+                        atomic_write(target, original)
+                raise
             self._rebuild_quietly(md_path)
             out = _board_payload(md_path)
             out["appendix"] = appendix

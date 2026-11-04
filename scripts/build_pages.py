@@ -32,7 +32,7 @@ def build():
         if path.is_file(): digest.update(path.read_bytes())
     version=digest.hexdigest()[:12]
     template_version=hashlib.sha256((ROOT/'online/default_checklist.md').read_bytes()).hexdigest()[:10]
-    for name in ('index.html','dashboard.js','store.js','vault.js','vault-ui.js','github-sync.js','guide.html','guide.js','experience.js','history.js','history.css','enhancements.css','storage.js','bootstrap.js','templates.js','workflows.js','workflows.css','project-import.js'):
+    for name in ('index.html','dashboard.js','store.js','vault.js','vault-ui.js','github-sync.js','guide.html','guide.js','experience.js','history.js','history.css','enhancements.css','storage.js','bootstrap.js','templates.js','workflows.js','workflows.css','project-import.js','import-preview.js'):
         shutil.copyfile(ROOT/'pages'/name,OUT/name)
     shutil.copyfile(ROOT/'online/static/app.css',OUT/'app.css')
     shutil.copyfile(ROOT/'permission_visibility.js',OUT/'permission_visibility.js')
@@ -49,7 +49,7 @@ def build():
     page=page.replace('__PERMISSION_RULES__',(ROOT/'permission_rules.json').read_text(encoding='utf-8')).replace('__PERMISSION_VISIBILITY__',(ROOT/'permission_visibility.js').read_text(encoding='utf-8')).replace('__BOARD_CSS__',(ROOT/'board.css').read_text(encoding='utf-8')).replace('__BOARD_JS__',js)
     page=page.replace('const EMBEDDED = __DATA__;','const EMBEDDED = PagesStore.openProject();').replace('const EMBEDDED_PROFILES = __PROFILES__;','const EMBEDDED_PROFILES = PAGES_DATA.profiles;').replace('__TITLE__','检查项目 · Pages 个人版')
     page=page.replace('<script>\nconst PERMISSION_RULES', '<script type="text/plain" id="pagesBoardSource">\nconst PERMISSION_RULES').replace('</body>', '<script defer src="bootstrap.js"></script></body>')
-    page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="release_analysis.js"></script><script src="vault.js"></script><script src="storage.js"></script><script src="store.js"></script><script>PagesStore.install();</script><script defer src="vault-ui.js"></script><script defer src="experience.js"></script><link rel="stylesheet" href="history.css"><script defer src="history.js"></script><link rel="stylesheet" href="workflows.css"><script defer src="workflows.js"></script>')
+    page=page.replace('<head>','<head>\n<script src="data.js"></script><script src="release_analysis.js"></script><script src="release_readiness.js"></script><script src="vault.js"></script><script src="storage.js"></script><script src="store.js"></script><script>PagesStore.install();</script><script defer src="vault-ui.js"></script><script defer src="experience.js"></script><link rel="stylesheet" href="history.css"><script defer src="history.js"></script><link rel="stylesheet" href="workflows.css"><script defer src="workflows.js"></script>')
     page=page.replace('<body>','<body><nav class="workspace-topbar"><a href="index.html">← 我的项目</a><span id="pagesProjectName"></span><span class="workspace-local">本机工作台</span></nav>')
     page=page.replace('勾选状态保存在本机浏览器 · 需要写回文件请使用本地服务模式','所有记录保存在当前浏览器 · 换设备或清理网站数据前请导出完整 JSON')
     unresolved=re.findall(r'__[A-Z][A-Z_]+__',page)
