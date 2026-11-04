@@ -33,9 +33,17 @@ function prompt(data){
  const release=Object.fromEntries(data.configFields.map(f=>[f.key,'']));release.status='planning';release.strictValidation='on';
  const features=Object.fromEntries(['hasAccountSystem','hasSubscriptions','hasPush','hasFeedbackSystem','targetMinors','hasAdjust','hasAnalysisApi','hasFirebase'].map(key=>[key,true]));
  const example={format:FORMAT,release,integrations:[],subscriptionEvents:[],features,featureStates:Object.fromEntries(Object.keys(features).map(key=>[key,'unknown'])),permissions:{selected:[],descs:{},descsEn:{}},subscriptions:[]};
+ const featureNames={hasAccountSystem:'账号系统',hasSubscriptions:'订阅管理',hasPush:'推送',hasFeedbackSystem:'反馈系统',targetMinors:'面向未成年人',hasAdjust:'Adjust',hasAnalysisApi:'AnalysisApi 自有统计',hasFirebase:'Firebase'};
+ const featureLines=Object.entries(features).map(([key,value])=>'- '+featureNames[key]+'：待确认（保持必检）；完善度：待源码排查后按已验证/适用检查项计算').join('\n');
  return `# 已有工程接入 Release Desk：AI 采集说明
 
-请在当前工程根目录工作，读取实际源码及构建配置，生成可直接导入 Release Desk 的「已有工程上架清单.md」。这是采集与文档任务：只新建该 Markdown 文件，不修改业务代码或现有文件，不执行发布、上传或付费操作。
+## 当前项目功能配置与预期完善度
+
+${featureLines}
+
+请以源码证据修正每项状态，并输出已验证检查数/适用检查数、完善度百分比和缺口。未知状态必须标待核验，不得计为完成。
+
+请在当前工程根目录工作，读取实际源码及构建配置，生成可直接导入 Release Desk 的「已有工程上架清单.md」。这是采集与文档任务：只新建该 Markdown 文件，不修改业务代码或现有文件，不执行发布、上传或付费操作。最终 Markdown 须包含「功能现状与完善度」表，逐功能列出使用状态、源码证据、已覆盖检查数/适用检查数、完善百分比及尚缺事项；只有源码证据可核实的事项才计入已覆盖。再单列「必须完成的发布功能」，列出所有已启用的订阅、Adjust、Firebase、AnalysisApi、权限说明与配置，以及自动触发的订阅事件统计阻塞项。未知状态不得计为完成。
 
 ## 采集范围
 
