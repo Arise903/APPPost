@@ -23,3 +23,5 @@ online/**/__pycache__/
 !release_analysis.js
 
 !checklist_modules.json
+
+!release_config_fields.json
